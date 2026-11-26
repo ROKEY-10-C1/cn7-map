@@ -9,6 +9,7 @@ from random import Random
 from pxr import Gf, PhysxSchema, UsdPhysics
 
 from cell_config import CONFIG
+from sim_util import body, constrain, convex_prism, drive, mass_properties, pin, rotate
 from fitment import BOLT_CENTERS, FLANGE_RADIUS, OFFSET, PCD, PILOT, PILOT_LENGTH, STUD_DIAMETER, STUD_PROJECTION
 from physical_data import TIRE_MASS, annulus_inertia, box_inertia
 from process import CN7_R16, HUB_Z
@@ -18,12 +19,6 @@ STUD_CHAMFER = (.0020, .0015)    # dog point on the stud end
 HUB_MASS = 6.5       # hub, rotor hat and bearing inner race (estimated)
 KNUCKLE_MASS = 11.   # knuckle, caliper bracket, half of the control arm (estimated)
 HUB_CONTACT_OFFSET = .0008   # > 0.32 mm press travel per step at 76 mm/s, 240 Hz
-
-
-def _helpers():
-    # physics.py defines the shared USD helpers and imports this module lazily.
-    import physics
-    return physics
 
 
 def lock(joint, dofs):
@@ -61,8 +56,6 @@ class Tolerance:
 
 def chamfered_pin(stage, path, xy, z0, length, radius, chamfer, material):
     """Cylinder with a conical lead-in at its free end (+Z)."""
-    P = _helpers()
-    pin, convex_prism = P.pin, P.convex_prism
     tip, inset = chamfer
     pin(stage, path, xy, z0, length-tip, radius, material)
     points = [Gf.Vec3f(xy[0]+(rr)*cos(i*tau/24), xy[1]+(rr)*sin(i*tau/24), z)
@@ -77,9 +70,6 @@ def chamfered_pin(stage, path, xy, z0, length, radius, chamfer, material):
 
 def build_corner(stage, car_pose, root, name, axle, side, hub_y, steel, seed):
     """Knuckle on the suspension, hub on its bearing. Returns (hub body path, hub angle, tolerance)."""
-    P = _helpers()
-    body, constrain, drive, mass_properties, pin, rotate = (P.body, P.constrain, P.drive,
-                                                            P.mass_properties, P.pin, P.rotate)
     rng = Random(f"{seed}-{name}-corner")
     hub_cfg, susp = CONFIG["hub"], CONFIG["suspension"]
     angle = rng.uniform(0., 72.)          # the stopped car parks its hubs at any angle
@@ -136,8 +126,6 @@ def ring_tire(stage, wheel_path, ring_path, position, orientation, materials, tr
     The rim body keeps the full wheel visual and the mounting-face colliders; the ring carries
     the tread colliders, so grippers and rollers act through the tire's own compliance.
     """
-    P = _helpers()
-    body, constrain, drive, mass_properties = P.body, P.constrain, P.drive, P.mass_properties
     cfg = CONFIG["tire"]
     ring = body(stage, ring_path, position, orientation, TIRE_MASS)
     mass_properties(ring, (0., 0., 0.), annulus_inertia(TIRE_MASS, CN7_R16.inner, CN7_R16.radius, CN7_R16.width))
