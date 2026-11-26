@@ -7,6 +7,10 @@ choongman/
 # 관제 작업 폴더 — 커밋하지 않음
 control_center/
 
+# direnv (개인 PC 환경) — 커밋하지 않음
+.envrc
+.direnv/
+
 # Python
 __pycache__/
 *.pyc
