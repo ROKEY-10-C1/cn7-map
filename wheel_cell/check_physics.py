@@ -1,4 +1,4 @@
-"""Exercise live contact, drive tracking and USD pose write-back on CPU."""
+"""Check the live cell on CPU: supply, pick zone, AMR docking, hub/wheel contact, pose write-back."""
 
 import argparse
 import json
@@ -8,6 +8,11 @@ from pathlib import Path
 import sys
 
 import omni.kit.app
+
+# --config must be in the environment before the live modules read their parameters.
+for _i, _arg in enumerate(sys.argv[:-1]):
+    if _arg == "--config":
+        os.environ["CELL_CONFIG"] = str(Path(sys.argv[_i+1]).resolve())
 from pxr import Gf, PhysicsSchemaTools, Usd, UsdGeom, UsdPhysics
 
 sys.dont_write_bytecode = True
@@ -15,9 +20,21 @@ root = Path(__file__).resolve().parent
 sys.path.insert(0, str(root))
 
 from physical_data import AMR_LIFT_SPEED, AMR_SPEED_X, AMR_SPEED_Y, WHEEL_MASS
-from physics import Cell, DOCK_READY, HZ, MIN_RAIL_SPACING, REAR_SEAT, ROOT, SOURCE_POSE, STATIONS
-from physics import constrain, pose, qfloat, quaternion, reference, rotate
+from physics import Cell, DOCK_READY, HZ, MIN_RAIL_SPACING, ROOT, STATIONS
+from physics import constrain, drive, reference
 from process import AMR_GATE_X, BELT_Z, LINE_Y
+
+
+def count_colliders(stage):
+    counts={}
+    for prim in Usd.PrimRange(stage.GetPrimAtPath(ROOT)):
+        if prim.HasAPI(UsdPhysics.CollisionAPI):
+            path=str(prim.GetPath())[len(ROOT)+1:]
+            key=path.split("/")[0]
+            key="wheel" if "/Wheel/" in path else "robot" if key.startswith(("Left","Right")) else key
+            counts[key]=counts.get(key,0)+1
+    counts["total"]=sum(counts.values())
+    return counts
 
 
 def check_actors(stage, robots, exported=False):
@@ -36,7 +53,9 @@ def check_actors(stage, robots, exported=False):
         return False
     for path in wheels:
         props=UsdPhysics.MassAPI(stage.GetPrimAtPath(path))
-        if abs(props.GetMassAttr().Get()-WHEEL_MASS)>.001 or min(props.GetDiagonalInertiaAttr().Get())<=0.:
+        tire=stage.GetPrimAtPath(path.rsplit("/",1)[0]+"/Tire")   # ring tire model carries the tread
+        mass=props.GetMassAttr().Get()+(UsdPhysics.MassAPI(tire).GetMassAttr().Get() if tire else 0.)
+        if abs(mass-WHEEL_MASS)>.001 or min(props.GetDiagonalInertiaAttr().Get())<=0.:
             return False
     if any(prim.GetName()=="TipGrip" for prim in live):
         return False
@@ -56,9 +75,12 @@ def check_supply(stage,seed,side):
     cell=Cell(stage,seed,robots=False,branch_side=side)
     test_path=ROOT+"/IncomingWheel"
     try:
+        # A second tire from the truck infeed: rim and tread ring, held together for this probe.
         wheel=reference(stage,test_path,cell.stations[0].wheel)
-        translation=UsdGeom.Xformable(wheel).GetOrderedXformOps()[0]
-        translation.Set(Gf.Vec3d(7.57,0.,BELT_Z+.125))
+        tire=reference(stage,test_path+"Tire",cell.stations[0].tire)
+        for prim in (wheel,tire):
+            UsdGeom.Xformable(prim).GetOrderedXformOps()[0].Set(Gf.Vec3d(7.57,0.,BELT_Z+.125))
+        constrain(UsdPhysics.FixedJoint.Define(stage,test_path+"Mount"),wheel,tire)
         for i in range(18*HZ):
             cell.step()
             p=cell.api.get_rigidbody_transformation(test_path)["position"]
@@ -72,22 +94,41 @@ def check_supply(stage,seed,side):
 
 
 def check_insertion(stage,seed,skew):
-    # Fixture-only test: a stationary vehicle and an upright wheel on the bench mandrel.
-    # This isolates the hub and known allowable actuator load from the upstream gripper.
-    cell=Cell(stage,seed,jam=skew,robots=False)
+    """Bench: stationary car, FL wheel upright on a force-limited axial slide in front of its hub,
+    pressed home at 76 mm/s / 145 N (the reach of a robot with a compliance unit). Nominal must
+    seat on the face; skew (4 mm radial offset) must be stopped by the studs."""
+    cell=Cell(stage,seed,robots=False)
     try:
         unit=cell.stations[0]
         car=stage.GetPrimAtPath(ROOT+"/CN7")
+        cache=UsdGeom.XformCache()
+        before=cache.GetLocalToWorldTransform(car)
         UsdGeom.Xformable(car).GetOrderedXformOps()[0].Set(Gf.Vec3d(0.))
         UsdPhysics.RigidBodyAPI(car).GetKinematicEnabledAttr().Set(True)
-        shuttle=stage.GetPrimAtPath(ROOT+"/FL/Shuttle")
-        wheel=stage.GetPrimAtPath(unit.wheel)
-        wheel.GetAttribute("xformOp:translate").Set(shuttle.GetAttribute("xformOp:translate").Get())
-        wheel.GetAttribute("xformOp:orient").Set(qfloat(rotate((1,0,0),-90).GetQuat()))
-        constrain(UsdPhysics.FixedJoint.Define(stage,ROOT+"/FL/BenchMandrel"),shuttle,wheel)
+        cache.Clear()
+        moved=before.GetInverse()*cache.GetLocalToWorldTransform(car)
+        # Knuckles and hubs are bodies of their own on joints to the car: move them with it.
+        for station in cell.stations:
+            for path in (station.hub_path.rsplit("/",1)[0]+"/Knuckle",station.hub_path):
+                prim=stage.GetPrimAtPath(path)
+                world=cache.GetLocalToWorldTransform(prim)*moved
+                prim.GetAttribute("xformOp:translate").Set(world.ExtractTranslation())
+                if prim.GetAttribute("xformOp:orient"):
+                    prim.GetAttribute("xformOp:orient").Set(Gf.Quatf(world.ExtractRotationQuat()))
+        hub=stage.GetPrimAtPath(unit.hub_path)
+        hub_q=hub.GetAttribute("xformOp:orient").Get()
+        start=Gf.Vec3d(unit.hub[0]+(.004 if skew else 0.),unit.hub[1]+unit.side*.040,unit.hub[2])
+        for path in (unit.wheel,unit.tire):
+            prim=stage.GetPrimAtPath(path)
+            prim.GetAttribute("xformOp:translate").Set(start)
+            prim.GetAttribute("xformOp:orient").Set(hub_q)
+        slide=constrain(UsdPhysics.PrismaticJoint.Define(stage,ROOT+"/FL/BenchSlide"),None,
+                        stage.GetPrimAtPath(unit.wheel),start,rot0=Gf.Quatd(hub_q))
+        slide.CreateAxisAttr("Z")
+        press=drive(slide,"linear",0.,9000.,2300.,145.)
         touches=set()
         for i in range(9*HZ):
-            unit.target_gap(-.009,.076,1/HZ)
+            press.Set(max(-.049,-.076*i/HZ))
             cell.sim.simulate(1/HZ,i/HZ)
             cell.sim.fetch_results()
             for header in cell.sim.get_contact_report()[0]:
@@ -95,23 +136,29 @@ def check_insertion(stage,seed,skew):
                     continue
                 paths=[str(PhysicsSchemaTools.intToSdfPath(value)) for value in (header.collider0,header.collider1)]
                 if any(path.startswith(unit.wheel+"/Web_") for path in paths):
-                    touches.update(path.rsplit("/",1)[-1] for path in paths if "/Contact_FL/" in path)
-        wheel_y=cell.api.get_rigidbody_transformation(unit.wheel)["position"][1]
-        gap=wheel_y-unit.hub[1]
-        print("INSERTION_BENCH",round(gap*1000,4),sorted(touches),flush=True)
+                    touches.update(path.rsplit("/",1)[-1] for path in paths if path.startswith(unit.hub_path+"/"))
+            unit.step(cell.api,1/HZ)
+            if os.environ.get("BENCH_DEBUG") and i%24==0:
+                print("BENCHDBG",round(i/HZ,2),round(unit.gap*1000,2),round(unit.error_true,3),round(unit.center_error*1000,3),flush=True)
+        print("INSERTION_BENCH",round(unit.gap*1000,4),round(unit.error_true,3),sorted(touches),flush=True)
         if skew:
-            return gap>.005 and "Face" not in touches and any(name.startswith("Stud_") for name in touches)
-        return abs(gap)<.0007 and "Face" in touches
+            return unit.gap>.005 and "Face" not in touches and any(name.startswith("Stud_") for name in touches)
+        return abs(unit.gap)<.0007 and "Face" in touches
     finally:
         cell.close()
 
 
-def check(path, seed, jam, robots, rail_probe, export, interference_probe, tip_drive_off, require_seated):
+def check(path, seed, robots, export, interference_probe, until=None):
+    """Full cell: AMR docks, each tire is fed, stopped in the V, centred, lifted and left
+    pick-ready within +-3 mm along / +-2 mm across the flow; nothing touches the robots or the
+    pick-zone mechanisms; runtime poses are written back to USD."""
     stage = Usd.Stage.Open(str(path))
     stage.SetEditTarget(stage.GetSessionLayer())
-    cell = Cell(stage,seed,jam,robots,rail_probe)
-    tracking = 0.
-    tracking_samples=0
+    cell = Cell(stage,seed,robots)
+    from perf import StepTimer
+    import time as _time
+    cell.timer = StepTimer()
+    wall_start = _time.perf_counter()
     try:
         if not check_actors(stage,robots):
             return False
@@ -120,7 +167,6 @@ def check(path, seed, jam, robots, rail_probe, export, interference_probe, tip_d
                 raise OSError(f"Could not save {export}")
             if not check_actors(Usd.Stage.Open(str(export)),robots,exported=True):
                 return False
-        front_left=cell.stations[0]
         car_path=ROOT+"/CN7"
         car=stage.GetPrimAtPath(car_path)
         if dist(UsdGeom.Xformable(car).GetLocalTransformation().ExtractTranslation(),(AMR_GATE_X,0.,-.12))>.001:
@@ -128,7 +174,8 @@ def check(path, seed, jam, robots, rail_probe, export, interference_probe, tip_d
         previous_deck=None
         previous_lift=None
         maximum_speed=[0.,0.,0.]
-        for i in range(int(DOCK_READY+42)*HZ):
+        settled=None
+        for i in range(int(DOCK_READY+10)*HZ):
             if interference_probe and i==int(DOCK_READY+2)*HZ:
                 for robot in cell.rail_pairs[0]:
                     robot.rail.Set(0.)
@@ -138,11 +185,6 @@ def check(path, seed, jam, robots, rail_probe, export, interference_probe, tip_d
                 for event in cell.pending:
                     print("EVENTDBG",*event,flush=True)
                 cell.pending.clear()
-            if tip_drive_off and front_left.phase=="tip_up" and front_left.timer==0.:
-                lift=front_left.transfer.axes[2]
-                UsdPhysics.DriveAPI(lift.GetPrim(),"linear").GetMaxForceAttr().Set(0.)
-            step_start=cell.seconds-1/HZ
-            drive_frame=round((step_start-cell.dock_ready_time)*HZ) if cell.dock_ready_time is not None else -1
             deck=cell.api.get_rigidbody_transformation(cell.carrier.path)["position"]
             lift=cell.api.get_rigidbody_transformation(cell.carrier.lift_path)["position"][2]-deck[2]
             if i%HZ==0:
@@ -151,48 +193,46 @@ def check(path, seed, jam, robots, rail_probe, export, interference_probe, tip_d
                         maximum_speed[axis]=max(maximum_speed[axis],abs(delta))
                 previous_deck=tuple(deck)
                 previous_lift=lift
-            if drive_frame in (0,2*HZ,7*HZ,10*HZ,12*HZ,14*HZ,18*HZ,22*HZ,25*HZ):
-                for robot in cell.robots:
-                    side=1 if "Left" in robot.path else -1
-                    if (robot.paused_targets or robot.sample is None
-                            or not any(station.side==side and station.tip_handoff for station in cell.stations)):
-                        continue
-                    measured=cell.api.get_rigidbody_transformation(robot.path+"/Link_6")["position"]
-                    sample=robot.sample
-                    expected=pose(stage,robot.source+"/Joint_6",sample)[0]
-                    tracking=max(tracking,dist(measured,expected))
-                    if os.environ.get("CELL_DEBUG"):
-                        print("TRACKDBG",drive_frame/HZ,robot.path.rsplit("/",1)[1],round(dist(measured,expected)*1000,1),
-                              [round(v,3) for v in measured],[round(v,3) for v in expected],flush=True)
-                    tracking_samples+=1
             if interference_probe and i>int(DOCK_READY+10)*HZ:
                 break
-            # Keep running until the mount arms have withdrawn and parked: the exit path
-            # crosses the parked tip fixtures and was not exercised when the check stopped
-            # at the last seat.
-            parked=all(robot.paused_targets or (not robot.holds and robot.detour is None
-                                                and robot.clock>=REAR_SEAT+5.)
-                       for robot in cell.robots if "Mount" in robot.path)
-            if cell.carrier.ready and drive_frame>=25*HZ and cell.finished and parked and i%HZ==0:
+            if until is not None and cell.seconds>=until:
                 break
-        results={station.name: {"initial_deg":round(station.initial,3),
-                               "final_error_deg":round(station.error,3),
-                               "gap_mm":round(station.gap*1000,3),
-                               "stall_mm":round(station.stall_gap*1000,3),
-                               "face_contact":station.face_contact,"belt_contact":station.belt_contact,
-                               "stopper_contact":station.stop_contact,"guide_contact":station.guide_contact,
-                               "tip_started":station.tip_started,"tip_handoff":station.tip_handoff,
-                               "grip_slip_mm":round(station.max_grip_slip*1000,2),
-                               "peak_pad_normal_N":round(station.peak_pad_force,1),
-                               "conveyed_mm":round(station.conveyed_distance*1000,1),
-                               "max_lateral_mm":round(station.max_lateral_travel*1000,1),"result":station.phase}
-                 for station in cell.stations}
+            # Stop 2 s after the car is docked and every tire is pick-ready: anything that
+            # drifts in the zone or on the hub shows up in that hold.
+            if settled is None and cell.carrier.ready and cell.finished:
+                settled=cell.seconds
+            if settled is not None and cell.seconds>=settled+2. and not interference_probe:
+                break
+        results={}
+        for station in cell.stations:
+            p=cell.api.get_rigidbody_transformation(station.wheel)["position"]
+            results[station.name]={"result":station.phase,
+                                   "along_mm":round((p[0]-station.hub[0])*1000,2),
+                                   "across_mm":round((p[1]-station.side*LINE_Y)*1000,2),
+                                   "s1":station.zone.s1.blocked,"s2":station.zone.s2.blocked,
+                                   "belt_contact":station.belt_contact,"stopper_contact":station.stop_contact,
+                                   "guide_contact":station.guide_contact,
+                                   "conveyed_mm":round(station.conveyed_distance*1000,1),
+                                   "max_lateral_mm":round(station.max_lateral_travel*1000,1),
+                                   "hub_angle_error_deg":round(station.error,3)}
         print("PHYSICS_RESULT",json.dumps(results),flush=True)
+        wall = _time.perf_counter()-wall_start
+        print("PROFILE",json.dumps({"sim_s":round(cell.seconds,2),"wall_s":round(wall,1),
+                                    "realtime_factor":round(cell.seconds/wall,3),"hz":HZ,
+                                    "step_ms":cell.timer.summary_ms(),"steps":cell.timer.steps,
+                                    "colliders":count_colliders(stage)}),flush=True)
         cell.api.update_transformations(False,True,False,False)
-        print("ROBOT_TRACKING_MAX_MM",round(tracking*1000,2) if tracking_samples else "not_run",flush=True)
         print("RAIL_CHECK",cell.min_rail_spacing,cell.interference,flush=True)
+        print("ZONE_CONTACTS",sorted(cell.zone_contacts),flush=True)
         measured_car=tuple(cell.api.get_rigidbody_transformation(car_path)["position"])
         print("CARRIER_CHECK",cell.dock_ready_time,measured_car,maximum_speed,flush=True)
+        if until is not None and cell.seconds>=until:
+            # Partial run (one area of the cycle): pass if nothing has failed so far.
+            faults=[(s.name,s.phase) for s in cell.stations if s.phase in ("feed_failed","dock_lost")]
+            broken=[s.name for s in cell.stations
+                    if any(v!=v for v in cell.api.get_rigidbody_transformation(s.wheel)["position"])]
+            print("PARTIAL_CHECK",round(cell.seconds,2),faults,flush=True)
+            return not faults and not broken and not cell.zone_contacts
         if (not cell.carrier.ready or dist(measured_car,(0.,0.,0.))>.040
                 or any(found>rated+.020 for found,rated in zip(maximum_speed,(AMR_SPEED_X,AMR_SPEED_Y,AMR_LIFT_SPEED)))):
             return False
@@ -201,31 +241,16 @@ def check(path, seed, jam, robots, rail_probe, export, interference_probe, tip_d
                     and all(robot.paused_targets for robot in cell.rail_pairs[0])
                     and cell.min_rail_spacing>=MIN_RAIL_SPACING)
         for station in cell.stations:
-            prim=stage.GetPrimAtPath(station.wheel)
-            pose_usd=UsdGeom.Xformable(prim).ComputeLocalToWorldTransform(Usd.TimeCode.Default())
+            pose_usd=UsdGeom.Xformable(stage.GetPrimAtPath(station.wheel)).ComputeLocalToWorldTransform(Usd.TimeCode.Default())
             runtime=cell.api.get_rigidbody_transformation(station.wheel)
             if dist(pose_usd.ExtractTranslation(),runtime["position"])>.0001:
                 return False
+            r=results[station.name]
             if not (station.belt_contact and station.stop_contact and station.conveyed_distance>.65):
                 return False
-            if rail_probe and station.name=="FL" and (not station.guide_contact or station.max_lateral_travel>.045):
+            if r["result"]!="pick_ready" or abs(r["along_mm"])>3. or abs(r["across_mm"])>2.:
                 return False
-            if tip_drive_off and station.name=="FL":
-                normal=Gf.Rotation(quaternion(runtime)).TransformDir(Gf.Vec3d(0,0,1))
-                print("UNPOWERED_TIP",station.phase,normal,flush=True)
-                if (not station.tip_started or station.tip_handoff or station.phase not in ("tip_failed","grip_slip")
-                        or abs(normal[1])>=.25 or station.face_contact):
-                    return False
-                continue
-            if station.phase=="seated" and not (station.tip_started and station.tip_handoff and station.face_contact):
-                return False
-            if jam and station.name=="FL":
-                if station.phase!="jammed" or station.face_contact or station.stall_gap<.005:
-                    print("INSERTION_PROBE_NOT_REACHED",station.name,station.phase,flush=True)
-                    return False
-            elif require_seated and station.phase!="seated":
-                return False
-        return cell.finished
+        return not cell.interference and not cell.zone_contacts
     finally:
         cell.close()
 
@@ -234,15 +259,13 @@ def main():
     args=argparse.ArgumentParser()
     args.add_argument("--stage",type=Path,default=root.parent/"scene"/"wheel_cell.usda")
     args.add_argument("--seed",type=int,default=42)
-    args.add_argument("--jam",action="store_true")
     args.add_argument("--without-robots",action="store_true")
-    args.add_argument("--rail-probe",action="store_true",help="Nudge the FL wheel into the raised guide")
     args.add_argument("--interference-probe",action="store_true",help="Command same-rail arms toward each other")
-    args.add_argument("--tip-drive-off",action="store_true",help="Disable lift effort after the FL jaws grip")
-    args.add_argument("--require-seated",action="store_true",help="Require successful completion of the demo sequence")
     args.add_argument("--supply-probe",choices=("left","right"),help="Run one wheel from truck infeed into a branch")
-    args.add_argument("--insertion-probe",choices=("nominal","skew"),help="Exercise the hub on an isolated fixture")
+    args.add_argument("--insertion-probe",choices=("nominal","skew"),help="Press the FL wheel onto its hub on a bench slide")
     args.add_argument("--export-setup",type=Path,help="Save the physical scene before stepping")
+    args.add_argument("--config",type=Path,help="JSON overrides for cell_config.DEFAULTS")
+    args.add_argument("--until",type=float,help="Stop at this simulated time (s) and check only for faults so far")
     config=args.parse_args()
     if config.interference_probe and config.without_robots:
         args.error("--interference-probe requires robots")
@@ -252,9 +275,8 @@ def main():
         if config.insertion_probe:
             return check_insertion(stage,config.seed,config.insertion_probe=="skew")
         return check_supply(stage,config.seed,1 if config.supply_probe=="left" else -1)
-    return check(config.stage,config.seed,config.jam,not config.without_robots,
-                 config.rail_probe,config.export_setup,config.interference_probe,config.tip_drive_off,
-                 config.require_seated)
+    return check(config.stage,config.seed,not config.without_robots,config.export_setup,
+                 config.interference_probe,config.until)
 
 
 if __name__=="__main__":

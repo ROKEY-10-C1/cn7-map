@@ -42,17 +42,19 @@ def main():
     parser.set_defaults(camera="Overview")
     parser.add_argument("--replay", action="store_true", help="Use the original timeline preview")
     parser.add_argument("--seed", type=int, help="Reproduce the wheel arrival angles")
-    parser.add_argument("--jam", action="store_true", help="Inject a 2 mm FL guide offset in live mode")
     parser.add_argument("--start-at", type=float, default=None, metavar="SECONDS",
                         help="Seek to this scene time when starting")
     parser.add_argument("--quality", choices=("balanced", "high", "cinematic"), default="high")
+    parser.add_argument("--config", type=Path, help="JSON overrides for cell_config.DEFAULTS")
     parser.add_argument("--smoke-frames", type=int, default=0, help="Render N updates headless, then exit")
     args = parser.parse_args()
     replay = args.replay or args.start_at is not None
-    if replay and (args.seed is not None or args.jam):
-        parser.error("--seed and --jam require live PhysX mode (omit --replay and --start-at)")
+    if replay and args.seed is not None:
+        parser.error("--seed requires live PhysX mode (omit --replay and --start-at)")
     if args.smoke_frames < 0:
         parser.error("--smoke-frames must be nonnegative")
+    if args.config:
+        os.environ["CELL_CONFIG"] = str(args.config.resolve())
     sim_dir = Path(os.environ.get("ISAAC_SIM_ROOT", Path.home()/"isaacsim"))
     binary = sim_dir/"python.sh"
     if not binary.is_file() or not args.stage.is_file():
@@ -70,8 +72,6 @@ def main():
             flags.append("--replay")
         if args.seed is not None:
             flags.extend(("--seed",str(args.seed)))
-        if args.jam:
-            flags.append("--jam")
         process = subprocess.Popen([str(binary), "-B", str(root/"play.py"),
                                     str(args.stage.resolve()), str(args.smoke_frames), *flags],
                                    start_new_session=True)

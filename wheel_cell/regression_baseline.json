@@ -1,0 +1,538 @@
+{
+ "seed42": {
+  "name": "seed42",
+  "args": [
+   "--seed",
+   "42"
+  ],
+  "exit": 0,
+  "wall_s": 20.3,
+  "stations": {
+   "FL": {
+    "result": "pick_ready",
+    "along_mm": -0.26,
+    "across_mm": -0.06,
+    "s1": false,
+    "s2": true,
+    "belt_contact": true,
+    "stopper_contact": true,
+    "guide_contact": false,
+    "conveyed_mm": 762.9,
+    "max_lateral_mm": 0.3,
+    "hub_angle_error_deg": -14.463
+   },
+   "FR": {
+    "result": "pick_ready",
+    "along_mm": -0.52,
+    "across_mm": 0.82,
+    "s1": false,
+    "s2": true,
+    "belt_contact": true,
+    "stopper_contact": true,
+    "guide_contact": false,
+    "conveyed_mm": 763.2,
+    "max_lateral_mm": 0.0,
+    "hub_angle_error_deg": 34.184
+   },
+   "RL": {
+    "result": "pick_ready",
+    "along_mm": -0.4,
+    "across_mm": 1.02,
+    "s1": false,
+    "s2": true,
+    "belt_contact": true,
+    "stopper_contact": true,
+    "guide_contact": false,
+    "conveyed_mm": 763.3,
+    "max_lateral_mm": 0.1,
+    "hub_angle_error_deg": -14.807
+   },
+   "RR": {
+    "result": "pick_ready",
+    "along_mm": -0.46,
+    "across_mm": -0.79,
+    "s1": false,
+    "s2": true,
+    "belt_contact": true,
+    "stopper_contact": true,
+    "guide_contact": false,
+    "conveyed_mm": 763.3,
+    "max_lateral_mm": 0.1,
+    "hub_angle_error_deg": 33.652
+   }
+  },
+  "profile": {
+   "sim_s": 21.16,
+   "wall_s": 16.6,
+   "realtime_factor": 1.272,
+   "hz": 240,
+   "step_ms": {
+    "finish": 0.503,
+    "prepare": 0.445,
+    "simulate": 2.253
+   },
+   "steps": 5078,
+   "colliders": {
+    "Floor": 1,
+    "DockedAMR": 5,
+    "DockLift": 8,
+    "DockClamp_0_0": 3,
+    "DockClamp_0_2": 3,
+    "DockClamp_1_0": 3,
+    "DockClamp_1_2": 3,
+    "CN7": 42,
+    "Conveyor": 9,
+    "FL": 71,
+    "wheel": 1352,
+    "FR": 71,
+    "RL": 71,
+    "RR": 71,
+    "robot": 114,
+    "total": 1827
+   }
+  },
+  "lines": [
+   "RAIL_CHECK 6.119186878204346 []",
+   "CARRIER_CHECK 19.149999999999235 (9.117294212046545e-06, 2.2943995645618998e-06, -0.0007244348526000977) [0.9997899532318115, 6.001178789460937e-07, 0.05000007152557373]"
+  ]
+ },
+ "seed7": {
+  "name": "seed7",
+  "args": [
+   "--seed",
+   "7"
+  ],
+  "exit": 0,
+  "wall_s": 20.2,
+  "stations": {
+   "FL": {
+    "result": "pick_ready",
+    "along_mm": -0.59,
+    "across_mm": -0.46,
+    "s1": false,
+    "s2": true,
+    "belt_contact": true,
+    "stopper_contact": true,
+    "guide_contact": false,
+    "conveyed_mm": 762.7,
+    "max_lateral_mm": 0.1,
+    "hub_angle_error_deg": 13.371
+   },
+   "FR": {
+    "result": "pick_ready",
+    "along_mm": -0.53,
+    "across_mm": 0.83,
+    "s1": false,
+    "s2": true,
+    "belt_contact": true,
+    "stopper_contact": true,
+    "guide_contact": false,
+    "conveyed_mm": 763.2,
+    "max_lateral_mm": 0.0,
+    "hub_angle_error_deg": -34.279
+   },
+   "RL": {
+    "result": "pick_ready",
+    "along_mm": -0.45,
+    "across_mm": 0.74,
+    "s1": false,
+    "s2": true,
+    "belt_contact": true,
+    "stopper_contact": true,
+    "guide_contact": false,
+    "conveyed_mm": 763.2,
+    "max_lateral_mm": 0.0,
+    "hub_angle_error_deg": -28.849
+   },
+   "RR": {
+    "result": "pick_ready",
+    "along_mm": -0.55,
+    "across_mm": -0.67,
+    "s1": false,
+    "s2": true,
+    "belt_contact": true,
+    "stopper_contact": true,
+    "guide_contact": false,
+    "conveyed_mm": 763.0,
+    "max_lateral_mm": 0.0,
+    "hub_angle_error_deg": 30.204
+   }
+  },
+  "profile": {
+   "sim_s": 21.16,
+   "wall_s": 16.5,
+   "realtime_factor": 1.279,
+   "hz": 240,
+   "step_ms": {
+    "finish": 0.505,
+    "prepare": 0.445,
+    "simulate": 2.232
+   },
+   "steps": 5078,
+   "colliders": {
+    "Floor": 1,
+    "DockedAMR": 5,
+    "DockLift": 8,
+    "DockClamp_0_0": 3,
+    "DockClamp_0_2": 3,
+    "DockClamp_1_0": 3,
+    "DockClamp_1_2": 3,
+    "CN7": 42,
+    "Conveyor": 9,
+    "FL": 71,
+    "wheel": 1352,
+    "FR": 71,
+    "RL": 71,
+    "RR": 71,
+    "robot": 114,
+    "total": 1827
+   }
+  },
+  "lines": [
+   "RAIL_CHECK 6.119186878204346 []",
+   "CARRIER_CHECK 19.149999999999235 (6.610269338125363e-06, 1.9632648218248505e-06, -0.0007246732711791992) [0.999793529510498, 5.922479431319516e-07, 0.0499999076128006]"
+  ]
+ },
+ "seed123": {
+  "name": "seed123",
+  "args": [
+   "--seed",
+   "123"
+  ],
+  "exit": 0,
+  "wall_s": 20.0,
+  "stations": {
+   "FL": {
+    "result": "pick_ready",
+    "along_mm": -0.57,
+    "across_mm": 0.5,
+    "s1": false,
+    "s2": true,
+    "belt_contact": true,
+    "stopper_contact": true,
+    "guide_contact": false,
+    "conveyed_mm": 762.9,
+    "max_lateral_mm": 0.0,
+    "hub_angle_error_deg": -6.235
+   },
+   "FR": {
+    "result": "pick_ready",
+    "along_mm": -0.33,
+    "across_mm": 1.04,
+    "s1": false,
+    "s2": true,
+    "belt_contact": true,
+    "stopper_contact": true,
+    "guide_contact": false,
+    "conveyed_mm": 763.3,
+    "max_lateral_mm": 0.0,
+    "hub_angle_error_deg": -27.463
+   },
+   "RL": {
+    "result": "pick_ready",
+    "along_mm": -0.7,
+    "across_mm": -0.18,
+    "s1": false,
+    "s2": true,
+    "belt_contact": true,
+    "stopper_contact": true,
+    "guide_contact": false,
+    "conveyed_mm": 763.3,
+    "max_lateral_mm": 0.0,
+    "hub_angle_error_deg": 29.618
+   },
+   "RR": {
+    "result": "pick_ready",
+    "along_mm": -0.65,
+    "across_mm": -0.21,
+    "s1": false,
+    "s2": true,
+    "belt_contact": true,
+    "stopper_contact": true,
+    "guide_contact": false,
+    "conveyed_mm": 762.8,
+    "max_lateral_mm": 0.1,
+    "hub_angle_error_deg": -35.544
+   }
+  },
+  "profile": {
+   "sim_s": 21.16,
+   "wall_s": 16.5,
+   "realtime_factor": 1.282,
+   "hz": 240,
+   "step_ms": {
+    "finish": 0.506,
+    "prepare": 0.442,
+    "simulate": 2.23
+   },
+   "steps": 5078,
+   "colliders": {
+    "Floor": 1,
+    "DockedAMR": 5,
+    "DockLift": 8,
+    "DockClamp_0_0": 3,
+    "DockClamp_0_2": 3,
+    "DockClamp_1_0": 3,
+    "DockClamp_1_2": 3,
+    "CN7": 42,
+    "Conveyor": 9,
+    "FL": 71,
+    "wheel": 1352,
+    "FR": 71,
+    "RL": 71,
+    "RR": 71,
+    "robot": 114,
+    "total": 1827
+   }
+  },
+  "lines": [
+   "RAIL_CHECK 6.119186878204346 []",
+   "CARRIER_CHECK 19.149999999999235 (7.504943823732901e-06, 1.7191788401760277e-06, -0.0007245540618896484) [0.9997870922088623, 6.14751506589073e-07, 0.049999967217445374]"
+  ]
+ },
+ "seed2024": {
+  "name": "seed2024",
+  "args": [
+   "--seed",
+   "2024"
+  ],
+  "exit": 0,
+  "wall_s": 20.6,
+  "stations": {
+   "FL": {
+    "result": "pick_ready",
+    "along_mm": -0.57,
+    "across_mm": -0.59,
+    "s1": false,
+    "s2": true,
+    "belt_contact": true,
+    "stopper_contact": true,
+    "guide_contact": false,
+    "conveyed_mm": 763.3,
+    "max_lateral_mm": 0.1,
+    "hub_angle_error_deg": 4.498
+   },
+   "FR": {
+    "result": "pick_ready",
+    "along_mm": -0.51,
+    "across_mm": -0.71,
+    "s1": false,
+    "s2": true,
+    "belt_contact": true,
+    "stopper_contact": true,
+    "guide_contact": false,
+    "conveyed_mm": 763.1,
+    "max_lateral_mm": 0.0,
+    "hub_angle_error_deg": -29.316
+   },
+   "RL": {
+    "result": "pick_ready",
+    "along_mm": -0.54,
+    "across_mm": 0.81,
+    "s1": false,
+    "s2": true,
+    "belt_contact": true,
+    "stopper_contact": true,
+    "guide_contact": false,
+    "conveyed_mm": 763.1,
+    "max_lateral_mm": 0.2,
+    "hub_angle_error_deg": -22.8
+   },
+   "RR": {
+    "result": "pick_ready",
+    "along_mm": -0.58,
+    "across_mm": -0.5,
+    "s1": false,
+    "s2": true,
+    "belt_contact": true,
+    "stopper_contact": true,
+    "guide_contact": false,
+    "conveyed_mm": 762.8,
+    "max_lateral_mm": 0.1,
+    "hub_angle_error_deg": -10.72
+   }
+  },
+  "profile": {
+   "sim_s": 21.16,
+   "wall_s": 17.2,
+   "realtime_factor": 1.23,
+   "hz": 240,
+   "step_ms": {
+    "finish": 0.508,
+    "prepare": 0.446,
+    "simulate": 2.358
+   },
+   "steps": 5078,
+   "colliders": {
+    "Floor": 1,
+    "DockedAMR": 5,
+    "DockLift": 8,
+    "DockClamp_0_0": 3,
+    "DockClamp_0_2": 3,
+    "DockClamp_1_0": 3,
+    "DockClamp_1_2": 3,
+    "CN7": 42,
+    "Conveyor": 9,
+    "FL": 71,
+    "wheel": 1352,
+    "FR": 71,
+    "RL": 71,
+    "RR": 71,
+    "robot": 114,
+    "total": 1827
+   }
+  },
+  "lines": [
+   "RAIL_CHECK 6.119186878204346 []",
+   "CARRIER_CHECK 19.149999999999235 (7.633630048076157e-06, 2.0553018202917883e-06, -0.0007244348526000977) [0.9997828006744385, 1.6109608385050933e-06, 0.04999999701976776]"
+  ]
+ },
+ "rails": {
+  "name": "rails",
+  "args": [
+   "--interference-probe"
+  ],
+  "exit": 0,
+  "wall_s": 21.5,
+  "stations": {
+   "FL": {
+    "result": "pick_ready",
+    "along_mm": -0.26,
+    "across_mm": -0.06,
+    "s1": false,
+    "s2": true,
+    "belt_contact": true,
+    "stopper_contact": true,
+    "guide_contact": false,
+    "conveyed_mm": 762.9,
+    "max_lateral_mm": 0.3,
+    "hub_angle_error_deg": -14.5
+   },
+   "FR": {
+    "result": "pick_ready",
+    "along_mm": -0.52,
+    "across_mm": 0.82,
+    "s1": false,
+    "s2": true,
+    "belt_contact": true,
+    "stopper_contact": true,
+    "guide_contact": false,
+    "conveyed_mm": 763.2,
+    "max_lateral_mm": 0.0,
+    "hub_angle_error_deg": 34.169
+   },
+   "RL": {
+    "result": "pick_ready",
+    "along_mm": -0.4,
+    "across_mm": 1.02,
+    "s1": false,
+    "s2": true,
+    "belt_contact": true,
+    "stopper_contact": true,
+    "guide_contact": false,
+    "conveyed_mm": 763.3,
+    "max_lateral_mm": 0.1,
+    "hub_angle_error_deg": -14.74
+   },
+   "RR": {
+    "result": "pick_ready",
+    "along_mm": -0.46,
+    "across_mm": -0.79,
+    "s1": false,
+    "s2": true,
+    "belt_contact": true,
+    "stopper_contact": true,
+    "guide_contact": false,
+    "conveyed_mm": 763.3,
+    "max_lateral_mm": 0.1,
+    "hub_angle_error_deg": 33.661
+   }
+  },
+  "profile": {
+   "sim_s": 30.0,
+   "wall_s": 19.5,
+   "realtime_factor": 1.542,
+   "hz": 240,
+   "step_ms": {
+    "finish": 0.369,
+    "prepare": 0.334,
+    "simulate": 1.94
+   },
+   "steps": 7200,
+   "colliders": {
+    "Floor": 1,
+    "DockedAMR": 5,
+    "DockLift": 8,
+    "DockClamp_0_0": 3,
+    "DockClamp_0_2": 3,
+    "DockClamp_1_0": 3,
+    "DockClamp_1_2": 3,
+    "CN7": 42,
+    "Conveyor": 9,
+    "FL": 71,
+    "wheel": 1352,
+    "FR": 71,
+    "RL": 71,
+    "RR": 71,
+    "robot": 114,
+    "total": 1827
+   }
+  },
+  "lines": [
+   "RAIL_CHECK 6.119186878204346 [(21.999999999999073, '/World/Live/LeftMount', '/World/Live/LeftFasten', 'rail_command')]",
+   "CARRIER_CHECK 19.149999999999235 (-4.6784739424765576e-06, 2.0795200725842733e-06, -0.0007243156433105469) [0.9997899532318115, 6.001178789460937e-07, 0.05000007152557373]"
+  ]
+ },
+ "insert_nominal": {
+  "name": "insert_nominal",
+  "args": [
+   "--insertion-probe",
+   "nominal"
+  ],
+  "exit": 0,
+  "wall_s": 10.3,
+  "stations": null,
+  "profile": null,
+  "lines": [
+   "INSERTION_BENCH -0.0004 0.137 ['Face', 'Pilot', 'PilotTip', 'Stud_0', 'Stud_0Tip', 'Stud_1', 'Stud_1Tip', 'Stud_2', 'Stud_2Tip', 'Stud_3', 'Stud_3Tip', 'Stud_4', 'Stud_4Tip']"
+  ]
+ },
+ "insert_skew": {
+  "name": "insert_skew",
+  "args": [
+   "--insertion-probe",
+   "skew"
+  ],
+  "exit": 0,
+  "wall_s": 9.1,
+  "stations": null,
+  "profile": null,
+  "lines": [
+   "INSERTION_BENCH 30.0001 0.0 ['Stud_0Tip', 'Stud_1Tip', 'Stud_2Tip', 'Stud_3Tip', 'Stud_4Tip']"
+  ]
+ },
+ "supply_left": {
+  "name": "supply_left",
+  "args": [
+   "--supply-probe",
+   "left"
+  ],
+  "exit": 0,
+  "wall_s": 14.1,
+  "stations": null,
+  "profile": null,
+  "lines": []
+ },
+ "supply_right": {
+  "name": "supply_right",
+  "args": [
+   "--supply-probe",
+   "right"
+  ],
+  "exit": 0,
+  "wall_s": 13.6,
+  "stations": null,
+  "profile": null,
+  "lines": []
+ }
+}
