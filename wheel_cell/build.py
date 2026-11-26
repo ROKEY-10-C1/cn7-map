@@ -1,4 +1,34 @@
-"""Build a self-contained animated USD and its simulated production history."""
+"""Build a self-contained animated USD and its simulated production history.
+
+Run with Isaac Sim's Python:  isaac_python map/wheel_cell/build.py
+"""
+import os
+import sys
+
+
+def _ensure_usd():
+    """Isaac Sim's python.sh does not expose pxr; re-exec with omni.usd.libs on the paths."""
+    try:
+        import pxr  # noqa: F401
+        return
+    except ImportError:
+        pass
+    sim = Path(os.environ.get("ISAAC_SIM_ROOT", Path.home()/"isaacsim"))
+    libs = sorted(sim.glob("extscache/omni.usd.libs-*/pxr"))
+    if not libs or os.environ.get("_CELL_USD_BOOTSTRAPPED"):
+        sys.exit("Cannot import pxr: set ISAAC_SIM_ROOT to the Isaac Sim installation.")
+    usd = libs[0].parent
+    env = dict(os.environ, _CELL_USD_BOOTSTRAPPED="1")
+    env["PYTHONPATH"] = os.pathsep.join(filter(None, [str(usd), env.get("PYTHONPATH")]))
+    env["LD_LIBRARY_PATH"] = os.pathsep.join(filter(None, [str(usd/"bin"), env.get("LD_LIBRARY_PATH")]))
+    os.execve(sys.executable, [sys.executable, "-B", *sys.argv], env)
+
+
+from pathlib import Path
+
+_ensure_usd()
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 import argparse
 import sqlite3
 from math import atan2, ceil, cos, degrees, hypot, sin, sqrt, tau
@@ -15,8 +45,8 @@ from fitment import (
 )
 from physical_data import AMR_SIZE, AMR_WHEEL_RADIUS, DOCK_CLAMP_CLOSED, DOCK_CLAMP_OPEN, ROLLER_RADIUS
 from process import (
-    AMR_BAY_Y, AMR_GATE_X, AXLE, BELT_Z, CN7_R16, CROSS, FASTEN_PARK, FEED, FPS,
-    HUB_Z, LINE_Y, MOUNT_PARK, NUT_CYCLE, NUT_DRIVE, NUT_ENGAGE, NUT_PICKUP,
+    AMR_AT_GATE, AMR_BAY_Y, AMR_DOCKED, AMR_GATE_X, AMR_LIFTED, AMR_OUT_GATE, AXLE, BELT_Z, CN7_R16, FASTEN_PARK, FEED, FPS,
+    HUB_Z, LINE_Y, MOUNT_PARK, NUT_CYCLE, NUT_DRIVE, NUT_ENGAGE, NUT_FINAL, NUT_PICKUP,
     RAIL_Y, REJECT_GATE_HALF, REJECT_X, STATIONS, bend, schedule,
 )
 from wheel_geometry import barrel, center_web, hub as make_hub, nut as make_nut, wheelhouse
@@ -31,8 +61,17 @@ WHITE = (.72, .77, .79)
 RED = (.73, .10, .08)
 TEAL = (.08, .58, .43)
 TOOL = .20
+# Plant layout outside the cell: fence at CELL_Y, walkway, buffer guard, buffers, outer guard, wall.
+CELL_Y = 2.36
+BUFFER_GUARD_Y = AMR_BAY_Y-2.65
+OUTER_GUARD_Y = AMR_BAY_Y+2.65
+HALL_Y = OUTER_GUARD_Y+.40
+FLOOR_Y = HALL_Y+.40
 DOOSAN_ASSETS = Path(__file__).parent/"assets"
 NUT_ADVANCE = 5*PITCH
+# Flange frame of the fastening tool (see Arm.solve): x = world x, y = world z * side, so
+# stud k at hub angle a sits at (PCD/2 cos a, -PCD/2 sin a) on either side of the car.
+SOCKET_LAYOUT = tuple((PCD/2*cos(a), -PCD/2*sin(a)) for a in BOLT_ANGLES)
 
 
 def frame(seconds):
@@ -204,7 +243,7 @@ def rail(stage, root, side):
 
 
 def parking(stage, root, side):
-    bay_y=side*4.92
+    bay_y=side*AMR_BAY_Y
     marker=(.06,.53,.74)
     for i,x in enumerate((-3.12,0.,3.12)):
         box(stage,root+f"/Line_{i}_a",(x-.99,bay_y,.004),(.032,4.98,.004),marker)
@@ -224,11 +263,11 @@ def parking(stage, root, side):
 
 
 def concrete_floor(stage, path):
-    box(stage,path+"/Slab",(0,0,-.108),(20,15,.2),CONCRETE)
-    floor=mesh(stage,path+"/Concrete", [(-10,-7.5,0),(10,-7.5,0),(10,7.5,0),(-10,7.5,0)],
+    box(stage,path+"/Slab",(0,0,-.108),(20,2*FLOOR_Y,.2),CONCRETE)
+    floor=mesh(stage,path+"/Concrete", [(-10,-FLOOR_Y,0),(10,-FLOOR_Y,0),(10,FLOOR_Y,0),(-10,FLOOR_Y,0)],
                [4],[0,1,2,3],CONCRETE)
     uv=UsdGeom.PrimvarsAPI(floor).CreatePrimvar("st", Sdf.ValueTypeNames.TexCoord2fArray,"vertex")
-    uv.Set([(0.,0.),(5.,0.),(5.,3.75),(0.,3.75)])
+    uv.Set([(0.,0.),(5.,0.),(5.,FLOOR_Y/2),(0.,FLOOR_Y/2)])
     shader=UsdShade.Shader.Get(stage,"/Looks/Concrete/Surface")
     coords=UsdShade.Shader.Define(stage,"/Looks/Concrete/UV")
     coords.CreateIdAttr("UsdPrimvarReader_float2")
@@ -253,7 +292,7 @@ def write_concrete(path):
     base=rng.standard_normal((768,768))
     mottling=gaussian_filter(base,16,mode="wrap")
     grit=gaussian_filter(base,1.2,mode="wrap")
-    shade=138+5*mottling/mottling.std()+2.3*grit/grit.std()+1.5*base
+    shade=184+5*mottling/mottling.std()+2.3*grit/grit.std()+1.5*base  # light gray epoxy-sealed slab
     rgb=np.stack((shade+1,shade,shade-1),axis=-1)
     Image.fromarray(np.clip(rgb,0,255).astype(np.uint8)).save(path,optimize=True)
 
@@ -262,27 +301,42 @@ def factory(stage):
     path="/World/Factory"
     concrete_floor(stage,path)
     for i in range(1,8):
-        box(stage,path+f"/FloorJoint_{i}",(-10+i*2.5,0,.001),(.007,14.95,.002),(.17,.19,.20))
-    for j in range(-2,3):
-        box(stage,path+f"/TransverseJoint_{j+2}",(0,j*2.5,.001),(19.96,.007,.002),(.17,.19,.20))
+        box(stage,path+f"/FloorJoint_{i}",(-10+i*2.5,0,.001),(.007,2*FLOOR_Y-.05,.002),(.17,.19,.20))
+    joints=int(FLOOR_Y//2.5)
+    for j in range(-joints,joints+1):
+        box(stage,path+f"/TransverseJoint_{j+joints}",(0,j*2.5,.001),(19.96,.007,.002),(.17,.19,.20))
     box(stage,path+"/DockPlate",(0,0,-.012),(4.95,2.22,.024),(.15,.18,.20))
     for i in range(9):
         box(stage,path+f"/AMR_Center_{i}",(-6.53+i*.48,0,.003),(.265,.045,.005),(.04,.54,.78))
     arrow_points=[(-2.62,0.,.004),(-3.06,.20,.004),(-3.06,.071,.004),
                   (-3.52,.071,.004),(-3.52,-.071,.004),(-3.06,-.071,.004),(-3.06,-.20,.004)]
     mesh(stage,path+"/DockDirection",arrow_points,[3,4],[0,1,6,2,3,4,5],(.04,.54,.78),True)
+    cell_floor=(.36,.43,.52)  # inside-cell tint from the layout legend; the dock plate stays dark
+    for name,(x0,x1,y0,y1) in (("Left",(-4.52,5.65,1.11,2.36)),("Right",(-4.52,5.65,-2.36,-1.11)),
+                               ("Entry",(-4.52,-2.475,-1.11,1.11)),("Exit",(2.475,5.65,-1.11,1.11))):
+        box(stage,path+f"/CellFloor_{name}",((x0+x1)/2,(y0+y1)/2,.0015),(x1-x0,y1-y0,.002),cell_floor)
     for side,label in ((1,"Left"),(-1,"Right")):
-        for i in range(10):
+        for i in range(int((AMR_BAY_Y-.24)/.48)+1):
             box(stage,path+f"/AMR_{label}_{i}",(AMR_GATE_X,side*(.24+i*.48),.005),
                 (.044,.26,.005),(.04,.54,.78))
+        # AMR loop between the buffers and the cell entry, dashed as in the layout image.
+        for i in range(4):
+            box(stage,path+f"/AMR_{label}Loop_{i}",(AMR_GATE_X+.30+i*.48,side*AMR_BAY_Y,.005),
+                (.26,.044,.005),(.04,.54,.78))
+        tip=[(-4.62,side*AMR_BAY_Y,.006),(-4.98,side*AMR_BAY_Y+.20,.006),(-4.98,side*AMR_BAY_Y-.20,.006)]
+        mesh(stage,path+f"/AMR_{label}LoopArrow",tip,[3],[0,1,2],(.04,.54,.78),True)
         parking(stage,path+f"/{label}VehicleBuffer",side)
         rail(stage,path+f"/{label}Rail",side)
         guard_end=REJECT_X-.40 if side>0 else 4.95
         fence(stage,path+f"/{label}InnerGuard",(-4.52,side*2.36),(guard_end,side*2.36))
         if side>0:
             fence(stage,path+"/RejectGuard",(REJECT_X+.40,2.36),(4.95,2.36))
-        fence(stage,path+f"/{label}OuterGuard",(-5.55,side*7.32),(6.10,side*7.32))
-        fence(stage,path+f"/{label}EndGuard",(5.65,side*2.38),(5.65,side*7.32))
+        # Walkway between the cell fence and the vehicle buffer, as in the layout image.
+        fence(stage,path+f"/{label}BufferGuard",(-4.52,side*BUFFER_GUARD_Y),(4.95,side*BUFFER_GUARD_Y))
+        for k,y in enumerate((CELL_Y+.18,BUFFER_GUARD_Y-.18)):
+            box(stage,path+f"/CellFloor_{label}Walkway_{k}",(.215,side*y,.004),(9.47,.06,.003),AMBER)
+        fence(stage,path+f"/{label}OuterGuard",(-5.55,side*OUTER_GUARD_Y),(6.10,side*OUTER_GUARD_Y))
+        fence(stage,path+f"/{label}EndGuard",(5.65,side*2.38),(5.65,side*OUTER_GUARD_Y))
         belt(stage,label+"AxleTransfer",(-1.04,side*LINE_Y),(1.04,side*LINE_Y),.67)
         if side>0:
             reject_gate=belt(stage,label+"Feed",(1.68,side*LINE_Y),bend(side)[-1],.67,outlet_x=REJECT_X)
@@ -315,7 +369,7 @@ def factory(stage):
         box(stage,path+f"/TruckBay_{i}",(6.55+i*.23,5.81,.006),(.121,.089,.007),AMBER)
     industrial_hall(stage,path)
     for name,eye,target,focal in (
-            ("Overview",(-14.8,0.,14.0),(.65,0.,.44),20.8),
+            ("Overview",(-17.6,0.,16.6),(.65,0.,.44),20.8),
             ("Assembly",(-6.0,-4.35,3.34),(.18,0.,1.0),26),
             ("WheelDetail",(2.37,2.76,1.95),(1.40,1.13,.82),30),
             ("HubDetail",(1.94,2.13,1.53),(AXLE,.81,.97),48),
@@ -325,13 +379,13 @@ def factory(stage):
         cam.AddTransformOp().Set(Gf.Matrix4d().SetLookAt(vector(eye),vector(target),up).GetInverse())
         if name=="TopView":
             cam.CreateProjectionAttr("orthographic")
-            cam.CreateHorizontalApertureAttr(280.)
-            cam.CreateVerticalApertureAttr(157.5)
+            cam.CreateHorizontalApertureAttr(16/9*(2*FLOOR_Y+.6)*10)
+            cam.CreateVerticalApertureAttr((2*FLOOR_Y+.6)*10)
         cam.CreateFocalLengthAttr(focal)
     light=UsdLux.DomeLight.Define(stage,"/World/Fill")
-    light.CreateIntensityAttr(95)
+    light.CreateIntensityAttr(260)
     sun=UsdLux.DistantLight.Define(stage,"/World/Ambient")
-    sun.CreateIntensityAttr(220)
+    sun.CreateIntensityAttr(420)
     sun.AddRotateXYZOp().Set(Gf.Vec3f(35,-23,0))
     for side,tag in ((1,"Left"),(-1,"Right")):
         for axle,kind in ((AXLE,"Front"),(-AXLE,"Rear")):
@@ -354,31 +408,36 @@ def industrial_hall(stage, root):
     wall = (.51, .55, .58)
     for i in range(4):
         center = -7.5+i*5
-        box(stage, root+f"/WallBase_{i}", (center, 7.43, .59), (4.98, .16, 1.18), CONCRETE)
-        box(stage, root+f"/Cladding_{i}", (center, 7.46, 2.20), (4.98, .12, 2.1), wall)
-        box(stage, root+f"/Clerestory_{i}", (center, 7.45, 3.83), (4.75, .11, 1.12), GLASS)
+        box(stage, root+f"/WallBase_{i}", (center, HALL_Y, .59), (4.98, .16, 1.18), CONCRETE)
+        box(stage, root+f"/Cladding_{i}", (center, HALL_Y+.03, 2.20), (4.98, .12, 2.1), wall)
+        box(stage, root+f"/Clerestory_{i}", (center, HALL_Y+.02, 3.83), (4.75, .11, 1.12), GLASS)
         for j in range(5):
-            box(stage, root+f"/Mullion_{i}_{j}", (center-2+j, 7.38, 3.83), (.047, .09, 1.11), BRUSHED)
-        box(stage, root+f"/UpperCladding_{i}", (center, 7.46, 4.77), (4.98, .12, .74), wall)
-    for i, y in enumerate((-4.15, -.10, 3.92)):
-        box(stage, root+f"/EndWall_{i}", (9.94, y, 2.45), (.12, 3.92, 4.9), wall)
+            box(stage, root+f"/Mullion_{i}_{j}", (center-2+j, HALL_Y-.05, 3.83), (.047, .09, 1.11), BRUSHED)
+        box(stage, root+f"/UpperCladding_{i}", (center, HALL_Y+.03, 4.77), (4.98, .12, .74), wall)
+    # End wall from the open front edge to the side wall, in equal bays.
+    bays = 4
+    y0, y1 = -FLOOR_Y+.5, HALL_Y
+    width = (y1-y0)/bays
+    for i in range(bays):
+        y = y0+(i+.5)*width
+        box(stage, root+f"/EndWall_{i}", (9.94, y, 2.45), (.12, width-.02, 4.9), wall)
         for j in range(2):
-            box(stage, root+f"/EndWindow_{i}_{j}", (9.86, y+(j-.5)*1.52, 3.73),
-                (.035, 1.47, .86), GLASS)
-    for i, y in enumerate((-5.60, -2.15, 1.91)):
-        box(stage, root+f"/EndUpright_{i}", (9.82, y, 2.45), (.16, .17, 4.9), BRUSHED)
+            box(stage, root+f"/EndWindow_{i}_{j}", (9.86, y+(j-.5)*width*.39, 3.73),
+                (.035, width*.37, .86), GLASS)
+    for i in range(bays-1):
+        box(stage, root+f"/EndUpright_{i}", (9.82, y0+(i+1)*width, 2.45), (.16, .17, 4.9), BRUSHED)
     for i, x in enumerate((-9.8, -5., 0., 5., 9.8)):
-        box(stage, root+f"/Column_{i}", (x, 7.17, 2.61), (.28, .24, 5.2), BRUSHED)
-        box(stage, root+f"/ColumnFoot_{i}", (x, 7.17, .10), (.43, .37, .20), ZINC)
-        box(stage, root+f"/RoofBeam_{i}", (x, 6.91, 5.13), (.16, 1.24, .24), BRUSHED)
-        for j, y in enumerate((-1.65, 3.65)):
+        box(stage, root+f"/Column_{i}", (x, HALL_Y-.26, 2.61), (.28, .24, 5.2), BRUSHED)
+        box(stage, root+f"/ColumnFoot_{i}", (x, HALL_Y-.26, .10), (.43, .37, .20), ZINC)
+        box(stage, root+f"/RoofBeam_{i}", (x, HALL_Y-.52, 5.13), (.16, 1.24, .24), BRUSHED)
+        for j, y in enumerate((-AMR_BAY_Y, -1.65, 1.65, AMR_BAY_Y)):
             fixture = f"/World/Lighting/Strip_{i}_{j}"
             rect = UsdLux.RectLight.Define(stage, fixture)
             rect.AddTranslateOp().Set(Gf.Vec3d(x, y, 4.789))
             rect.CreateWidthAttr(1.92)
             rect.CreateHeightAttr(.19)
             rect.CreateIntensityAttr(650 if i in (1, 2, 3) else 380)
-    box(stage,root+"/RoofEdge",(0.,7.04,5.16),(19.75,.16,.23),BRUSHED)
+    box(stage,root+"/RoofEdge",(0.,HALL_Y-.39,5.16),(19.75,.16,.23),BRUSHED)
     for i, x in enumerate((5.90, 6.62, 7.34, 8.05)):
         cabinet = root+f"/Panel_{i}"
         box(stage, cabinet+"/Housing", (x, -4.88, .96), (.66, .52, 1.86), PANEL)
@@ -554,11 +613,15 @@ def robot_model(stage, root, side, arm, mounting):
         for j in (-1,1):
             box(stage,flange+f"/GuideJaw_{j+1}",(j*.025,0,.142),(.024,.037,.070),ALLOY)
     else:
-        cylinder(stage,flange+"/Nutrunner",(0,0,.070),.037,.14,BRUSHED)
-        for i in range(5):
-            ring(stage,flange+f"/DriveFins_{i}",(0,0,.026+i*.014),.041,.033,.003,ALLOY)
-        cylinder(stage,flange+"/GearHead",(0,0,.131),.026,.050,BRUSHED)
-        cylinder(stage,flange+"/Socket",(0,0,.177),.016,.046,AMBER)
+        # Five-spindle head on the PCD: socket tips at TOOL, laid out in the flange frame so
+        # that with the fixed approach orientation each socket lands on its own stud.
+        cylinder(stage,flange+"/Nutrunner",(0,0,.060),.037,.12,BRUSHED)
+        for i in range(4):
+            ring(stage,flange+f"/DriveFins_{i}",(0,0,.022+i*.014),.041,.033,.003,ALLOY)
+        cylinder(stage,flange+"/GearHead",(0,0,.132),.088,.024,BRUSHED)
+        for i,(sx,sy) in enumerate(SOCKET_LAYOUT):
+            cylinder(stage,flange+f"/Nutrunner_Spindle_{i}",(sx,sy,.152),.011,.018,ALLOY)
+            cylinder(stage,flange+f"/Socket_{i}",(sx,sy,.180),.016,.040,AMBER)
     return groups
 
 
@@ -566,10 +629,10 @@ def magazine(stage, path, side):
     pocket=(.30,side*1.23,1.135)
     px,py,pz=pocket
     box(stage,path+"/Stand",(px,py-side*.095,.715),(.098,.10,.77),BRUSHED)
-    box(stage,path+"/Cassette",(px,py-side*.065,pz+.044),(.097,.11,.18),PANEL)
-    cylinder(stage,path+"/Outlet",(px,py-side*.018,pz),.023,.041,BRUSHED,"Y")
-    for i in range(4):
-        box(stage,path+f"/Rib_{i}",(px,py-side*.007,pz+.037+i*.028),(.078,.012,.008),RUBBER)
+    # Nut presenter: five outlets on the stud pattern, filled for one wheel per pick.
+    box(stage,path+"/Cassette",(px,py-side*.065,pz),(.17,.11,.17),PANEL)
+    for i,(sx,sy) in enumerate(SOCKET_LAYOUT):
+        cylinder(stage,path+f"/Outlet_{i}",(px+sx,py-side*.018,pz+side*sy),.020,.041,BRUSHED,"Y")
     return np.array(pocket)+(0.,side*TOOL,0.)
 
 
@@ -588,11 +651,22 @@ def key_robot(stage, arm, groups, side, waypoints, root):
 
     previous_t,first=waypoints[0]
     # Start H2515 on the same folded-elbow branch as the insertion targets.
-    seed=np.deg2rad([side*17,0,-143,-side*76,80,-side*54]) if arm.model=="h2515" else None
-    previous=arm.solve(base,first,side,seed)
+    seed=np.deg2rad([17,0,-143,-76,80,-54]) if arm.model=="h2515" else None
+    left_base=(base[0],abs(base[1]),base[2])
+    mirrored=lambda p:(p[0],-p[1],p[2])
+
+    def solve(target,previous,reference):
+        # Solve the left arm, then give the right arm the mirror image of that posture so
+        # both sides sweep the same envelope past the parked tip fixtures.
+        left=arm.solve(left_base,mirrored(target) if side<0 else target,1,reference)
+        if side>0:
+            return left,left
+        return left,arm.solve_mirrored(base,target,left,previous)
+
+    reference,previous=solve(first,None,seed)
     pose(previous_t,previous)
     for seconds,target in waypoints[1:]:
-        q=arm.solve(base,target,side,previous)
+        reference,q=solve(target,previous,reference)
         duration=seconds-previous_t
         if np.any(abs(q-previous)>arm.speed*duration):
             raise ValueError(f"Joint speed limit exceeded at {root}, {seconds:.2f}s; required {max(abs(q-previous)/arm.speed):.2f}s, planned {duration:.2f}s")
@@ -620,33 +694,33 @@ def rail_robot(stage, root, arm, side, start, front, rear, rear_tight, front_tig
         poses=[(start,safe)]
         for t,approach,axle in ((front,6.7,AXLE),(rear,3.8,-AXLE)):
             seated_target=(-offset,side*(half_track(axle)+.30),HUB_Z+.10)
-            poses.extend(((t-approach,safe),(t-2.2,movement_target),(t,seated_target),(t+1.35,safe)))
+            poses.extend(((t-approach,safe),(t-2.2,movement_target),(t,seated_target),
+                          (t+1.35,safe)))
     else:
         offset=-.53
         rail_samples=((start,FASTEN_PARK),(rear_tight-3,FASTEN_PARK),(rear_tight,-AXLE+offset),
-                      (rear_tight+len(CROSS)*NUT_CYCLE+1,-AXLE+offset),
+                      (rear_tight+NUT_CYCLE+1,-AXLE+offset),
                       (front_tight-1,AXLE+offset),
-                      (front_tight+len(CROSS)*NUT_CYCLE+1,AXLE+offset),(departure,FASTEN_PARK))
+                      (front_tight+NUT_CYCLE+1,AXLE+offset),(departure,FASTEN_PARK))
         pickup=magazine(stage,root+"/NutMagazine",side)
         poses=[(start,safe)]
         for first,axle in ((rear_tight,-AXLE),(front_tight,AXLE)):
-            poses.append((first,safe))
-            for step,index in enumerate(CROSS):
-                a=BOLT_ANGLES[index]
-                t=first+step*NUT_CYCLE
-                px,pz=-offset+PCD/2*cos(a),HUB_Z-side*PCD/2*sin(a)
-                outside=half_track(axle)+NUT_SEAT+NUT_LENGTH+NUT_ADVANCE+TOOL
-                waypoint=(px,side*(outside+.08),pz)
-                poses.extend(((t+NUT_PICKUP,pickup),(t+1.94,waypoint),
-                              (t+NUT_ENGAGE,(px,side*outside,pz)),
-                              (t+NUT_ENGAGE+NUT_DRIVE,(px,side*(outside-NUT_ADVANCE),pz)),
-                              (t+NUT_CYCLE,waypoint)))
-                held_root=root+f"/Joint_6/CarriedNut_{round(first*1000)}_{step}"
-                held,_=xform(stage,held_root,(0.,0.,TOOL+NUT_LENGTH))
+            # The head is centred on the hub axis; all five sockets engage and run down together.
+            px,pz=-offset,HUB_Z
+            outside=half_track(axle)+NUT_SEAT+NUT_LENGTH+NUT_ADVANCE+TOOL
+            waypoint=(px,side*(outside+.08),pz)
+            run_down=(px,side*(outside-NUT_ADVANCE),pz)
+            poses.extend(((first,safe),(first+NUT_PICKUP,pickup),(first+1.94,waypoint),
+                          (first+NUT_ENGAGE,(px,side*outside,pz)),
+                          (first+NUT_ENGAGE+NUT_DRIVE,run_down),
+                          (first+NUT_ENGAGE+NUT_DRIVE+NUT_FINAL,run_down),
+                          (first+NUT_CYCLE,waypoint),(first+NUT_CYCLE+1,safe)))
+            for k,(sx,sy) in enumerate(SOCKET_LAYOUT):
+                held_root=root+f"/Joint_6/CarriedNut_{round(first*1000)}_{k}"
+                held,_=xform(stage,held_root,(sx,sy,TOOL+NUT_LENGTH))
                 held.AddRotateXOp().Set(180.)
                 make_nut(stage,held_root)
-                visibility(held,t+NUT_PICKUP,t+NUT_ENGAGE)
-            poses.append((first+len(CROSS)*NUT_CYCLE+1,safe))
+                visibility(held,first+NUT_PICKUP,first+NUT_ENGAGE)
     for t,x in rail_samples:
         move(slide,t,(x,0,0))
     key_robot(stage,arm,groups,side,poses,root)
@@ -662,7 +736,7 @@ def dock_clamps(stage, root, start, departure):
             box(stage,path+"/Slide/Jaw",(0,0,.22),(.13,.057,.105),AMBER)
             box(stage,path+"/Slide/Pad",(0,-side*.032,.22),(.09,.016,.074),ALLOY)
             cylinder(stage,path+"/Slide/Pin",(0,side*.055,.22),.020,.086,ZINC,"Y")
-            for t,y in ((start,DOCK_CLAMP_OPEN),(start+16,DOCK_CLAMP_OPEN),(start+18,DOCK_CLAMP_CLOSED),
+            for t,y in ((start,DOCK_CLAMP_OPEN),(start+AMR_DOCKED,DOCK_CLAMP_OPEN),(start+AMR_DOCKED+2,DOCK_CLAMP_CLOSED),
                         (departure-2,DOCK_CLAMP_CLOSED),(departure,DOCK_CLAMP_OPEN)):
                 move(slide,t,(x,side*y,0))
 
@@ -672,20 +746,24 @@ def order(stage, assets, mount_arm, fasten_arm, data, record):
     vehicle=f"CN7-{number:03}"
     root=f"/World/Orders/CN7_{number:03}"
     cycle,_=xform(stage,root)
-    visibility(cycle,start,end)
+    # The next car is staged: its AMR leaves the buffer while the previous car is still
+    # in the cell and waits at the gate, so the order starts with only the 7 m straight run.
+    staged=max(0.,start-AMR_AT_GATE)
+    visibility(cycle,staged,end)
     amr,lift=carrier(stage,assets,root+"/Carrier")
     dock_clamps(stage,root,start,departure)
-    route=((start,AMR_GATE_X,AMR_BAY_Y),(start+7,AMR_GATE_X,0.),(start+16,0.,0.),
-           (departure,0.,0.),(departure+10,AMR_GATE_X,0.),(end,AMR_GATE_X,-AMR_BAY_Y))
+    route=((start-AMR_AT_GATE,AMR_GATE_X,AMR_BAY_Y),(start,AMR_GATE_X,0.),(start+AMR_DOCKED,0.,0.),
+           (departure,0.,0.),(departure+AMR_OUT_GATE,AMR_GATE_X,0.),(end,AMR_GATE_X,-AMR_BAY_Y))
     for t,x,y in route:
         move(amr,t,(x,y,0.))
-    for t,height in ((start,-.12),(start+16,-.12),(start+19,0.),
-                     (departure+10,0.),(end,-.10)):
+    for t,height in ((start-AMR_AT_GATE,-.12),(start+AMR_DOCKED,-.12),(start+AMR_LIFTED,0.),
+                     (departure+AMR_OUT_GATE,0.),(end,-.10)):
         move(lift,t,(0.,0.,height))
     record(start,vehicle,"","order",wheel.name)
-    record(start+19,vehicle,"","docked","AMR dock and lift complete")
+    record(start+AMR_LIFTED,vehicle,"","docked","AMR dock and lift complete")
     record(departure,vehicle,"","depart","Both rails parked")
     record(end,vehicle,"","outbound","AMR reached outbound apron")
+    record(staged,vehicle,"","staged","AMR leaves inbound buffer for the gate")
     for side,name in ((1,"Left"),(-1,"Right")):
         rail_robot(stage,root+f"/{name}Mount",mount_arm,side,start,front,rear,rear_tight,front_tight,departure,True)
         rail_robot(stage,root+f"/{name}Fasten",fasten_arm,side,start,front,rear,rear_tight,front_tight,departure,False)
@@ -729,32 +807,40 @@ def order(stage, assets, mount_arm, fasten_arm, data, record):
                          (seated-2.,x+.012,y,HUB_Z+.01-roller),
                          (seated-1.,x,y,HUB_Z-roller),
                          (seated,x,wheel_y,HUB_Z-roller),
-                         (tight+len(CROSS)*NUT_CYCLE,x,wheel_y,HUB_Z-roller),
-                         (tight+len(CROSS)*NUT_CYCLE+1,x,wheel_y,.45),
-                         (tight+len(CROSS)*NUT_CYCLE+2,x,y,.45)):
+                         (tight+NUT_CYCLE,x,wheel_y,HUB_Z-roller),
+                         (tight+NUT_CYCLE+1,x,wheel_y,.45),
+                         (tight+NUT_CYCLE+2,x,y,.45)):
             move(carriage,t,(cx,cy,z))
         record(path[-1][0],vehicle,name,"inspect","Simulated wheel inspection")
         record(seated-1,vehicle,name,"aligned",
                f"Nominal static envelope: pilot clearance {fit(wheel)['pilot_m']*1000:.2f} mm radial")
         record(seated,vehicle,name,"seated","Nominal alignment, wheel retained by load support")
-        for step,index in enumerate(CROSS):
-            bx,by=BOLT_CENTERS[index]
+        t=tight+NUT_ENGAGE
+        for index,(bx,by) in enumerate(BOLT_CENTERS):
             nut_root=root+f"/Carrier/Hanger/{name}/Nut_{index}"
             nut,nut_pos=xform(stage,nut_root)
             nut_spin=nut.AddRotateZOp()
-            t=tight+step*NUT_CYCLE+NUT_ENGAGE
             visibility(nut,t,end)
             make_nut(stage,nut_root)
-            for seconds,distance,spin_angle in ((t,NUT_ADVANCE,0.),(t+NUT_DRIVE,0.,1800.)):
+            for seconds,distance,spin_angle in ((t,NUT_ADVANCE,0.),(t+NUT_DRIVE,0.,1800.),
+                                                (t+NUT_DRIVE+NUT_FINAL,0.,1830.)):
                 move(nut_pos,seconds,(bx,by,NUT_SEAT+distance))
                 nut_spin.Set(spin_angle,frame(seconds))
-            record(t+NUT_DRIVE,vehicle,name,"tightened",f"Nut {index+1}; virtual {DEMO_TORQUE:.0f} N m (accept {NUT_TORQUE[0]}–{NUT_TORQUE[1]})")
-        record(tight+len(CROSS)*NUT_CYCLE+2,vehicle,name,"complete","Five nuts, support withdrawn")
+            record(t+NUT_DRIVE+NUT_FINAL,vehicle,name,"tightened",f"Nut {index+1}; virtual {DEMO_TORQUE:.0f} N m (accept {NUT_TORQUE[0]}–{NUT_TORQUE[1]})")
+        record(tight+NUT_CYCLE+2,vehicle,name,"complete","Five nuts in one multi-spindle cycle, support withdrawn")
+    # Only the staged AMR and its car are shown before the order starts; the cell
+    # equipment of this order would otherwise overlap the previous order's.
+    for child in cycle.GetPrim().GetChildren():
+        if child.GetName()!="Carrier" and not UsdGeom.Imageable(child).GetVisibilityAttr().HasAuthoredValue():
+            visibility(UsdGeom.Xformable(child),start,end)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", type=Path, default=Path(__file__).parent/"output")
+    parser.add_argument("--output", type=Path, default=Path(__file__).parent/"output",
+                        help="Folder for build intermediates and the physics setup export")
+    parser.add_argument("--scene", type=Path, default=Path(__file__).resolve().parent.parent/"scene",
+                        help="Layered scene folder; overrides/ inside it is never overwritten")
     parser.add_argument("--inject-defect", action="store_true", help="Reject and replace first FL wheel")
     parser.add_argument("--mount-urdf", type=Path, default=DOOSAN_ASSETS/"h2515.urdf")
     parser.add_argument("--fasten-urdf", "--urdf", type=Path, default=DOOSAN_ASSETS/"m1509.urdf")
@@ -809,13 +895,18 @@ def main():
     usd = args.output/"wheel_cell.usdc"
     if not stage.GetRootLayer().Export(str(usd)):
         raise OSError(f"Could not export {usd}")
-    db = args.output/"production.sqlite3"
+    # The scene is delivered as a root layer with one sublayer per area; the
+    # monolithic file is only the intermediate the split is made from.
+    from split_scene import split
+    usd_root, parts = split(usd, args.scene)
+    usd.unlink()
+    db = args.scene/"production.sqlite3"
     with sqlite3.connect(db) as connection:
         connection.execute("CREATE TABLE IF NOT EXISTS events ("
                            "sim_s REAL, vehicle TEXT, station TEXT, code TEXT, detail TEXT)")
         connection.execute("DELETE FROM events")
         connection.executemany("INSERT INTO events VALUES (?, ?, ?, ?, ?)", sorted(events))
-    print(f"{usd} ({data[-1]:.1f}s), {db} ({len(events)} events)")
+    print(f"{usd_root} ({len(parts)} layers, {data[-1]:.1f}s), {db} ({len(events)} events)")
 
 
 if __name__ == "__main__":

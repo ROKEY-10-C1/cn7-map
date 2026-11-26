@@ -6,11 +6,12 @@ from fitment import WHEELBASE
 
 FPS = 24
 HUB_Z = 0.94
-CROSS = (0, 2, 4, 1, 3)
-NUT_CYCLE = 3.9
+# Five-spindle nutrunner: one pick of all five nuts, one simultaneous run-down per wheel.
 NUT_PICKUP = .90
 NUT_ENGAGE = 2.45
 NUT_DRIVE = .75
+NUT_FINAL = .60                    # synchronized final-torque step after run-down
+NUT_CYCLE = NUT_ENGAGE+NUT_DRIVE+NUT_FINAL+.70
 AXLE = WHEELBASE/2
 STATIONS = {"FL": (AXLE, 1), "FR": (AXLE, -1),
             "RL": (-AXLE, 1), "RR": (-AXLE, -1)}
@@ -23,7 +24,14 @@ REJECT_GATE_HALF = .365
 BELT_Z = .50
 SPEED = .30
 AMR_GATE_X = -7.0
-AMR_BAY_Y = 4.95
+# AMR legs timed to KUKA KMP 1500 limits (crab 0.56 m/s, straight 1.0 m/s) with ~10 % margin,
+# plus the 0.05 m/s lift: buffer -> gate (crab), gate -> dock (straight), lift 0.12 m.
+AMR_AT_GATE = 13.                 # staged ahead of the order start, during the previous car
+AMR_DOCKED = 8.                    # order start (at the gate) -> docked
+AMR_LIFTED = AMR_DOCKED+3.
+AMR_OUT_GATE = 10.                 # dock -> gate after departure; gate -> outbound buffer follows
+AMR_OUT_BUFFER = 13.
+AMR_BAY_Y = 6.55                  # vehicle buffer centre line, 1.5 m aisle outside the cell fence
 MOUNT_PARK = 3.15
 FASTEN_PARK = -3.15
 
@@ -90,8 +98,8 @@ def schedule(inject, mixed_sizes=False):
         front_seat = ready+6.
         rear_seat = front_seat+9.
         rear_tighten = rear_seat+5.
-        front_tighten = rear_tighten+len(CROSS)*NUT_CYCLE+7.
-        departure = front_tighten+len(CROSS)*NUT_CYCLE+8.
-        end = departure+19.
+        front_tighten = rear_tighten+NUT_CYCLE+7.
+        departure = front_tighten+NUT_CYCLE+8.
+        end = departure+AMR_OUT_GATE+AMR_OUT_BUFFER
         yield number, wheel, start, deliveries, reject, front_seat, rear_seat, rear_tighten, front_tighten, departure, end
         start = end+1.
