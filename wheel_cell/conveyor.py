@@ -1,20 +1,15 @@
-"""Physical roller surfaces, containment and the supported tip-up transfer."""
+"""Physical roller surfaces and containment of the wheel supply conveyors."""
 
-from math import atan2, degrees
+from math import degrees
 
 from pxr import Gf, PhysxSchema, UsdGeom, UsdPhysics, UsdShade
 
-from physical_data import JAW_STROKE, ROLLER_RADIUS, ROLLER_RATED_SPEED, ROLLER_TORQUE, tube_properties
-from process import BELT_Z, CN7_R16, LINE_Y, REJECT_GATE_HALF, REJECT_X
-from cell_config import CONFIG
+from physical_data import ROLLER_RATED_SPEED, ROLLER_TORQUE, tube_properties
+from process import LINE_Y, REJECT_GATE_HALF, REJECT_X
 
 FACTORY="/World/Factory"
 START_AHEAD=.76
 TREAD_HALF=.095
-PARK_X=-.07       # TipCenter travel is -.08 to .49 m from the axle
-PARK_Y=CONFIG["fixture"]["park_y"]   # clear of the withdrawing mount arm (E12)
-PARK_Z=-.20
-PARK_TIME=4.0
 
 
 def collider(prim, material=None):
@@ -126,144 +121,6 @@ def setup_factory(stage, root, material, guide_material, branch_side):
                           (end-start,.035,.102),guide_material)
 
 
-def station_hardware(stage,root,axle,side,material):
-    frame_bottom=BELT_Z-.087-.032
-    for i,dx in enumerate((-.236,.236)):
-        for j,dy in enumerate((-.226,.226)):
-            block(stage,root+f"/Support_{i}_{j}",(axle+dx,side*LINE_Y+dy,frame_bottom/2),
-                  (.071,.071,frame_bottom))
-    block(stage,root+"/TransferBed",(axle,side*LINE_Y,BELT_Z-.087),(.66,.654,.064))
-    cache=UsdGeom.XformCache()
-    for i in range(7):
-        path=root+f"/TransferRoller_{i}"
-        roll=UsdGeom.Cylinder.Define(stage,path)
-        roll.CreateAxisAttr("Y")
-        roll.CreateRadiusAttr(ROLLER_RADIUS)
-        roll.CreateHeightAttr(.58)
-        roll.AddTranslateOp().Set(Gf.Vec3d(axle+(i-3)*.087,side*LINE_Y,BELT_Z-ROLLER_RADIUS))
-        roll.CreateDisplayColorAttr([(.36,.40,.42)])
-        powered_roller(roll,path+"_Axle",-.32,material,cache)
-    stop_x=axle-CN7_R16.radius-.027
-    stopper=block(stage,root+"/EndStop",(stop_x,side*LINE_Y,.56),(.045,.65,.116),material)
-    return str(stopper)
-
-
 def quaternion(data):
     q=data["rotation"]
     return Gf.Quatd(q[3],Gf.Vec3d(q[0],q[1],q[2]))
-
-
-def progress(seconds,start,duration):
-    fraction=min(max((seconds-start)/duration,0.),1.)
-    return fraction*fraction*(3.-2.*fraction)
-
-
-class Transfer:
-    def __init__(self,tool,axes,jaws,pads,origin,destination,side):
-        self.tool=tool
-        self.axes=axes
-        self.jaws=jaws
-        self.pads=pads
-        self.origin=Gf.Vec3d(*origin)
-        self.destination=Gf.Vec3d(*destination)
-        self.side=side
-        self.angular_goal=-side*90.
-        self.pad_contacts=set()
-        self.tip_start=None
-        self.return_time=None
-
-    def position_target(self,point):
-        for attr,value in zip(self.axes[:3],point-self.origin):
-            attr.Set(value)
-
-    def begin_clamp(self,point):
-        self.pickup_target=Gf.Vec3d(*point)
-        self.close_start=None
-
-    def close(self,api,seconds):
-        # Traverse above the flat tire before lowering: the inboard jaw otherwise crosses
-        # the shoulder while the gripper approaches from its outboard parking position.
-        across=progress(seconds,0.,.48)
-        lower=progress(seconds,.52,.54)
-        target=self.origin+Gf.Vec3d((self.pickup_target[0]-self.origin[0])*across,
-                                   (self.pickup_target[1]-self.origin[1])*across,
-                                   (self.pickup_target[2]+.002-self.origin[2])*lower)
-        self.position_target(target)
-        if self.close_start is None:
-            actual=api.get_rigidbody_transformation(self.tool)
-            if seconds<1.06 or not actual.get("ret_val") or (Gf.Vec3d(*actual["position"])-target).GetLength()>.006:
-                return False
-            self.close_start=seconds
-        closing=progress(seconds,self.close_start,.49)
-        for attr in self.jaws:
-            attr.Set(JAW_STROKE*closing)
-        return closing>=.90
-
-    def capture(self,api,wheel):
-        tool=api.get_rigidbody_transformation(self.tool)
-        rotation=Gf.Rotation(quaternion(tool))
-        inverse=rotation.GetInverse()
-        self.offset=inverse.TransformDir(Gf.Vec3d(*wheel["position"])-Gf.Vec3d(*tool["position"]))
-        self.pickup=Gf.Vec3d(*wheel["position"])
-
-    def slip(self,api,wheel):
-        tool=api.get_rigidbody_transformation(self.tool)
-        relative=Gf.Vec3d(*wheel["position"])-Gf.Vec3d(*tool["position"])
-        local=Gf.Rotation(quaternion(tool)).GetInverse().TransformDir(relative)
-        return (local-self.offset).GetLength()
-
-    def step(self,seconds,wheel):
-        # Lift clear of the bed before commanding the pitch axis. Lower to the
-        # spindle datum only once upright. The wheel stays a dynamic body.
-        lift=progress(seconds,0.,1.15)
-        if self.tip_start is None and seconds>=1.25 and wheel["position"][2]>=self.destination[2]+.039:
-            self.tip_start=seconds
-        tip=progress(seconds,self.tip_start,1.30) if self.tip_start is not None else 0.
-        settle=progress(seconds,self.tip_start+1.40,.60) if self.tip_start is not None else 0.
-        angle=self.angular_goal*tip
-        rotation=Gf.Rotation(Gf.Vec3d(1,0,0),angle)
-        center=self.pickup*(1-lift)+self.destination*lift+Gf.Vec3d(0,0,.048*(lift-settle))
-        self.position_target(center-rotation.TransformDir(self.offset)+Gf.Vec3d(0,0,.002))
-        self.axes[3].Set(angle)
-        if self.tip_start is None or seconds-self.tip_start<2.30:
-            return False
-        normal=Gf.Rotation(quaternion(wheel)).TransformDir(Gf.Vec3d(0,0,1))
-        error=(Gf.Vec3d(*wheel["position"])-self.destination).GetLength()
-        return normal[1]*self.side>.9998 and error<.006
-
-    def release(self):
-        for attr in self.jaws:
-            attr.Set(0.)
-
-    def hold(self,api):
-        tool=api.get_rigidbody_transformation(self.tool)
-        if not tool.get("ret_val"):
-            return
-        normal=Gf.Rotation(quaternion(tool)).TransformDir(Gf.Vec3d(0,0,1))
-        self.axes[3].Set(degrees(atan2(-normal[1],normal[2])))
-        self.position_target(Gf.Vec3d(*tool["position"])+Gf.Vec3d(0,0,.002))
-
-    def finish_handoff(self,api):
-        tool=api.get_rigidbody_transformation(self.tool)
-        self.return_start=Gf.Vec3d(*tool["position"])
-        self.return_time=0.
-
-    def park(self,dt):
-        if self.return_time is None or self.return_time>=PARK_TIME:
-            return
-        self.return_time+=dt
-        # Stay upright and tuck beside the axle, below the robot tool and outboard of the
-        # wheel path: the mount robot's rail carriage later occupies axle+0.53 m, where the
-        # flat jaw beam used to park and was pushed back between the wheel and the hub.
-        outbound=progress(self.return_time,.80,.75)
-        retreat=progress(self.return_time,1.60,.85)
-        lower=progress(self.return_time,2.50,.80)
-        parked=Gf.Vec3d(self.origin[0]+PARK_X,self.side*(LINE_Y+PARK_Y),self.origin[2]+PARK_Z)
-        start=self.return_start
-        self.position_target(Gf.Vec3d(start[0]+(parked[0]-start[0])*retreat,
-                                      start[1]+(parked[1]-start[1])*outbound,
-                                      start[2]+(parked[2]-start[2])*lower))
-        self.axes[3].Set(self.angular_goal)
-        if self.return_time>3.4:
-            for attr in self.jaws:
-                attr.Set(JAW_STROKE)

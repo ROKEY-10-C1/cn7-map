@@ -4,16 +4,11 @@
     python3 map/wheel_cell/regress.py --quick         # module probes only (about a minute)
     python3 map/wheel_cell/regress.py --save-baseline # store this run as the reference
     python3 map/wheel_cell/regress.py --only seed42 jam42 -- --config my.json
-    python3 map/wheel_cell/regress.py --area feed     # one area of the cell only
+    python3 map/wheel_cell/regress.py --area cycle    # one area of the cell only
     python3 map/wheel_cell/regress.py --changed       # areas touched by uncommitted changes
 
-Areas: supply (truck infeed), insertion (hub bench), feed (belt, stopper, clamp, tip-up,
-hand-off, alignment: first 11 s), dock (AMR docking: first 21 s), cycle (seed 42 to the
-mount arms parked), jam (fault case), realistic (configs/realistic.json, seeds 42 and 7),
-full (every default-model scenario).
-
-Each scenario is one check_physics.sh run. Results land in output/regress/<time>.json and a
-table is printed. Any station whose result differs from the baseline is flagged.
+Areas: supply (truck infeed), insertion (hub bench), cycle (seed 42: docking and pick zone),
+seeds (four seeds), rails (same-rail arm interlock), full (everything).
 """
 import argparse
 import json
@@ -31,47 +26,38 @@ OUT = ROOT/"output"/"regress"
 
 # name: (arguments, what passing means)
 SCENARIOS = {
-    "seed42": (["--seed", "42", "--require-seated"], "full cycle, all four seated"),
-    "seed7": (["--seed", "7", "--require-seated"], "full cycle, all four seated"),
-    "seed123": (["--seed", "123", "--require-seated"], "full cycle, all four seated"),
-    "seed2024": (["--seed", "2024", "--require-seated"], "full cycle, all four seated"),
-    "jam42": (["--seed", "42", "--jam"], "FL must jam without face contact"),
-    "insert_nominal": (["--insertion-probe", "nominal"], "bench insertion seats"),
-    "insert_skew": (["--insertion-probe", "skew"], "bench insertion with skew stalls on studs"),
+    "seed42": (["--seed", "42"], "docked, all four tires pick-ready in the V, no equipment contact"),
+    "seed7": (["--seed", "7"], "same, another seed"),
+    "seed123": (["--seed", "123"], "same, another seed"),
+    "seed2024": (["--seed", "2024"], "same, another seed"),
+    "rails": (["--interference-probe"], "same-rail arms commanded together are stopped"),
+    "insert_nominal": (["--insertion-probe", "nominal"], "bench: wheel pressed onto the hub seats on the face"),
+    "insert_skew": (["--insertion-probe", "skew"], "bench: 4 mm radial offset is stopped by the studs"),
     "supply_left": (["--supply-probe", "left"], "infeed reaches the left branch"),
     "supply_right": (["--supply-probe", "right"], "infeed reaches the right branch"),
 }
 QUICK = ("insert_nominal", "insert_skew", "supply_left")
 
-# A partial scenario stops at --until and passes if no station has failed so far.
-SCENARIOS["feed42"] = (["--seed", "42", "--until", "11"], "belt to aligned, no fault")
-SCENARIOS["dock42"] = (["--seed", "42", "--until", "21"], "AMR docked, no fault")
-# All corner/tire/sensing models on (hub on bearing + suspension, tolerances, ring tire, camera).
-REALISTIC = str(ROOT/"configs"/"realistic.json")
-SCENARIOS["real42"] = (["--seed", "42", "--require-seated", "--config", REALISTIC], "realistic models, all four seated")
-SCENARIOS["real7"] = (["--seed", "7", "--require-seated", "--config", REALISTIC], "realistic models, all four seated")
-
 AREAS = {
     "supply": ("supply_left", "supply_right"),
     "insertion": ("insert_nominal", "insert_skew"),
-    "feed": ("feed42",),
-    "dock": ("dock42",),
     "cycle": ("seed42",),
-    "jam": ("jam42",),
-    "realistic": ("real42", "real7"),
-    "full": tuple(n for n in SCENARIOS if n not in ("feed42", "dock42", "real42", "real7")),
+    "seeds": ("seed42", "seed7", "seed123", "seed2024"),
+    "rails": ("rails",),
+    "full": tuple(SCENARIOS),
 }
 
 # Which areas a source file can affect (files not listed affect none: tooling, docs, recording).
 FILE_AREAS = {
-    "conveyor.py": ("supply", "feed", "cycle"),
-    "physics.py": ("insertion", "feed", "dock", "cycle", "realistic"),
-    "corner.py": ("realistic",),
-    "realistic.json": ("realistic",),
+    "conveyor.py": ("supply", "cycle"),
+    "handling.py": ("cycle",),
+    "gripper.py": ("cycle", "rails"),
+    "corner.py": ("insertion", "cycle"),
+    "physics.py": ("insertion", "cycle", "rails"),
     "fitment.py": ("insertion", "cycle"),
     "wheel_geometry.py": ("insertion", "cycle"),
-    "robot.py": ("cycle",),
-    "cell_config.py": ("feed", "cycle"),
+    "robot.py": ("cycle", "rails"),
+    "cell_config.py": ("insertion", "cycle"),
     "process.py": ("full",),
     "physical_data.py": ("full",),
     "build.py": ("full",),
@@ -79,9 +65,7 @@ FILE_AREAS = {
 }
 
 # Known to be unreliable in the current model: reported, but they do not fail the run.
-KNOWN_FRAGILE = {
-    "jam42": "2 mm FL offset is inside float + hole clearance: jams on seed 42 only by chance",
-}
+KNOWN_FRAGILE = {}
 
 
 def changed_areas():

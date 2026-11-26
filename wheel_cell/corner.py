@@ -1,18 +1,16 @@
 """Vehicle corner and wheel models: hub on its bearing, suspension, dimensional tolerance,
 rigid-ring tire, and the camera measurement model that replaces simulator ground truth.
 
-All of it is switched by cell_config.CONFIG ("corner", "tire", "sensing"); with the defaults
-physics.py keeps its fixed hub, rigid wheel and true angle. Estimates are listed in
-calibration.json.
+Parameters come from cell_config.CONFIG; estimates are listed in calibration.json.
 """
-from math import cos, degrees, radians, sin, sqrt, tau
+from math import cos, degrees, sin, sqrt, tau
 from random import Random
 
-from pxr import Gf, PhysxSchema, UsdGeom, UsdPhysics
+from pxr import Gf, PhysxSchema, UsdPhysics
 
 from cell_config import CONFIG
 from fitment import BOLT_CENTERS, FLANGE_RADIUS, OFFSET, PCD, PILOT, PILOT_LENGTH, STUD_DIAMETER, STUD_PROJECTION
-from physical_data import RIM_MASS, TIRE_MASS, annulus_inertia, box_inertia
+from physical_data import TIRE_MASS, annulus_inertia, box_inertia
 from process import CN7_R16, HUB_Z
 
 PILOT_CHAMFER = (.0015, .0010)   # length, radial: 1.5 mm x ~34 deg lead-in on the pilot (drawing practice)
@@ -46,14 +44,13 @@ class Tolerance:
 
     def __init__(self, rng):
         cfg = CONFIG["tolerance"]
-        on = cfg["enabled"]
         low, high = cfg["pilot_diameter_mm"]
-        self.pilot = PILOT + (rng.uniform(low, high)/1000 if on else 0.)
-        pcd = PCD + (rng.gauss(0., cfg["pcd_mm"]/2000) if on else 0.)
+        self.pilot = PILOT + rng.uniform(low, high)/1000
+        pcd = PCD + rng.gauss(0., cfg["pcd_mm"]/2000)
         self.studs = []
         for x, y in BOLT_CENTERS:
             a = rng.uniform(0, tau)
-            r = rng.uniform(0, cfg["stud_position_mm"]/1000) if on else 0.
+            r = rng.uniform(0, cfg["stud_position_mm"]/1000)
             scale = pcd/PCD
             self.studs.append((x*scale + r*cos(a), y*scale + r*sin(a)))
 
@@ -85,31 +82,24 @@ def build_corner(stage, car_pose, root, name, axle, side, hub_y, steel, seed):
                                                             P.mass_properties, P.pin, P.rotate)
     rng = Random(f"{seed}-{name}-corner")
     hub_cfg, susp = CONFIG["hub"], CONFIG["suspension"]
-    angle = rng.uniform(0., 72.) if hub_cfg["random_angle"] else 0.
+    angle = rng.uniform(0., 72.)          # the stopped car parks its hubs at any angle
     tolerance = Tolerance(rng)
-    axle_q = rotate((1, 0, 0), -side*90).GetQuat()
     local = Gf.Vec3d(axle, hub_y, HUB_Z)
     world = car_pose.Transform(local)
     car = stage.GetPrimAtPath(root+"/CN7")
-    parent = car
-    if susp["enabled"]:
-        knuckle = body(stage, f"{root}/{name}/Knuckle", world, None, KNUCKLE_MASS)
-        mass_properties(knuckle, (0., 0., 0.), box_inertia(KNUCKLE_MASS, (.18, .12, .30)))
-        spring = constrain(UsdPhysics.Joint.Define(stage, f"{root}/{name}/Suspension"), car, knuckle, local)
-        lock(spring, ("transX", "rotX", "rotY", "rotZ"))
-        # Lifted car: the corner hangs at full droop, pressed onto the rebound stop by the
-        # spring preload. Downward load (the wheel weight on the pilot) is taken by the stop;
-        # only an upward push beyond preload + unsprung weight moves the hub.
-        rate = susp["wheel_rate_n_per_mm"]*1000
-        travel(spring, "transZ", 0., .09)
-        drive(spring, "transZ", -susp["droop_preload_mm"]/1000, rate, susp["damping_ns_per_m"], 2e4)
-        lateral = susp["lateral_rate_n_per_mm"]*1000
-        travel(spring, "transY", -.004, .004)
-        drive(spring, "transY", 0., lateral, 2*sqrt(lateral*KNUCKLE_MASS), 2e4)
-        parent = knuckle
-        joint_parent_pos = Gf.Vec3d(0.)
-    else:
-        joint_parent_pos = local
+    knuckle = body(stage, f"{root}/{name}/Knuckle", world, None, KNUCKLE_MASS)
+    mass_properties(knuckle, (0., 0., 0.), box_inertia(KNUCKLE_MASS, (.18, .12, .30)))
+    spring = constrain(UsdPhysics.Joint.Define(stage, f"{root}/{name}/Suspension"), car, knuckle, local)
+    lock(spring, ("transX", "rotX", "rotY", "rotZ"))
+    # Lifted car: the corner hangs at full droop, pressed onto the rebound stop by the
+    # spring preload. Downward load (the wheel weight on the pilot) is taken by the stop;
+    # only an upward push beyond preload + unsprung weight moves the hub.
+    rate = susp["wheel_rate_n_per_mm"]*1000
+    travel(spring, "transZ", 0., .09)
+    drive(spring, "transZ", -susp["droop_preload_mm"]/1000, rate, susp["damping_ns_per_m"], 2e4)
+    lateral = susp["lateral_rate_n_per_mm"]*1000
+    travel(spring, "transY", -.004, .004)
+    drive(spring, "transY", 0., lateral, 2*sqrt(lateral*KNUCKLE_MASS), 2e4)
     # Quaternion product: turn about the hub's own axle by `angle`, then lay the axle along Y.
     hub_q = rotate((1, 0, 0), -side*90).GetQuat()*rotate((0, 0, 1), angle).GetQuat()
     hub = body(stage, f"{root}/{name}/Hub", world, hub_q, HUB_MASS)
@@ -117,34 +107,26 @@ def build_corner(stage, car_pose, root, name, axle, side, hub_y, steel, seed):
     PhysxSchema.PhysxContactReportAPI.Apply(hub).CreateThresholdAttr(0.)
     path = str(hub.GetPath())
     pin(stage, path+"/Face", (0, 0), OFFSET-.012, .012, FLANGE_RADIUS, steel)
-    if CONFIG["corner"]["chamfers"]:
-        chamfered_pin(stage, path+"/Pilot", (0, 0), OFFSET, PILOT_LENGTH, tolerance.pilot/2, PILOT_CHAMFER, steel)
-        for i, center in enumerate(tolerance.studs):
-            chamfered_pin(stage, path+f"/Stud_{i}", center, OFFSET, STUD_PROJECTION, STUD_DIAMETER/2, STUD_CHAMFER, steel)
-    else:
-        pin(stage, path+"/Pilot", (0, 0), OFFSET, PILOT_LENGTH, tolerance.pilot/2, steel)
-        for i, center in enumerate(tolerance.studs):
-            pin(stage, path+f"/Stud_{i}", center, OFFSET, STUD_PROJECTION, STUD_DIAMETER/2, steel)
+    chamfered_pin(stage, path+"/Pilot", (0, 0), OFFSET, PILOT_LENGTH, tolerance.pilot/2, PILOT_CHAMFER, steel)
+    for i, center in enumerate(tolerance.studs):
+        chamfered_pin(stage, path+f"/Stud_{i}", center, OFFSET, STUD_PROJECTION, STUD_DIAMETER/2, STUD_CHAMFER, steel)
     # A moving hub pressed by the wheel at 145 N lost the precise (0.045 mm) face contact and the
-    # web slid through it to the shuttle stop. A larger contact offset keeps the contacts alive;
+    # web slid through it to the end of its travel. A larger contact offset keeps the contacts alive;
     # the rest offset stays 0, so the seated position is unchanged.
     for part in hub.GetChildren():
         if part.HasAPI(UsdPhysics.CollisionAPI):
             PhysxSchema.PhysxCollisionAPI(part).GetContactOffsetAttr().Set(HUB_CONTACT_OFFSET)
-    bearing = constrain(UsdPhysics.Joint.Define(stage, f"{root}/{name}/Bearing"), parent, hub, joint_parent_pos,
+    bearing = constrain(UsdPhysics.Joint.Define(stage, f"{root}/{name}/Bearing"), knuckle, hub, Gf.Vec3d(0.),
                         rot0=rotate((1, 0, 0), -side*90).GetQuat())
     bearing.CreateLocalRot1Attr(Gf.Quatf(rotate((0, 0, 1), -angle).GetQuat()))
     lock(bearing, ("transZ", "rotX", "rotY"))
     play = hub_cfg["radial_play_mm"]/2000
     for dof in ("transX", "transY"):
         travel(bearing, dof, -play, play)
-    if not hub_cfg["free_rotation"]:
-        lock(bearing, ("rotZ",))
-    else:
-        # Bearing seal and pad drag behaves like Coulomb friction: it holds the parked hub against
-        # stray solver torques yet yields to a stud pushing on it. A steep viscous law reaching the
-        # drag torque at 0.5 deg/s stands in for it.
-        drive(bearing, "rotZ", 0., 0., hub_cfg["bearing_drag_nm"]/.5, 50.)
+    # Bearing seal and pad drag behaves like Coulomb friction: it holds the parked hub against
+    # stray solver torques yet yields to a stud pushing on it. A steep viscous law reaching the
+    # drag torque at 0.5 deg/s stands in for it.
+    drive(bearing, "rotZ", 0., 0., hub_cfg["bearing_drag_nm"]/.5, 50.)
     return path, angle, tolerance
 
 
