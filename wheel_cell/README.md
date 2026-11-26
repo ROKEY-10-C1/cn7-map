@@ -61,9 +61,12 @@ cd "$HOME/project"
 | 리프트 | `lift_joint` 직동 0–200 mm, 50 mm/s | 사양서 "Lift table height max. 200 mm", "Lifting speed max. 50 mm/s" |
 | 바퀴 | Ø310 mm × 4, x ±0.72 m, y ±0.31 m | 지름은 사양서 "Wheel diameter 310 mm". 개수·위치는 사양서에 없음 → `build.py` `amr_housing()`과 같은 추정값 |
 | 스캐너 | `laser_front` / `laser_rear`, x ±0.958 m, z 0.28 m | 사양서는 "Integrated safety laser scanners"만 언급. 개수·위치는 `amr_housing()`과 같은 추정값 |
-| 리프트 테이블 판, 지상고, 바퀴 질량 | 1.80 × 0.70 × 0.03 m, 40 mm, 20 kg | 사양서에 없음 → 추정 |
+| 외형 메시 | `assets/kmp1500_meshes/` 스커트·팬·상부 셸 STL + 상태 표시등 | 장면 `amr_housing()`의 외곽선·높이를 그대로 사양서 외곽(2,000 × 800 × 470 mm)에 맞춤. 모양은 제품 사진을 보고 근사한 것이며 KUKA CAD가 아님 |
+| 리프트 테이블 판, 지상고, 바퀴 질량 | 1.50 × 0.60 × 0.03 m (상부 셸 안), 40 mm, 20 kg | 사양서에 없음 → 추정 |
 | 속도 (주석) | 직진 1 m/s, 대각·횡 0.56 m/s | 사양서 "Velocity straight ahead", "Velocity diagonally and sideways" |
 
 출처: KUKA, *KMP 1500* 제품 사양서(영문, © 2022), 2026-11-26 확인. [PDF](https://www.kuka.com/-/media/kuka-downloads/files/87f2706ce77c4318877932fb36f6002d/kuka_kmp1500_en.pdf?hash=90820FB7DA3F2999B45EFC28EF98A626&rev=c434eb6522c4445e8b65c5e1fdde221c) — 같은 사양서가 위 "AMR·승강" 행의 출처입니다. 사양서에는 치수 도면과 CAD 데이터가 없습니다.
+
+메시 경로는 URDF 기준 상대 경로(`kmp1500_meshes/*.stl`)라 Isaac URDF Importer는 그대로 읽습니다. RViz는 `file://` 절대 경로가 필요하므로 불러올 때 바꿔 줍니다. 리프트는 `/joint_states`의 `lift_joint` 값(0–0.2 m)으로 올립니다.
 
 좌표계는 REP 105를 따릅니다(`base_link`는 바닥의 차대 중심, x 전방). omniMove 메카넘 롤러는 모델링하지 않았으므로 전방향 주행은 바퀴 관절이 아닌 holonomic 베이스 제어로 구동합니다. 차체 운반용 행어(`Hanger`)는 셀 장비라서 포함하지 않았습니다.
