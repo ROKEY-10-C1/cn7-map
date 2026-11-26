@@ -1,0 +1,216 @@
+"""Write assets/kmp1500.urdf: KUKA KMP 1500 omniMove at datasheet size.
+
+Source: KUKA "KMP 1500" product datasheet (EN, (c) 2022), read 2026-11-26:
+  https://www.kuka.com/-/media/kuka-downloads/files/87f2706ce77c4318877932fb36f6002d/kuka_kmp1500_en.pdf?hash=90820FB7DA3F2999B45EFC28EF98A626&rev=c434eb6522c4445e8b65c5e1fdde221c
+Datasheet values: 2,000 x 800 x 470 mm with scanners, 711 kg,
+lifting system +144 kg with max. 200 mm lift table height at max. 50 mm/s,
+1,500 kg rated payload, 310 mm wheels, 1 m/s straight, 0.56 m/s sideways.
+Those values come from physical_data.py. Everything marked ESTIMATE is not in
+the datasheet and matches the scene's amr_housing() in build.py instead
+(wheel and scanner positions) or is a plain engineering guess (masses split,
+lift table size, ground clearance).
+The exterior meshes (assets/kmp1500_meshes/*.stl) are the scene's amr_housing()
+shell scaled to the datasheet envelope; mesh paths are relative to the URDF.
+
+Frames follow REP 105: base_link sits on the floor at the platform centre,
+x forward, z up. Two SICK S300 safety scanners sit on diagonal corners
+(laser_front_left, laser_rear_right; 270 deg each, so together they see all
+round) and imu_link carries a yaw-rate gyro for odometry fusion.
+The omniMove wheels are modelled as plain wheels on continuous joints; the
+mecanum rollers are left out, so drive it with a holonomic base controller,
+not by spinning the wheel joints.
+
+python3 wheel_cell/kmp1500_urdf.py   # rewrites wheel_cell/assets/kmp1500.urdf
+"""
+import struct
+from math import pi
+from pathlib import Path
+
+from physical_data import (AMR_LIFT_MASS, AMR_LIFT_SPEED, AMR_MASS, AMR_SIZE, AMR_SPEED_X,
+                           AMR_WHEEL_RADIUS)
+
+SOURCE_URL = ("https://www.kuka.com/-/media/kuka-downloads/files/87f2706ce77c4318877932fb36f6002d/kuka_kmp1500_en.pdf?hash=90820FB7DA3F2999B45EFC28EF98A626&rev=c434eb6522c4445e8b65c5e1fdde221c")
+
+LENGTH, WIDTH, HEIGHT = AMR_SIZE
+LIFT_STROKE = .200                      # datasheet: lift table height max. 200 mm
+LIFT_FORCE = (AMR_LIFT_MASS + 1500.) * 9.81 * 1.5
+
+WHEEL_X, WHEEL_Y, WHEEL_WIDTH = .72, .31, .132   # ESTIMATE, as amr_housing()
+WHEEL_MASS = 20.                                  # ESTIMATE
+CLEARANCE = .04                                   # ESTIMATE, chassis underside
+DECK = (1.50, .60, .03)                           # ESTIMATE, lift table plate (fits inside the top shell)
+# Safety laser scanners: two SICK S300 on diagonal corners, the arrangement SICK and the
+# KMP literature describe for KUKA's KMP/KMR bases (the KMP 1500 datasheet only says
+# "integrated safety laser scanners"; the exact KMP 1500 scanner model is not published).
+# S300 Standard datasheet (SICK S30B-2011BA, part no. 1026820, sheet dated 2026-10-10):
+S300_URL = "https://www.sick.com/media/pdf/5/45/845/dataSheet_S30B-2011BA_1026820_en.pdf"
+S300_SIZE = (.106, .102, .152)          # D x W x H; datasheet W x H x D = 102 x 152 x 106 mm
+S300_MASS = 1.2                         # datasheet 1.2 kg
+S300_FOV = 270.                         # datasheet scanning angle 270 deg
+S300_ANGULAR_RES = .5                   # datasheet angular resolution 0.5 deg
+S300_RESPONSE = .080                    # datasheet response time 80 ms
+S300_RANGE = 30.                        # datasheet distance measuring range 30 m
+SCANNER_X, SCANNER_Y, SCANNER_Z = .92, .32, .20   # ESTIMATE: corner, inside the 2,000 x 800 envelope
+# IMU: not in the KUKA datasheet; added for odometry fusion (gyro yaw rate). Position ESTIMATE.
+IMU_XYZ = (0., 0., .25)
+
+# Exterior shell: the same outline and levels as build.py amr_housing() (keep the two in sync).
+# The outline is normalised to a 3.06 x 1.18 x 0.36 drawing and scaled to the datasheet size,
+# so the shell's outer envelope is exactly 2,000 x 800 x 470 mm. The shape itself is an
+# approximation drawn from product photos, not KUKA CAD.
+OUTLINE = ((1.53, .43), (1.46, .55), (.99, .59), (-.99, .59), (-1.46, .55), (-1.53, .43),
+           (-1.53, -.43), (-1.46, -.55), (-.99, -.59), (.99, -.59), (1.46, -.55), (1.53, -.43))
+SHELLS = (  # name, (z, scale) levels, rgb (visuals.py / build.py colours)
+    ('skirt', ((.065, .94), (.10, 1.), (.155, 1.), (.180, .98)), (.016, .019, .023)),
+    ('pan', ((.146, .965), (.187, 1.), (.252, 1.), (.284, .96)), (.85, .60, .039)),
+    ('upper_shell', ((.275, .96), (.311, .93), (.344, .86), (.36, .80)), (.61, .615, .61)),
+)
+STATUS_BAR = (.024, .123, .039)                    # as amr_housing(), at (x*1.32, +-.224, .338)
+MESH_DIR = 'kmp1500_meshes'
+
+CHASSIS_MASS = AMR_MASS - 4 * WHEEL_MASS
+CHASSIS_TOP = HEIGHT - DECK[2]                    # deck flush with the 470 mm top when lowered
+
+
+def shell_triangles(levels):
+    """Closed shell in base_link coordinates (m), as amr_housing() builds it."""
+    n = len(OUTLINE)
+    pts = [(x * k * LENGTH / 3.06, y * k * WIDTH / 1.18, z * HEIGHT / .36) for z, k in levels for x, y in OUTLINE]
+    tris = [(0, i + 1, i) for i in range(1, n - 1)]                       # bottom cap, facing down
+    tris += [(3 * n, 3 * n + i, 3 * n + i + 1) for i in range(1, n - 1)]  # top cap, facing up
+    for r in range(3):
+        for i in range(n):
+            a, b = r * n + i, r * n + (i + 1) % n
+            tris += [(a, b, b + n), (a, b + n, a + n)]
+    return pts, tris
+
+
+def write_stl(path, pts, tris):
+    with open(path, 'wb') as f:
+        f.write(b'kmp1500 shell, generated by kmp1500_urdf.py'.ljust(80, b' '))
+        f.write(struct.pack('<I', len(tris)))
+        for t in tris:
+            a, b, c = (pts[i] for i in t)
+            u = [b[k] - a[k] for k in range(3)]
+            v = [c[k] - a[k] for k in range(3)]
+            nrm = (u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0])
+            length = sum(x * x for x in nrm) ** .5 or 1.
+            f.write(struct.pack('<12fH', *(x / length for x in nrm), *a, *b, *c, 0))
+
+
+def shell_visuals():
+    """Visual elements for the chassis link (whose origin sits CLEARANCE above base_link)."""
+    out = []
+    for name, _, rgb in SHELLS:
+        out.append(f'    <visual name="{name}"><origin xyz="0 0 {-CLEARANCE}"/>'
+                   f'<geometry><mesh filename="{MESH_DIR}/{name}.stl"/></geometry>'
+                   f'<material name="{name}"><color rgba="{rgb[0]} {rgb[1]} {rgb[2]} 1"/></material></visual>\n')
+    for x in (-.72, .72):
+        for side in (-1, 1):
+            out.append(f'    <visual name="status_bar"><origin xyz="{x*1.32:.4f} {side*.224} {.338-CLEARANCE:.3f}"/>'
+                       f'<geometry><box size="{STATUS_BAR[0]} {STATUS_BAR[1]} {STATUS_BAR[2]}"/></geometry>'
+                       f'<material name="status"><color rgba="0.03 0.43 0.76 1"/></material></visual>\n')
+    return ''.join(out)
+
+
+def box_inertia(m, x, y, z):
+    return (f'<inertia ixx="{m*(y*y+z*z)/12:.4f}" ixy="0" ixz="0" iyy="{m*(x*x+z*z)/12:.4f}" '
+            f'iyz="0" izz="{m*(x*x+y*y)/12:.4f}"/>')
+
+
+def box_link(name, size, mass, rgba, z_offset=0.):
+    x, y, z = size
+    geom = f'<origin xyz="0 0 {z_offset:.4f}"/><geometry><box size="{x} {y} {z}"/></geometry>'
+    return f'''  <link name="{name}">
+    <visual>{geom}<material name="{name}_mat"><color rgba="{rgba}"/></material></visual>
+    <collision>{geom}</collision>
+    <inertial><origin xyz="0 0 {z_offset:.4f}"/><mass value="{mass}"/>{box_inertia(mass, x, y, z)}</inertial>
+  </link>
+'''
+
+
+def wheel(name, x, y):
+    r, w, m = AMR_WHEEL_RADIUS, WHEEL_WIDTH, WHEEL_MASS
+    geom = f'<origin rpy="1.5708 0 0"/><geometry><cylinder radius="{r}" length="{w}"/></geometry>'
+    izz = m * r * r / 2
+    ixx = m * (3 * r * r + w * w) / 12
+    return f'''  <link name="{name}_wheel">
+    <visual>{geom}<material name="rubber"><color rgba="0.08 0.08 0.08 1"/></material></visual>
+    <collision>{geom}</collision>
+    <inertial><mass value="{m}"/><inertia ixx="{ixx:.4f}" ixy="0" ixz="0" iyy="{izz:.4f}" iyz="0" izz="{ixx:.4f}"/></inertial>
+  </link>
+  <joint name="{name}_wheel_joint" type="continuous">
+    <parent link="base_link"/><child link="{name}_wheel"/>
+    <origin xyz="{x} {y} {r}"/><axis xyz="0 1 0"/>
+  </joint>
+'''
+
+
+def scanner(name, x, y, yaw):
+    """SICK S300; the link origin is the scan plane centre, x along the middle of the 270 deg field."""
+    sx, sy, sz = S300_SIZE
+    return f'''  <link name="{name}">
+    <visual><geometry><box size="{sx} {sy} {sz}"/></geometry><material name="s300"><color rgba="0.95 0.8 0.1 1"/></material></visual>
+    <inertial><mass value="{S300_MASS}"/>{box_inertia(S300_MASS, sx, sy, sz)}</inertial>
+  </link>
+  <joint name="{name}_joint" type="fixed">
+    <parent link="base_link"/><child link="{name}"/>
+    <origin xyz="{x} {y} {SCANNER_Z}" rpy="0 0 {yaw:.6f}"/>
+  </joint>
+'''
+
+
+def imu():
+    return f'''  <link name="imu_link"/>
+  <joint name="imu_joint" type="fixed">
+    <parent link="base_link"/><child link="imu_link"/>
+    <origin xyz="{IMU_XYZ[0]} {IMU_XYZ[1]} {IMU_XYZ[2]}"/>
+  </joint>
+'''
+
+
+def urdf():
+    chassis_h = CHASSIS_TOP - CLEARANCE
+    parts = [
+        '<?xml version="1.0"?>\n',
+        '<!-- Generated by wheel_cell/kmp1500_urdf.py from physical_data.py. Edit that script, not this file. -->\n',
+        f'<!-- Source: KUKA KMP 1500 datasheet (EN, (c) 2022, read 2026-11-26) {SOURCE_URL.replace("&", "&amp;")} -->\n',
+        '<!-- Datasheet: size, masses, lift stroke/speed, wheel diameter, speeds. ESTIMATE: wheel positions'
+        ' (build.py amr_housing), scanner and IMU positions, deck plate, clearance, wheel mass. -->\n',
+        '<robot name="kmp1500">\n',
+        '  <link name="base_link"/>\n',
+        f'''  <link name="chassis">
+{shell_visuals()}    <collision><origin xyz="0 0 {chassis_h / 2:.4f}"/><geometry><box size="{LENGTH} {WIDTH} {chassis_h:.3f}"/></geometry></collision>
+    <inertial><origin xyz="0 0 {chassis_h / 2:.4f}"/><mass value="{CHASSIS_MASS}"/>{box_inertia(CHASSIS_MASS, LENGTH, WIDTH, chassis_h)}</inertial>
+  </link>
+''',
+        f'''  <joint name="chassis_joint" type="fixed">
+    <parent link="base_link"/><child link="chassis"/><origin xyz="0 0 {CLEARANCE}"/>
+  </joint>
+''',
+        box_link('lift_table', DECK, AMR_LIFT_MASS, '0.6 0.6 0.62 1', DECK[2] / 2),
+        f'''  <joint name="lift_joint" type="prismatic">
+    <parent link="base_link"/><child link="lift_table"/>
+    <origin xyz="0 0 {CHASSIS_TOP}"/><axis xyz="0 0 1"/>
+    <limit lower="0" upper="{LIFT_STROKE}" velocity="{AMR_LIFT_SPEED}" effort="{LIFT_FORCE:.0f}"/>
+  </joint>
+''',
+    ]
+    for name, sx, sy in (('front_left', 1, 1), ('front_right', 1, -1), ('rear_left', -1, 1), ('rear_right', -1, -1)):
+        parts.append(wheel(name, sx * WHEEL_X, sy * WHEEL_Y))
+    parts += [scanner('laser_front_left', SCANNER_X, SCANNER_Y, pi / 4),        # sees front + left
+              scanner('laser_rear_right', -SCANNER_X, -SCANNER_Y, -3 * pi / 4),  # sees rear + right
+              imu()]
+    parts.append(f'  <!-- laser_*: SICK S300, {S300_FOV:.0f} deg, {S300_ANGULAR_RES} deg, {S300_RESPONSE*1000:.0f} ms,'
+                 f' {S300_RANGE:.0f} m ({S300_URL}) -->\n')
+    parts.append(f'  <!-- omniMove: max {AMR_SPEED_X} m/s straight, 0.56 m/s sideways (holonomic) -->\n</robot>\n')
+    return ''.join(parts)
+
+
+if __name__ == '__main__':
+    out = Path(__file__).resolve().parent / 'assets' / 'kmp1500.urdf'
+    (out.parent / MESH_DIR).mkdir(exist_ok=True)
+    for name, levels, _ in SHELLS:
+        write_stl(out.parent / MESH_DIR / f'{name}.stl', *shell_triangles(levels))
+    out.write_text(urdf())
+    print(out)

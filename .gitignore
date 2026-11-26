@@ -1,0 +1,23 @@
+# 로컬 AMR 테스트 (Isaac 맵 + Nav2/RViz) — 커밋하지 않음
+amr_test/
+
+# 개인 진행 기록 (choongman) — 커밋하지 않음
+choongman/
+
+# 관제 작업 폴더 — 커밋하지 않음
+control_center/
+
+# Python
+__pycache__/
+*.pyc
+
+# ROS 2 colcon 산출물
+build/
+install/
+log/
+
+# 에디터/OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
