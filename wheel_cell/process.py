@@ -32,6 +32,17 @@ AMR_LIFTED = AMR_DOCKED+3.
 AMR_OUT_GATE = 10.                 # dock -> gate after departure; gate -> outbound buffer follows
 AMR_OUT_BUFFER = 13.
 AMR_BAY_Y = 6.55                  # vehicle buffer centre line, 1.5 m aisle outside the cell fence
+# Vehicle buffers: three slots per side, cars parked across the bay (yaw -90 inbound, +90 outbound).
+# The cars rest on four stands at the body ends so the AMR+hanger (rails +/-1.80 m) can crab in under
+# the car from the AMR lane; slots are served in order (inbound 1->2->3, outbound 3->2->1).
+BUFFER_SLOT_X = (-3.12, 0., 3.12)
+BUFFER_STAND_X = 2.05             # car-frame stand position along the body, clear of the hanger rails
+BUFFER_STAND_Y = .68
+# Car height as the hanger/lift offset (0 = docked). Entry pads clear the parked body by 5 cm and the
+# carried body clears the stands by 5 cm when passing an empty slot.
+AMR_LIFT_ENTRY = -.12
+BUFFER_CAR_Z = -.09
+AMR_LIFT_CARRY = -.04
 MOUNT_PARK = 3.15
 FASTEN_PARK = -3.15
 

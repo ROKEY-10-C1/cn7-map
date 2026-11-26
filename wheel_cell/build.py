@@ -45,7 +45,8 @@ from fitment import (
 )
 from physical_data import AMR_SIZE, AMR_WHEEL_RADIUS, DOCK_CLAMP_CLOSED, DOCK_CLAMP_OPEN, ROLLER_RADIUS
 from process import (
-    AMR_AT_GATE, AMR_BAY_Y, AMR_DOCKED, AMR_GATE_X, AMR_LIFTED, AMR_OUT_GATE, AXLE, BELT_Z, CN7_R16, FASTEN_PARK, FEED, FPS,
+    AMR_AT_GATE, AMR_BAY_Y, AMR_DOCKED, AMR_GATE_X, AMR_LIFTED, AMR_OUT_GATE, AXLE, BELT_Z, BUFFER_CAR_Z,
+    BUFFER_STAND_X, BUFFER_STAND_Y, CN7_R16, FASTEN_PARK, FEED, FPS,
     HUB_Z, LINE_Y, MOUNT_PARK, NUT_CYCLE, NUT_DRIVE, NUT_ENGAGE, NUT_FINAL, NUT_PICKUP,
     RAIL_Y, REJECT_GATE_HALF, REJECT_X, STATIONS, bend, schedule,
 )
@@ -248,7 +249,8 @@ def parking(stage, root, side):
     for i,x in enumerate((-3.12,0.,3.12)):
         box(stage,root+f"/Line_{i}_a",(x-.99,bay_y,.004),(.032,4.98,.004),marker)
         box(stage,root+f"/Line_{i}_b",(x+.99,bay_y,.004),(.032,4.98,.004),marker)
-        pos,_=xform(stage,root+f"/Vehicle_{i}",(x,bay_y,-.56 if side>0 else CN7_R16.radius-HUB_Z))
+        # Same height on both sides: the AMR lifts a car off these stands and sets a finished one down.
+        pos,_=xform(stage,root+f"/Vehicle_{i}",(x,bay_y,BUFFER_CAR_Z))
         pos.AddRotateZOp().Set(-side*90)
         car=str(pos.GetPath())
         add_instance(stage,car+"/Body",LIB+"/Body")
@@ -259,7 +261,15 @@ def parking(stage, root, side):
                 cylinder(stage,car+f"/WheelFace_{name}",(axle,y+sign*.102,HUB_Z),.199,.015,ALLOY,"Y")
             else:
                 cylinder(stage,car+f"/Hub_{name}",(axle,y,HUB_Z),.132,.065,ALLOY,"Y")
-                box(stage,car+f"/Skid_{name}",(axle,sign*.47,.78),(.37,.29,.44),STEEL)
+        # Stands under the body ends (not under the hubs), leaving the lane for the hanger free.
+        # Tops touch the lowest body point over each 0.2 m stand (AssetLibrary Body, measured 2026-11-26:
+        # z 1.061 front, 1.031 rear); the floor is at -BUFFER_CAR_Z in this frame. A car carried at
+        # AMR_LIFT_CARRY clears these tops by 4.7 cm when it passes an empty slot.
+        for end,top in ((1,1.061),(-1,1.031)):
+            for sign in (-1,1):
+                box(stage,root+f"/Stand_{i}_{'F' if end>0 else 'R'}{'L' if sign>0 else 'R'}",
+                    (x-side*sign*BUFFER_STAND_Y,bay_y-side*end*BUFFER_STAND_X,(top+BUFFER_CAR_Z)/2),
+                    (.20,.20,top+BUFFER_CAR_Z),STEEL)
 
 
 def concrete_floor(stage, path):
