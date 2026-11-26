@@ -49,3 +49,18 @@ cd "$HOME/project"
 다시 빌드할 때 `ISAAC_SIM_ROOT`와 `--asset-root`, `--tool-usd`로 로컬 설치 및 자산 경로를 지정할 수 있습니다. 링크 라이브러리는 `import_doosan.py`로 공식 COLLADA 시각·충돌 메시를 변환해 다시 생성합니다. [Doosan 자산 라이선스](assets/LICENSE-Doosan.txt)
 
 현재 실행 환경에서 검증한 물리는 CPU PhysX입니다. RTX 화면과 VRAM 사용량은 별도 장비 측정이 필요합니다.
+
+## KMP 1500 URDF (ROS 2 · Isaac URDF Importer용)
+
+`assets/kmp1500.urdf`는 사양서 크기의 KUKA KMP 1500입니다. `physical_data.py` 값으로 `kmp1500_urdf.py`가 만들므로, 고칠 때는 스크립트를 수정하고 `python3 map/wheel_cell/kmp1500_urdf.py`로 다시 생성합니다.
+
+| 항목 | 값 | 근거 |
+|---|---|---|
+| 외형 | 2,000 × 800 × 470 mm (스캐너 포함) | 사양서 |
+| 질량 | 차대 711 kg + 리프트 144 kg = 855 kg | 사양서 |
+| 리프트 | `lift_joint` 직동 0–200 mm, 50 mm/s | 사양서 (최대 리프트 테이블 높이 200 mm) |
+| 바퀴 | Ø310 mm × 4, x ±0.72 m, y ±0.31 m | 지름은 사양서, 위치는 `amr_housing()`과 같은 추정값 |
+| 스캐너 | `laser_front` / `laser_rear`, x ±0.958 m, z 0.28 m | `amr_housing()`과 같은 추정값 |
+| 리프트 테이블 판, 지상고, 바퀴 질량 | 1.80 × 0.70 × 0.03 m, 40 mm, 20 kg | 추정 |
+
+좌표계는 REP 105를 따릅니다(`base_link`는 바닥의 차대 중심, x 전방). omniMove 메카넘 롤러는 모델링하지 않았으므로 전방향 주행은 바퀴 관절이 아닌 holonomic 베이스 제어로 구동합니다. 차체 운반용 행어(`Hanger`)는 셀 장비라서 포함하지 않았습니다.
