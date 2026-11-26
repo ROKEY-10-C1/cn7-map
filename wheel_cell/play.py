@@ -32,11 +32,30 @@ def live(app, stage, args):
     try:
         with Usd.EditContext(stage, live_layer):
             cell = Cell(stage, seed, args.jam, manual=False)
-            pre = cell.api.subscribe_physics_on_step_events(lambda dt: cell.prepare_step(dt), True, 0)
-            post = cell.api.subscribe_physics_on_step_events(lambda dt: cell.finish_step(dt), False, 0)
+            from datetime import datetime
+            from perf import PerfMonitor, enable_viewport_hud
+            monitor = PerfMonitor(Path(__file__).resolve().parent/"output"/"perf"/f"{datetime.now():%Y%m%d-%H%M%S}_seed{seed}.csv")
+            cell.timer = monitor.timer
+
+            def before_physics(dt):
+                cell.prepare_step(dt)
+                monitor.timer.start("simulate")   # PhysX solves between the two callbacks
+
+            def after_physics(dt):
+                monitor.timer.stop("simulate")
+                cell.finish_step(dt)
+
+            pre = cell.api.subscribe_physics_on_step_events(before_physics, True, 0)
+            post = cell.api.subscribe_physics_on_step_events(after_physics, False, 0)
             try:
                 window = ui.Window("CN7 | Live PhysX", width=555, height=194) if not args.smoke_frames else None
                 labels = {}
+                perf_labels = []
+                if not args.smoke_frames:
+                    enable_viewport_hud()
+                    perf_window = ui.Window("CN7 | Perf", width=640, height=120)
+                    with perf_window.frame, ui.VStack(spacing=2):
+                        perf_labels = [ui.Label("") for _ in range(4)]
 
                 def toggle():
                     if timeline.is_playing():
@@ -59,12 +78,21 @@ def live(app, stage, args):
                     if labels:
                         button.text = "Pause" if timeline.is_playing() else "Play"
                         update_live_status(cell, labels, seed)
+                    monitor.frame_begin()
                     app.update()
+                    monitor.frame_end()
+                    if monitor.sample(cell.seconds) and perf_labels:
+                        for label, text in zip(perf_labels, monitor.lines()):
+                            label.text = text
                     frames += 1
                     if context.get_stage() == stage and timeline.is_stopped() and cell.seconds:
                         live_layer.Clear()
                         cell = Cell(stage, seed, args.jam, manual=False)
+                        cell.timer = monitor.timer
             finally:
+                monitor.sample(cell.seconds, force=True)
+                monitor.close()
+                print("PERF", monitor.summary(), "->", monitor.csv_path, flush=True)
                 pre.unsubscribe()
                 post.unsubscribe()
                 if context.get_stage() == stage:

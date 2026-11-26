@@ -46,6 +46,7 @@ def main():
     parser.add_argument("--start-at", type=float, default=None, metavar="SECONDS",
                         help="Seek to this scene time when starting")
     parser.add_argument("--quality", choices=("balanced", "high", "cinematic"), default="high")
+    parser.add_argument("--config", type=Path, help="JSON overrides for cell_config.DEFAULTS")
     parser.add_argument("--smoke-frames", type=int, default=0, help="Render N updates headless, then exit")
     args = parser.parse_args()
     replay = args.replay or args.start_at is not None
@@ -53,6 +54,8 @@ def main():
         parser.error("--seed and --jam require live PhysX mode (omit --replay and --start-at)")
     if args.smoke_frames < 0:
         parser.error("--smoke-frames must be nonnegative")
+    if args.config:
+        os.environ["CELL_CONFIG"] = str(args.config.resolve())
     sim_dir = Path(os.environ.get("ISAAC_SIM_ROOT", Path.home()/"isaacsim"))
     binary = sim_dir/"python.sh"
     if not binary.is_file() or not args.stage.is_file():

@@ -1,6 +1,7 @@
 """Live, docked four-corner PhysX assembly with encoder-driven wheel alignment."""
 
 import os
+from contextlib import nullcontext
 from dataclasses import dataclass
 from math import atan2, cos, degrees, sin, sqrt, tau
 from pathlib import Path
@@ -20,10 +21,11 @@ from physical_data import AMR_ACCELERATION, AMR_LIFT_MASS, AMR_LIFT_SPEED, AMR_M
 from physical_data import AMR_SPEED_X, AMR_SPEED_Y, AMR_TRACTION_COEFFICIENT, AMR_WHEEL_RADIUS
 from physical_data import DOCK_CLAMP_CLOSED, DOCK_CLAMP_OPEN
 from process import BELT_Z, CN7_R16, HUB_Z, LINE_Y, RAIL_Y, STATIONS, schedule
+from cell_config import CONFIG
 
 ROOT = "/World/Live"
 REFERENCE = "/World/Orders/CN7_001"
-HZ = 240
+HZ = CONFIG["physics"]["hz"]
 ALIGN_TOL = .12                    # degrees, as measured by the simulated encoder
 FEED_STROKE = .060
 SEAT_TOL = .0007                   # numerical seating tolerance, not a production tolerance
@@ -83,8 +85,8 @@ def body(stage, path, pos, orientation, mass, kinematic=False):
     api.CreateKinematicEnabledAttr(kinematic)
     UsdPhysics.MassAPI.Apply(prim).CreateMassAttr(mass)
     options = PhysxSchema.PhysxRigidBodyAPI.Apply(prim)
-    options.CreateSolverPositionIterationCountAttr(64)
-    options.CreateSolverVelocityIterationCountAttr(8)
+    options.CreateSolverPositionIterationCountAttr(CONFIG["physics"]["position_iterations"])
+    options.CreateSolverVelocityIterationCountAttr(CONFIG["physics"]["velocity_iterations"])
     return prim
 
 
@@ -199,6 +201,58 @@ def drive(joint, axis, target, stiffness, damping, force):
     return api.CreateTargetPositionAttr(target)
 
 
+def _cross(o,a,b):
+    return (a[0]-o[0])*(b[1]-o[1])-(a[1]-o[1])*(b[0]-o[0])
+
+
+def _convex(poly,sign):
+    n=len(poly)
+    return all(sign*_cross(poly[i],poly[(i+1)%n],poly[(i+2)%n])>=-1e-12 for i in range(n))
+
+
+def merge_convex(triangles,max_vertices=24):
+    """Hertel–Mehlhorn style merge: join polygons across shared edges while they stay convex.
+
+    The union is exactly the input triangles, so the apertures keep their shape; PhysX just
+    sees ~10x fewer convex pieces (each piece is one more broad/narrow-phase pair per contact).
+    """
+    key=lambda p:(round(p[0],7),round(p[1],7))
+    polys=[[key(p) for p in tri] for tri in triangles]
+    sign=1 if _cross(*polys[0])>0 else -1
+    merged=True
+    while merged:
+        merged=False
+        edges={}
+        for index,poly in enumerate(polys):
+            for i in range(len(poly)):
+                edges[(poly[i],poly[(i+1)%len(poly)])]=index
+        for index,poly in enumerate(polys):
+            if poly is None:
+                continue
+            for i in range(len(poly)):
+                a,b=poly[i],poly[(i+1)%len(poly)]
+                other=edges.get((b,a))
+                if other is None or other==index or polys[other] is None:
+                    continue
+                q=polys[other]
+                j=q.index(b)
+                # Walk this polygon from b round to a, then the neighbour from a round to b.
+                k=poly.index(b)
+                path=[poly[(k+m)%len(poly)] for m in range(len(poly))]          # b ... a
+                qa=q.index(a)
+                rest=[q[(qa+m)%len(q)] for m in range(1,len(q)-1)]              # after a, before b
+                candidate=path+rest
+                if len(candidate)<=max_vertices and _convex(candidate,sign):
+                    polys[index]=candidate
+                    polys[other]=None
+                    merged=True
+                    break
+            if merged:
+                break
+        polys=[p for p in polys if p is not None]
+    return polys
+
+
 def collision_web(stage):
     """Use only mounting-face triangles, keeping the six apertures open on CPU."""
     web=UsdGeom.Mesh(stage.GetPrimAtPath("/AssetLibrary/Wheel_16/CenterWeb"))
@@ -213,6 +267,8 @@ def collision_web(stage):
             result.append([(p[0],p[1]) for p in reversed(face)])
     if not result:
         raise ValueError("CN7 wheel mounting face is missing")
+    if CONFIG["physics"]["merge_web_colliders"]:
+        result=merge_convex(result)
     return result
 
 
@@ -951,6 +1007,9 @@ class Cell:
         self.api=omni.physx.get_physx_interface()
         self.sim=omni.physx.get_physx_simulation_interface()
         self.seconds=0.
+        self.timer=None                    # perf.StepTimer, set by the caller to profile each step
+        self._collider_paths={}
+        self._robot_by_collider={}
         self.dock_ready_time=None
         self.pending=[]
         self.interference=[]
@@ -1062,7 +1121,27 @@ class Cell:
                 station.press.Set(station.gap-station.initial_gap)
                 station.phase="interference"
 
+    def section(self,name):
+        return self.timer.section(name) if self.timer else nullcontext()
+
+    def _collider(self,encoded):
+        # intToSdfPath + str() for every contact header cost ~2 ms per step; paths never change.
+        path=self._collider_paths.get(encoded)
+        if path is None:
+            path=self._collider_paths[encoded]=str(PhysicsSchemaTools.intToSdfPath(encoded))
+        return path
+
+    def _robot_of(self,path):
+        robot=self._robot_by_collider.get(path,False)
+        if robot is False:
+            robot=self._robot_by_collider[path]=self.robots_by_path.get("/".join(path.split("/")[:4]))
+        return robot
+
     def prepare_step(self,dt):
+        with self.section("prepare"):
+            self._prepare_step(dt)
+
+    def _prepare_step(self,dt):
         self.carrier.step(self.api,dt)
         car_pose=self.api.get_rigidbody_transformation(ROOT+"/CN7")
         if self.carrier.ready and self.dock_ready_time is None:
@@ -1095,16 +1174,20 @@ class Cell:
                 self.pending.append((self.seconds,station.name,station.phase))
 
     def finish_step(self,dt):
+        with self.section("finish"):
+            self._finish_step(dt)
+        if self.timer:
+            self.timer.count_step()
+
+    def _finish_step(self,dt):
         headers,contacts=self.sim.get_contact_report()[:2]
         self.carrier.grounded=False
         self.carrier.clamp_contacts.clear()
         for header in headers:
             if not header.num_contact_data:
                 continue
-            collider0,collider1=(str(PhysicsSchemaTools.intToSdfPath(item))
-                                 for item in (header.collider0,header.collider1))
-            pair=[self.robots_by_path.get("/".join(path.split("/")[:4]))
-                  for path in (collider0,collider1)]
+            collider0,collider1=self._collider(header.collider0),self._collider(header.collider1)
+            pair=[self._robot_of(path) for path in (collider0,collider1)]
             if all(pair) and pair[0]!=pair[1]:
                 self.stop_pair(*pair,"robot_contact")
             elif bool(pair[0])!=bool(pair[1]):
@@ -1154,8 +1237,9 @@ class Cell:
     def step(self):
         dt=1/HZ
         self.prepare_step(dt)
-        self.sim.simulate(dt,self.seconds)
-        self.sim.fetch_results()
+        with self.section("simulate"):
+            self.sim.simulate(dt,self.seconds)
+            self.sim.fetch_results()
         self.finish_step(dt)
 
     @property

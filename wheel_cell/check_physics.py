@@ -8,6 +8,11 @@ from pathlib import Path
 import sys
 
 import omni.kit.app
+
+# --config must be in the environment before the live modules read their parameters.
+for _i, _arg in enumerate(sys.argv[:-1]):
+    if _arg == "--config":
+        os.environ["CELL_CONFIG"] = str(Path(sys.argv[_i+1]).resolve())
 from pxr import Gf, PhysicsSchemaTools, Usd, UsdGeom, UsdPhysics
 
 sys.dont_write_bytecode = True
@@ -18,6 +23,18 @@ from physical_data import AMR_LIFT_SPEED, AMR_SPEED_X, AMR_SPEED_Y, WHEEL_MASS
 from physics import Cell, DOCK_READY, HZ, MIN_RAIL_SPACING, REAR_SEAT, ROOT, SOURCE_POSE, STATIONS
 from physics import constrain, pose, qfloat, quaternion, reference, rotate
 from process import AMR_GATE_X, BELT_Z, LINE_Y
+
+
+def count_colliders(stage):
+    counts={}
+    for prim in Usd.PrimRange(stage.GetPrimAtPath(ROOT)):
+        if prim.HasAPI(UsdPhysics.CollisionAPI):
+            path=str(prim.GetPath())[len(ROOT)+1:]
+            key=path.split("/")[0]
+            key="wheel" if "/Wheel/" in path else "robot" if key.startswith(("Left","Right")) else key
+            counts[key]=counts.get(key,0)+1
+    counts["total"]=sum(counts.values())
+    return counts
 
 
 def check_actors(stage, robots, exported=False):
@@ -110,6 +127,10 @@ def check(path, seed, jam, robots, rail_probe, export, interference_probe, tip_d
     stage = Usd.Stage.Open(str(path))
     stage.SetEditTarget(stage.GetSessionLayer())
     cell = Cell(stage,seed,jam,robots,rail_probe)
+    from perf import StepTimer
+    import time as _time
+    cell.timer = StepTimer()
+    wall_start = _time.perf_counter()
     tracking = 0.
     tracking_samples=0
     try:
@@ -188,6 +209,11 @@ def check(path, seed, jam, robots, rail_probe, export, interference_probe, tip_d
                                "max_lateral_mm":round(station.max_lateral_travel*1000,1),"result":station.phase}
                  for station in cell.stations}
         print("PHYSICS_RESULT",json.dumps(results),flush=True)
+        wall = _time.perf_counter()-wall_start
+        print("PROFILE",json.dumps({"sim_s":round(cell.seconds,2),"wall_s":round(wall,1),
+                                    "realtime_factor":round(cell.seconds/wall,3),"hz":HZ,
+                                    "step_ms":cell.timer.summary_ms(),"steps":cell.timer.steps,
+                                    "colliders":count_colliders(stage)}),flush=True)
         cell.api.update_transformations(False,True,False,False)
         print("ROBOT_TRACKING_MAX_MM",round(tracking*1000,2) if tracking_samples else "not_run",flush=True)
         print("RAIL_CHECK",cell.min_rail_spacing,cell.interference,flush=True)
@@ -243,6 +269,7 @@ def main():
     args.add_argument("--supply-probe",choices=("left","right"),help="Run one wheel from truck infeed into a branch")
     args.add_argument("--insertion-probe",choices=("nominal","skew"),help="Exercise the hub on an isolated fixture")
     args.add_argument("--export-setup",type=Path,help="Save the physical scene before stepping")
+    args.add_argument("--config",type=Path,help="JSON overrides for cell_config.DEFAULTS")
     config=args.parse_args()
     if config.interference_probe and config.without_robots:
         args.error("--interference-probe requires robots")
