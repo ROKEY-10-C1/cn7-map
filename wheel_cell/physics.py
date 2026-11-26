@@ -280,7 +280,9 @@ class Station:
             return
         p=window["position"]
         q=window["rotation"]
-        inv_car=Gf.Rotation(quaternion(car_pose)).GetInverse() if vehicle_docked else Gf.Rotation()
+        # Gf.Rotation() is uninitialized memory, not identity: it occasionally made the
+        # measured wheel angle NaN before docking and fed NaN to the spindle drive (E9).
+        inv_car=Gf.Rotation(quaternion(car_pose)).GetInverse() if vehicle_docked else rotate((0,0,1),0.)
         axis=inv_car.TransformDir(Gf.Rotation(Gf.Quatd(q[3],Gf.Vec3d(q[0],q[1],q[2])))
                                   .TransformDir(Gf.Vec3d(1,0,0)))
         angle=degrees(atan2(-self.side*axis[2],axis[0]))
