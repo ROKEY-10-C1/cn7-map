@@ -13,6 +13,8 @@ from physical_data import DOCK_CLAMP_CLOSED, DOCK_CLAMP_OPEN
 from sim_util import body, constrain, cube, drive, mass_properties, material, pose, reference, vec
 from live_params import ROOT
 
+LOCATOR_STROKE = .06
+
 
 class Carrier:
     """Force-limited equivalent traction for a low-speed omniMove platform."""
@@ -30,6 +32,7 @@ class Carrier:
         self.lift_target=0.
         self.clamp_target=0.
         self.clamps=[]
+        self.locators=[]
         self.clamp_contacts=set()
         self.grounded=False
         self.velocity=Gf.Vec3d(0.)
@@ -51,13 +54,34 @@ class Carrier:
         cube(stage,self.path+"/Collision",(0.,0.,.28),(AMR_SIZE[0],AMR_SIZE[1],.33))
         joint=constrain(UsdPhysics.PrismaticJoint.Define(stage,ROOT+"/VehicleLift"),deck,lift,(0.,0.,-.12))
         joint.CreateAxisAttr("Z")
-        joint.CreateLowerLimitAttr(-.02)
+        # 200 mm lift stroke (KMP 1500: lift table height max. 200 mm): down to hanger offset -0.18
+        # to pass under a parked car, up to 0.02 above the docked height.
+        joint.CreateLowerLimitAttr(-.06)
         joint.CreateUpperLimitAttr(.14)
         self.stiffness=1600000.
         self.lift_load=(AMR_LIFT_MASS+BODY_MASS)*9.81
         self.lift_drive=drive(joint,"linear",self.lift_load/self.stiffness,self.stiffness,
                               servo_damping(self.stiffness,AMR_LIFT_MASS+BODY_MASS),
                               (AMR_PAYLOAD+AMR_LIFT_MASS)*9.81)
+
+    def add_locator(self,stage,path,center,size):
+        """Pop-up locating block on the hanger (pneumatic, 60 mm stroke): up beside the sill or the
+        body end while carrying, down so the hanger can pass under a parked car."""
+        lift=stage.GetPrimAtPath(self.lift_path)
+        origin=Gf.Vec3d(UsdGeom.Xformable(lift).GetOrderedXformOps()[0].Get())
+        block=body(stage,path,origin+Gf.Vec3d(*center),None,.5)
+        mass_properties(block,(0.,0.,0.),box_inertia(.5,size))
+        cube(stage,path+"/Block",(0.,0.,0.),size)
+        joint=constrain(UsdPhysics.PrismaticJoint.Define(stage,path+"Stroke"),lift,block,center)
+        joint.CreateAxisAttr("Z")
+        joint.CreateLowerLimitAttr(-LOCATOR_STROKE)
+        joint.CreateUpperLimitAttr(0.)
+        self.locators.append(drive(joint,"linear",0.,2e5,servo_damping(2e5,.5),1500.))
+        return str(block.GetPath())
+
+    def set_locators(self,up):
+        for target in self.locators:
+            target.Set(0. if up else -LOCATOR_STROKE)
 
     def add_clamp(self,stage,path,source):
         base=reference(stage,path+"/Base",source+"/Base")

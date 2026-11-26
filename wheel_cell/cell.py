@@ -77,6 +77,9 @@ class Cell:
                             stage.OverridePrim(target+"/"+item.GetName()).SetActive(False)
         cube(stage,ROOT+"/CN7/Undertray",(0,0,1.10),(3.7,1.16,.23))
         cube(stage,ROOT+"/CN7/Body",(0,0,1.55),(4.56,1.57,.36))
+        # Sills and bumper corners cut from the body mesh (the buffer stands and the hanger meet them).
+        from vehicle import body_underside, buffer_stands
+        body_underside(stage,ROOT+"/CN7")
         sections=collision_web(stage)
         mats=(material(stage,"Steel",.27),material(stage,"Rubber",.82),material(stage,"RollerGrip",.62),
               material(stage,"GripPad",PAD_STATIC_FRICTION,PAD_DYNAMIC_FRICTION,combine="min"),
@@ -88,10 +91,11 @@ class Cell:
                          (.16,.10,.116))
                 UsdShade.MaterialBindingAPI.Apply(stage.GetPrimAtPath(pad)).Bind(mats[1],materialPurpose="physics")
         for side in (-1,1):
-            cube(stage,f"{ROOT}/DockLift/SideLocator_{side+1}",(0,side*.615,1.01),(.20,.06,.06))
-            cube(stage,f"{ROOT}/DockLift/EndLocator_{side+1}",(side*1.885,0,1.01),(.06,.20,.06))
+            self.carrier.add_locator(stage,f"{ROOT}/HangerLocator/Side_{side+1}",(0,side*.615,1.01),(.20,.06,.06))
+            self.carrier.add_locator(stage,f"{ROOT}/HangerLocator/End_{side+1}",(side*1.885,0,1.01),(.06,.20,.06))
         guide=material(stage,"GuideUHMW",GUIDE_STATIC_FRICTION,GUIDE_DYNAMIC_FRICTION,combine="min")
         setup_factory(stage,ROOT,mats[2],guide,branch_side)
+        self.buffer_stands=buffer_stands(stage)
         rng=Random(seed)
         self.stations=[make_station(stage,car,name,rng.uniform(-180.,180.),sections,mats,seed) for name in STATIONS]
         self.robots=[Robot(stage,REFERENCE+"/"+prefix+role)

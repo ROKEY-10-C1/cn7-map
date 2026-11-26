@@ -13,7 +13,7 @@ import omni.kit.app
 for _i, _arg in enumerate(sys.argv[:-1]):
     if _arg == "--config":
         os.environ["CELL_CONFIG"] = str(Path(sys.argv[_i+1]).resolve())
-from pxr import Gf, PhysicsSchemaTools, Usd, UsdGeom, UsdPhysics
+from pxr import Gf, PhysicsSchemaTools, PhysxSchema, Usd, UsdGeom, UsdPhysics
 
 sys.dont_write_bytecode = True
 root = Path(__file__).resolve().parent
@@ -148,6 +148,102 @@ def check_insertion(stage,seed,skew):
         cell.close()
 
 
+def check_buffer(stage,seed,slot,entry=None):
+    """Inbound vehicle buffer: the car stands on the four stands of `slot` (the slots nearer the
+    lane are empty, as after earlier pick-ups); the empty AMR + hanger crabs in under it at the
+    entry height, lifts it off the stands to the carry height and crabs back to the lane over the
+    empty stands. Nothing may touch the car or the stands except the hanger pads lifting it."""
+    from process import AMR_BAY_Y, AMR_LIFT_CARRY, AMR_LIFT_ENTRY, BUFFER_SLOT_X
+    from vehicle import AISLE_X, BufferRun, move_rigidly
+    entry=AMR_LIFT_ENTRY if entry is None else entry
+    cell=Cell(stage,seed,robots=False,manual=False)
+    try:
+        buffers=[p for p in stage.Traverse() if p.GetName()=="Vehicle_0" and "VehicleBuffer" in str(p.GetPath())]
+        inbound=next(p.GetParent() for p in buffers
+                     if UsdGeom.Xformable(p).ComputeLocalToWorldTransform(Usd.TimeCode.Default()).ExtractTranslation()[1]>0)
+        root=str(inbound.GetPath())
+        cache=UsdGeom.XformCache()
+        slot_pose=cache.GetLocalToWorldTransform(stage.GetPrimAtPath(f"{root}/Vehicle_{slot}"))
+        parked_z=slot_pose.ExtractTranslation()[2]
+        for k in range(slot+1):
+            stage.GetPrimAtPath(f"{root}/Vehicle_{k}").SetActive(False)
+        # The live car (with its knuckles and hubs) takes the parked car's place on the stands.
+        car=stage.GetPrimAtPath(ROOT+"/CN7")
+        corners=[s.hub_path.rsplit("/",1)[0]+part for s in cell.stations for part in ("/Knuckle","/Hub")]
+        move_rigidly(stage,[ROOT+"/CN7"]+corners,cache.GetLocalToWorldTransform(car).GetInverse()*slot_pose)
+        # The AMR and hanger stand in the lane, heading along the bay like the car.
+        deck=stage.GetPrimAtPath(cell.carrier.path)
+        start=cache.GetLocalToWorldTransform(deck)
+        lane=Gf.Matrix4d().SetRotate(Gf.Rotation(Gf.Vec3d(0,0,1),-90.))
+        lane.SetTranslateOnly(Gf.Vec3d(AISLE_X,AMR_BAY_Y,start.ExtractTranslation()[2]))
+        locators=[str(p.GetPath()) for p in stage.GetPrimAtPath(ROOT+"/HangerLocator").GetChildren()
+                  if p.HasAPI(UsdPhysics.RigidBodyAPI)]
+        move_rigidly(stage,[cell.carrier.path,cell.carrier.lift_path]+locators,start.GetInverse()*lane)
+        for path in [ROOT+"/CN7",cell.carrier.lift_path]+corners+locators:
+            PhysxSchema.PhysxContactReportAPI.Apply(stage.GetPrimAtPath(path)).CreateThresholdAttr(0.)
+        # A body at rest goes to sleep and stops reporting the floor contact the traction needs.
+        for path in [ROOT+"/CN7",cell.carrier.path,cell.carrier.lift_path]+locators:
+            PhysxSchema.PhysxRigidBodyAPI.Apply(stage.GetPrimAtPath(path)).CreateSleepThresholdAttr(0.)
+        from pxr import UsdUtils
+        cell.stage_id=UsdUtils.StageCache.Get().Insert(stage)
+        cell.sim.attach_stage(cell.stage_id.ToLongInt())
+        cell.carrier.step=lambda api,dt:None
+        run=BufferRun(cell.carrier,BUFFER_SLOT_X[slot],entry,AMR_LIFT_CARRY)
+        stands=set(cell.buffer_stands)
+        own=f"{root}/Stand_{slot}_"
+        hanger=(cell.carrier.path+"/",cell.carrier.lift_path+"/",ROOT+"/HangerLocator/")
+        touches={}
+        car_z=[]
+        phase=run.phase
+        lift_off=None
+        for i in range(70*HZ):
+            phase=run.step(cell.api,1/HZ)
+            cell.step()
+            pose=cell.api.get_rigidbody_transformation(ROOT+"/CN7")
+            z=pose["position"][2]
+            car_z.append((phase,z))
+            if os.environ.get("BUFFER_DEBUG") and i%HZ==0:
+                d=cell.api.get_rigidbody_transformation(cell.carrier.path)["position"]
+                print("BUFDBG",round(cell.seconds,1),phase,"grounded",cell.carrier.grounded,"force",cell.carrier.force.Get(),
+                      "deck",[round(v,3) for v in d],"car_z",round(z,4),"joint",round(run.joint,3),
+                      "lift_rel",round(cell.api.get_rigidbody_transformation(cell.carrier.lift_path)["position"][2]-d[2],4),
+                      "drive",round(cell.carrier.lift_drive.Get(),4),flush=True)
+            if lift_off is None and z>parked_z+.005:
+                lift_off=(phase,round(cell.seconds,2))
+            headers,contacts=cell.sim.get_contact_report()[:2]
+            for header in headers:
+                if not header.num_contact_data:
+                    continue
+                first=header.contact_data_offset
+                # Only real overlap counts; the contact offset also reports pairs a few mm apart.
+                deep=min(contacts[k].separation for k in range(first,first+header.num_contact_data))<=-.0002
+                a,b=(str(PhysicsSchemaTools.intToSdfPath(v)) for v in (header.collider0,header.collider1))
+                for x,y in ((a,b),(b,a)) if deep else ():
+                    if x.startswith(ROOT+"/CN7/") and (y in stands or y.startswith(hanger)):
+                        intended=(y.startswith(own) and phase in ("lower","enter","lift")) or (
+                            "/LoadPad_" in y and phase in ("lift","exit","done"))
+                        if not intended:
+                            key=(phase,x.rsplit("/",1)[1],y.rsplit("/",2)[-2]+"/"+y.rsplit("/",1)[1])
+                            touches[key]=touches.get(key,0)+1
+                    if x.startswith(hanger) and y in stands:
+                        key=(phase,x.rsplit("/",1)[1],y.rsplit("/",2)[-2]+"/"+y.rsplit("/",1)[1])
+                        touches[key]=touches.get(key,0)+1
+            if phase=="done" and run.timer>1.:
+                break
+        deck_end=cell.api.get_rigidbody_transformation(cell.carrier.path)["position"]
+        carried=[z for p,z in car_z if p=="exit"]
+        report={"slot":slot,"entry":entry,"phase":phase,"sim_s":round(cell.seconds,2),
+                "car_z_parked":round(car_z[0][1],4),"lift_off":lift_off,
+                "car_z_carried_min":round(min(carried),4) if carried else None,
+                "deck_end":[round(v,3) for v in deck_end],
+                "touches":sorted([list(k)+[n] for k,n in touches.items()])[:20]}
+        print("BUFFER_CHECK",json.dumps(report),flush=True)
+        return (phase=="done" and not touches and carried and min(carried)>parked_z+.03
+                and abs(deck_end[0]-AISLE_X)<.02)
+    finally:
+        cell.close()
+
+
 def check(path, seed, robots, export, interference_probe, until=None):
     """Full cell: AMR docks, each tire is fed, stopped in the V, centred, lifted and left
     pick-ready within +-3 mm along / +-2 mm across the flow; nothing touches the robots or the
@@ -266,9 +362,15 @@ def main():
     args.add_argument("--export-setup",type=Path,help="Save the physical scene before stepping")
     args.add_argument("--config",type=Path,help="JSON overrides for cell_config.DEFAULTS")
     args.add_argument("--until",type=float,help="Stop at this simulated time (s) and check only for faults so far")
+    args.add_argument("--buffer-probe",type=int,choices=(0,1,2),help="Fetch the car from this inbound buffer slot")
+    args.add_argument("--entry",type=float,help="Hanger entry height for --buffer-probe (default process.AMR_LIFT_ENTRY)")
     config=args.parse_args()
     if config.interference_probe and config.without_robots:
         args.error("--interference-probe requires robots")
+    if config.buffer_probe is not None:
+        stage=Usd.Stage.Open(str(config.stage))
+        stage.SetEditTarget(stage.GetSessionLayer())
+        return check_buffer(stage,config.seed,config.buffer_probe,config.entry)
     if config.supply_probe or config.insertion_probe:
         stage=Usd.Stage.Open(str(config.stage))
         stage.SetEditTarget(stage.GetSessionLayer())

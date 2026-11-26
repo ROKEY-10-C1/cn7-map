@@ -40,7 +40,10 @@ BUFFER_STAND_X = 2.05             # car-frame stand position along the body, cle
 BUFFER_STAND_Y = .68
 # Car height as the hanger/lift offset (0 = docked). Entry pads clear the parked body by 5 cm and the
 # carried body clears the stands by 5 cm when passing an empty slot.
-AMR_LIFT_ENTRY = -.12
+# Entry -0.16 (was -0.12): the live buffer probe found the hanger's side locating block 2 mm into the
+# parked car's sill at -0.12 and its pads 5 mm under the wheel-arch edges at -0.14. At -0.16 with the
+# locating blocks retracted (60 mm) the pads pass 2.5 cm under the arch edges.
+AMR_LIFT_ENTRY = -.16
 BUFFER_CAR_Z = -.09
 AMR_LIFT_CARRY = -.04
 MOUNT_PARK = 3.15

@@ -8,7 +8,8 @@
     python3 map/wheel_cell/regress.py --changed       # areas touched by uncommitted changes
 
 Areas: supply (truck infeed), insertion (hub bench), cycle (seed 42: docking and pick zone),
-seeds (four seeds), rails (same-rail arm interlock), full (everything).
+seeds (four seeds), rails (same-rail arm interlock), buffer (AMR fetches a car from the inbound
+vehicle buffer), full (everything).
 """
 import argparse
 import json
@@ -35,6 +36,8 @@ SCENARIOS = {
     "insert_skew": (["--insertion-probe", "skew"], "bench: 4 mm radial offset is stopped by the studs"),
     "supply_left": (["--supply-probe", "left"], "infeed reaches the left branch"),
     "supply_right": (["--supply-probe", "right"], "infeed reaches the right branch"),
+    "buffer0": (["--buffer-probe", "0"], "AMR fetches the car from inbound slot 1 (no contact, lifted off the stands)"),
+    "buffer2": (["--buffer-probe", "2"], "slot 3: crabs under empty stands, carries the car back over them"),
 }
 QUICK = ("insert_nominal", "insert_skew", "supply_left")
 
@@ -44,6 +47,7 @@ AREAS = {
     "cycle": ("seed42",),
     "seeds": ("seed42", "seed7", "seed123", "seed2024"),
     "rails": ("rails",),
+    "buffer": ("buffer0", "buffer2"),
     "full": tuple(SCENARIOS),
 }
 
@@ -59,7 +63,8 @@ FILE_AREAS = {
     "wheel.py": ("insertion", "cycle"),
     "station.py": ("insertion", "cycle"),
     "live_robot.py": ("cycle", "rails"),
-    "carrier.py": ("cycle", "rails"),
+    "carrier.py": ("cycle", "rails", "buffer"),
+    "vehicle.py": ("cycle", "buffer"),
     "cell.py": ("full",),
     "fitment.py": ("insertion", "cycle"),
     "wheel_geometry.py": ("insertion", "cycle"),

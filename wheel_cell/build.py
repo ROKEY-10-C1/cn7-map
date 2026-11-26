@@ -263,9 +263,10 @@ def parking(stage, root, side):
                 cylinder(stage,car+f"/Hub_{name}",(axle,y,HUB_Z),.132,.065,ALLOY,"Y")
         # Stands under the body ends (not under the hubs), leaving the lane for the hanger free.
         # Tops touch the lowest body point over each 0.2 m stand (AssetLibrary Body, measured 2026-11-26:
-        # z 1.061 front, 1.031 rear); the floor is at -BUFFER_CAR_Z in this frame. A car carried at
+        # z 1.0615 front, 1.0305 rear; rounding to mm left the front 0.5 mm short and the rear 0.5 mm
+        # into the body); the floor is at -BUFFER_CAR_Z in this frame. A car carried at
         # AMR_LIFT_CARRY clears these tops by 4.7 cm when it passes an empty slot.
-        for end,top in ((1,1.061),(-1,1.031)):
+        for end,top in ((1,1.0615),(-1,1.0305)):
             for sign in (-1,1):
                 box(stage,root+f"/Stand_{i}_{'F' if end>0 else 'R'}{'L' if sign>0 else 'R'}",
                     (x-side*sign*BUFFER_STAND_Y,bay_y-side*end*BUFFER_STAND_X,(top+BUFFER_CAR_Z)/2),
