@@ -1,0 +1,5 @@
+{
+  "corner": {"model": "bearing", "chamfers": true},
+  "tire": {"model": "ring"},
+  "sensing": {"enabled": true}
+}

@@ -41,6 +41,46 @@ DEFAULTS = {
         # current cycle the car does not drift, and holding early leaves up to 0.36° angle error.
         "hold_after_seat": False,
     },
+    # Vehicle corner and wheel models (corner.py). Defaults keep the original model: hub
+    # colliders fixed to the body, one rigid wheel body, true wheel angle. configs/realistic.json
+    # switches all of them on.
+    "corner": {
+        "model": "fixed",                 # "fixed" / "bearing": knuckle on suspension, hub on its bearing
+        "chamfers": True,                 # bearing model: lead-in on pilot and stud ends
+    },
+    "hub": {                              # bearing model only
+        "random_angle": True,             # the stopped car parks its hubs at any angle
+        "free_rotation": True,            # hub turns on its bearing, held by drag only
+        "bearing_drag_nm": 1.2,           # wheel bearing + brake pad drag torque (estimated)
+        "radial_play_mm": .03,            # bearing radial play
+    },
+    "suspension": {                       # bearing model only
+        "enabled": True,
+        "wheel_rate_n_per_mm": 22.,       # CN7 wheel rate, ~22-25 N/mm (estimated)
+        "damping_ns_per_m": 1800.,
+        "lateral_rate_n_per_mm": 900.,    # knuckle / bushing compliance along the axle
+        "droop_preload_mm": 6.,           # spring preload holding the hanging corner on its rebound stop
+    },
+    "tolerance": {                        # bearing model only: per-seed hub dimensions
+        "enabled": True,
+        "pilot_diameter_mm": (-.03, 0.),  # h8-like range on the pilot
+        "stud_position_mm": .05,          # true-position radius of each stud
+        "pcd_mm": .05,
+    },
+    "tire": {
+        "model": "rigid",                 # "rigid" / "ring": tread ring on springs around the rim
+        "radial_rate_n_per_mm": 210.,     # 205/55 R16 at 2.3 bar (estimated)
+        "lateral_rate_n_per_mm": 140.,
+        "torsional_rate_nm_per_deg": 55.,
+        "damping_ratio": .08,
+    },
+    "sensing": {
+        "enabled": False,                 # wheel-to-hub angle from the camera instead of ground truth
+        "wheel_angle_noise_deg": .03,     # 1 sigma of the bolt-pattern angle from the depth image
+        "center_noise_mm": .05,
+        "update_hz": 30,                  # camera rate; the last frame is held between frames
+        "latency_s": .033,                # one frame of processing delay
+    },
 }
 
 

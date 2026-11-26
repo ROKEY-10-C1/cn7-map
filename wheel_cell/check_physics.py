@@ -53,7 +53,9 @@ def check_actors(stage, robots, exported=False):
         return False
     for path in wheels:
         props=UsdPhysics.MassAPI(stage.GetPrimAtPath(path))
-        if abs(props.GetMassAttr().Get()-WHEEL_MASS)>.001 or min(props.GetDiagonalInertiaAttr().Get())<=0.:
+        tire=stage.GetPrimAtPath(path.rsplit("/",1)[0]+"/Tire")   # ring tire model carries the tread
+        mass=props.GetMassAttr().Get()+(UsdPhysics.MassAPI(tire).GetMassAttr().Get() if tire else 0.)
+        if abs(mass-WHEEL_MASS)>.001 or min(props.GetDiagonalInertiaAttr().Get())<=0.:
             return False
     if any(prim.GetName()=="TipGrip" for prim in live):
         return False

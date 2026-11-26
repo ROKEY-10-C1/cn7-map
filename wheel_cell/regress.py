@@ -9,7 +9,8 @@
 
 Areas: supply (truck infeed), insertion (hub bench), feed (belt, stopper, clamp, tip-up,
 hand-off, alignment: first 11 s), dock (AMR docking: first 21 s), cycle (seed 42 to the
-mount arms parked), jam (fault case), full (everything).
+mount arms parked), jam (fault case), realistic (configs/realistic.json, seeds 42 and 7),
+full (every default-model scenario).
 
 Each scenario is one check_physics.sh run. Results land in output/regress/<time>.json and a
 table is printed. Any station whose result differs from the baseline is flagged.
@@ -45,6 +46,10 @@ QUICK = ("insert_nominal", "insert_skew", "supply_left")
 # A partial scenario stops at --until and passes if no station has failed so far.
 SCENARIOS["feed42"] = (["--seed", "42", "--until", "11"], "belt to aligned, no fault")
 SCENARIOS["dock42"] = (["--seed", "42", "--until", "21"], "AMR docked, no fault")
+# All corner/tire/sensing models on (hub on bearing + suspension, tolerances, ring tire, camera).
+REALISTIC = str(ROOT/"configs"/"realistic.json")
+SCENARIOS["real42"] = (["--seed", "42", "--require-seated", "--config", REALISTIC], "realistic models, all four seated")
+SCENARIOS["real7"] = (["--seed", "7", "--require-seated", "--config", REALISTIC], "realistic models, all four seated")
 
 AREAS = {
     "supply": ("supply_left", "supply_right"),
@@ -53,13 +58,16 @@ AREAS = {
     "dock": ("dock42",),
     "cycle": ("seed42",),
     "jam": ("jam42",),
-    "full": tuple(n for n in SCENARIOS if n not in ("feed42", "dock42")),
+    "realistic": ("real42", "real7"),
+    "full": tuple(n for n in SCENARIOS if n not in ("feed42", "dock42", "real42", "real7")),
 }
 
 # Which areas a source file can affect (files not listed affect none: tooling, docs, recording).
 FILE_AREAS = {
     "conveyor.py": ("supply", "feed", "cycle"),
-    "physics.py": ("insertion", "feed", "dock", "cycle"),
+    "physics.py": ("insertion", "feed", "dock", "cycle", "realistic"),
+    "corner.py": ("realistic",),
+    "realistic.json": ("realistic",),
     "fitment.py": ("insertion", "cycle"),
     "wheel_geometry.py": ("insertion", "cycle"),
     "robot.py": ("cycle",),
@@ -150,7 +158,7 @@ def main():
             return 0
     if areas:
         names = []
-        for area in ("full",) if "full" in areas else areas:
+        for area in areas:
             names += [n for n in AREAS[area] if n not in names]
     else:
         names = config.only or (QUICK if config.quick else AREAS["full"])
