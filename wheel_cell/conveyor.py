@@ -6,12 +6,13 @@ from pxr import Gf, PhysxSchema, UsdGeom, UsdPhysics, UsdShade
 
 from physical_data import JAW_STROKE, ROLLER_RADIUS, ROLLER_RATED_SPEED, ROLLER_TORQUE, tube_properties
 from process import BELT_Z, CN7_R16, LINE_Y, REJECT_GATE_HALF, REJECT_X
+from cell_config import CONFIG
 
 FACTORY="/World/Factory"
 START_AHEAD=.76
 TREAD_HALF=.095
 PARK_X=-.07       # TipCenter travel is -.08 to .49 m from the axle
-PARK_Y=.24
+PARK_Y=CONFIG["fixture"]["park_y"]   # clear of the withdrawing mount arm (E12)
 PARK_Z=-.20
 PARK_TIME=4.0
 

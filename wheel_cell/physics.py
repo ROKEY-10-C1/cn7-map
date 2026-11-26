@@ -489,7 +489,10 @@ class Station:
                 self.seated_samples=0
             if self.seated_samples>=12:
                 self.phase="seated"
-                self.press.Set(-.006-self.initial_gap)
+                if CONFIG["insertion"]["hold_after_seat"]:
+                    self.press.Set(self.gap-.0005-self.initial_gap)
+                else:
+                    self.press.Set(-.006-self.initial_gap)
             elif self.timer>INSERT_TIMEOUT:
                 self.stall_gap=self.gap
                 self.phase="jammed"
@@ -1072,7 +1075,7 @@ class Cell:
         guide=material(stage,"GuideUHMW",GUIDE_STATIC_FRICTION,GUIDE_DYNAMIC_FRICTION,combine="min")
         setup_factory(stage,ROOT,mats[2],guide,branch_side)
         rng=Random(seed)
-        self.stations=[make_station(stage,car,name,rng.uniform(-180.,180.),.002 if jam and name=="FL" else 0.,
+        self.stations=[make_station(stage,car,name,rng.uniform(-180.,180.),CONFIG["insertion"]["jam_offset_mm"]/1000 if jam and name=="FL" else 0.,
                                     sections,mats,rail_probe and name=="FL") for name in STATIONS]
         self.robots=[Robot(stage,REFERENCE+"/"+prefix+role)
                 for prefix in ("Left","Right") for role in ("Mount","Fasten")] if robots else []

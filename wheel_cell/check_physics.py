@@ -123,7 +123,11 @@ def check_insertion(stage,seed,skew):
         cell.close()
 
 
-def check(path, seed, jam, robots, rail_probe, export, interference_probe, tip_drive_off, require_seated):
+PARTIAL_FAULTS = frozenset(("jammed","alignment_failed","feed_failed","clamp_failed","dock_lost",
+                            "tip_failed","grip_slip"))
+
+
+def check(path, seed, jam, robots, rail_probe, export, interference_probe, tip_drive_off, require_seated, until=None):
     stage = Usd.Stage.Open(str(path))
     stage.SetEditTarget(stage.GetSessionLayer())
     cell = Cell(stage,seed,jam,robots,rail_probe)
@@ -188,6 +192,8 @@ def check(path, seed, jam, robots, rail_probe, export, interference_probe, tip_d
                     tracking_samples+=1
             if interference_probe and i>int(DOCK_READY+10)*HZ:
                 break
+            if until is not None and cell.seconds>=until:
+                break
             # Keep running until the mount arms have withdrawn and parked: the exit path
             # crosses the parked tip fixtures and was not exercised when the check stopped
             # at the last seat.
@@ -219,6 +225,13 @@ def check(path, seed, jam, robots, rail_probe, export, interference_probe, tip_d
         print("RAIL_CHECK",cell.min_rail_spacing,cell.interference,flush=True)
         measured_car=tuple(cell.api.get_rigidbody_transformation(car_path)["position"])
         print("CARRIER_CHECK",cell.dock_ready_time,measured_car,maximum_speed,flush=True)
+        if until is not None and cell.seconds>=until:
+            # Partial run (one area of the cycle): pass if nothing has failed so far.
+            faults=[(s.name,s.phase) for s in cell.stations if s.phase in PARTIAL_FAULTS]
+            print("PARTIAL_CHECK",round(cell.seconds,2),faults,flush=True)
+            broken=[s.name for s in cell.stations
+                    if any(v!=v for v in cell.api.get_rigidbody_transformation(s.wheel)["position"])]
+            return not faults and not broken
         if (not cell.carrier.ready or dist(measured_car,(0.,0.,0.))>.040
                 or any(found>rated+.020 for found,rated in zip(maximum_speed,(AMR_SPEED_X,AMR_SPEED_Y,AMR_LIFT_SPEED)))):
             return False
@@ -270,6 +283,7 @@ def main():
     args.add_argument("--insertion-probe",choices=("nominal","skew"),help="Exercise the hub on an isolated fixture")
     args.add_argument("--export-setup",type=Path,help="Save the physical scene before stepping")
     args.add_argument("--config",type=Path,help="JSON overrides for cell_config.DEFAULTS")
+    args.add_argument("--until",type=float,help="Stop at this simulated time (s) and check only for faults so far")
     config=args.parse_args()
     if config.interference_probe and config.without_robots:
         args.error("--interference-probe requires robots")
@@ -281,7 +295,7 @@ def main():
         return check_supply(stage,config.seed,1 if config.supply_probe=="left" else -1)
     return check(config.stage,config.seed,config.jam,not config.without_robots,
                  config.rail_probe,config.export_setup,config.interference_probe,config.tip_drive_off,
-                 config.require_seated)
+                 config.require_seated,config.until)
 
 
 if __name__=="__main__":
