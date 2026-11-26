@@ -66,6 +66,23 @@ map/scene/
 | `capture.py` | 문서용 스크린샷을 렌더링합니다. |
 | 디버그 | `CELL_DEBUG=1`, `CELL_DEBUG_TIP=<FL..>`, `CELL_DEBUG_JAW=<FL..>`를 켤 때만 진단 로그를 출력합니다. |
 
+### 2026-11-26 AMR 차량 버퍼·KMP 1500 URDF (`ea2dfea`, `071e89b`, `e4f0ad2`)
+
+pull 후 다시 빌드할 필요는 없습니다. `scene/factory/vehicle_buffers.usdc`가 이미 새로 생성돼 있습니다.
+
+| 파일 | 내용 |
+|---|---|
+| `wheel_cell/build.py` `parking()` | 입고 칸 차의 받침대를 **바퀴 자리 4곳(Skid) → 차체 앞뒤 끝 4곳(`Stand_*`)** 으로 옮겼습니다. 차 밑에 AMR+행거가 옆으로 들어갈 통로가 생깁니다. 출고 칸도 같은 받침대 위에 차를 둡니다(타이어는 바닥에서 뜸). |
+| `wheel_cell/process.py` | 새 상수 `BUFFER_SLOT_X`, `BUFFER_STAND_X/Y`, `BUFFER_CAR_Z`(칸의 차 높이 -0.09), `AMR_LIFT_ENTRY`(-0.12), `AMR_LIFT_CARRY`(-0.04). |
+| `scene/factory/vehicle_buffers.usdc` | 위 변경으로 다시 생성한 레이어(이 레이어만 바뀜). Isaac 없이 usd-core로 만들어 crate 0.8 형식입니다. |
+| `wheel_cell/assets/kmp1500.urdf`, `kmp1500_meshes/`, `kmp1500_urdf.py` | KUKA KMP 1500 URDF(데이터시트 크기). SICK S300 2개(대각선 `laser_front_left`/`laser_rear_right`), `imu_link`, 외관 메시. ROS/RViz·Nav2 테스트용이고 Isaac 장면은 그대로입니다. |
+| `.gitignore` | `.envrc`, `.direnv/` 제외. `wood_table_steel_ball.usda` 삭제(쓰지 않던 파일). |
+| `docs/PROCESS_SCENARIO.md` 1단계, `scene/README.md` "변경 기록" | AMR 픽업·반납 흐름, 받침대 위치·높이 표. |
+
+AMR 흐름(정한 내용): 입고 칸은 **1 → 2 → 3**(통로 쪽부터) 꺼내고, 출고 칸은 **3 → 2 → 1**(먼 칸부터) 채웁니다. 차를 실은 채로는 다른 차 밑을 못 지나가서 빈 칸만 지나가게 하는 순서입니다. 회전은 통로 끝 (-7, ±6.55)에서 제자리 90°입니다.
+
+아직 안 된 것: Isaac 물리 검증(`check_physics.sh`), 키프레임 시연(주문 차량은 아직 통로 끝에서 실린 채 나타남), 주문 4대 중 4번째 차를 둘 칸.
+
 ## 4. 에러 기록 (발생 순서)
 
 모든 물리 결과는 `./map/wheel_cell/check_physics.sh --seed 42` 기준입니다.
