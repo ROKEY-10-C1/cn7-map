@@ -1114,7 +1114,7 @@ class Cell:
                     if os.environ.get("CELL_DEBUG"):
                         print("CONTACTDBG",round(self.seconds,3),collider0,collider1,
                               min(contacts[i].separation for i in range(first,first+header.num_contact_data)),
-                              [round(v,3) for v in contacts[first].position],
+                              [round(v,3) for v in contacts[first].position],"normal",[round(v,3) for v in contacts[first].normal],
                               "sample",robot.sample,"clock",round(robot.clock,2),"detour",robot.detour,flush=True)
                     self.stop_pair(*self.pair_by_robot[robot.path],"equipment_contact")
             for face,other in ((collider0,collider1),(collider1,collider0)):

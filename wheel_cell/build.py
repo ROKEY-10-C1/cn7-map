@@ -690,7 +690,11 @@ def rail_robot(stage, root, arm, side, start, front, rear, rear_tight, front_tig
         rail_samples=((start,MOUNT_PARK),(front-13,MOUNT_PARK),(front-7,AXLE+offset),
                       (front+1.4,AXLE+offset),(rear-4,-AXLE+offset),
                       (rear+1.4,-AXLE+offset),(rear+5,MOUNT_PARK))
-        movement_target=(-offset,side*(LINE_Y+.30),HUB_Z+.11)
+        # Wheel-side standby between the parked tip fixture's upper jaw head (x <= axle+0.003,
+        # z 1.14-1.22) and its upright guide beam (axle+0.28..0.33, top z 1.32). Tool parts
+        # span +-0.062 m and the live arm trails its target by ~+0.06 m in x, so the target
+        # sits at axle+0.06 (at the axle the arm grazed the jaw pad by ~1 mm).
+        movement_target=(-offset+.06,side*(LINE_Y+.30),HUB_Z+.11)
         poses=[(start,safe)]
         for t,approach,axle in ((front,6.7,AXLE),(rear,3.8,-AXLE)):
             seated_target=(-offset,side*(half_track(axle)+.30),HUB_Z+.10)
