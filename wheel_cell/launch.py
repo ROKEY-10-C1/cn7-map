@@ -42,6 +42,9 @@ def main():
     parser.set_defaults(camera="Overview")
     parser.add_argument("--replay", action="store_true", help="Use the original timeline preview")
     parser.add_argument("--seed", type=int, help="Reproduce the wheel arrival angles")
+    parser.add_argument("--start", choices=("buffer", "gate"), default="buffer",
+                        help="buffer: the AMR fetches the car from the inbound buffer first (whole order); "
+                             "gate: start with the car loaded at the gate")
     parser.add_argument("--start-at", type=float, default=None, metavar="SECONDS",
                         help="Seek to this scene time when starting")
     parser.add_argument("--quality", choices=("balanced", "high", "cinematic"), default="high")
@@ -72,6 +75,8 @@ def main():
             flags.append("--replay")
         if args.seed is not None:
             flags.extend(("--seed",str(args.seed)))
+        if not replay:
+            flags.extend(("--start",args.start))
         process = subprocess.Popen([str(binary), "-B", str(root/"play.py"),
                                     str(args.stage.resolve()), str(args.smoke_frames), *flags],
                                    start_new_session=True)

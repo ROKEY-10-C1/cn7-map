@@ -21,7 +21,10 @@ from wheel import collision_web
 
 
 class Cell:
-    def __init__(self, stage, seed, robots=True, branch_side=1, *, manual=True):
+    def __init__(self, stage, seed, robots=True, branch_side=1, *, manual=True, start="buffer", slot=0):
+        """start="buffer": the AMR fetches the car from inbound buffer slot `slot` and brings it to
+        the gate, then docks (the whole order). start="gate": the AMR starts at the gate with the
+        car already loaded (the cell part only)."""
         import omni.physx
 
         self.stage=stage
@@ -118,6 +121,16 @@ class Cell:
         # Pick-zone moving parts: anything but their own tire touching them is reported.
         self.zone_bodies=[path for station in self.stations for path in station.zone.contact_bodies]
         self.zone_contacts=set()
+        self.car_path=ROOT+"/CN7"
+        self.buffer_run=None
+        if start=="buffer":
+            from vehicle import BufferRun, place_at_buffer
+            from process import BUFFER_SLOT_X
+            stands,self.parked_z=place_at_buffer(stage,self,slot)
+            self.buffer_run=BufferRun(self.carrier,BUFFER_SLOT_X[slot],stands)
+            self.pending.append((0.,"AMR",f"buffer_slot_{slot+1}"))
+        elif start!="gate":
+            raise ValueError(f"start must be 'buffer' or 'gate', not {start!r}")
         self.stage_id=None
         if manual:
             self.stage_id=UsdUtils.StageCache.Get().Insert(stage)
@@ -177,8 +190,23 @@ class Cell:
         with self.section("prepare"):
             self._prepare_step(dt)
 
+    @property
+    def buffer_active(self):
+        return self.buffer_run is not None and self.buffer_run.phase!="done"
+
     def _prepare_step(self,dt):
-        self.carrier.step(self.api,dt)
+        if self.buffer_active:
+            old=self.buffer_run.phase
+            if self.buffer_run.step(self.api,dt)!=old:
+                self.pending.append((self.seconds,"AMR",f"buffer_{self.buffer_run.phase}"))
+            if not self.buffer_active:
+                # At the gate with the car at -0.12: the dock approach starts from here.
+                state=self.api.get_rigidbody_transformation(self.carrier.path)
+                self.carrier.previous=Gf.Vec3d(*state["position"])
+                self.carrier.velocity=Gf.Vec3d(0.)
+                self.carrier.previous_yaw=0.
+        else:
+            self.carrier.step(self.api,dt)
         if self.carrier.ready and self.dock_ready_time is None:
             self.dock_ready_time=self.seconds
             self.pending.append((self.seconds,"AMR","docked"))
@@ -207,12 +235,17 @@ class Cell:
 
     def _finish_step(self,dt):
         headers,contacts=self.sim.get_contact_report()[:2]
+        buffer_pairs=[]
         self.carrier.grounded=False
         self.carrier.clamp_contacts.clear()
         for header in headers:
             if not header.num_contact_data:
                 continue
             collider0,collider1=self._collider(header.collider0),self._collider(header.collider1)
+            if self.buffer_active:
+                first=header.contact_data_offset
+                deep=min(contacts[k].separation for k in range(first,first+header.num_contact_data))<=-.0002
+                buffer_pairs.append((collider0,collider1,deep))
             pair=[self._robot_of(path) for path in (collider0,collider1)]
             if all(pair) and pair[0]!=pair[1]:
                 self.stop_pair(*pair,"robot_contact")
@@ -248,6 +281,9 @@ class Cell:
                         unit.stop_contact=True
                     elif "roller" in face.lower() or "/TransferBed/" in face:
                         unit.belt_contact=True
+        if self.buffer_active:
+            car=self.api.get_rigidbody_transformation(self.car_path)
+            self.buffer_run.observe(self.car_path,self.seconds,car["position"][2],self.parked_z,buffer_pairs)
         self.seconds+=dt
 
     def step(self):

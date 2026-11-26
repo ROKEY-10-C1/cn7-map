@@ -6,15 +6,15 @@ Undertray box, the wheel openings stay the Wheelhouse arch proxies. The buffer s
 sills are cut from the mesh into collision blocks: 0.1 m slices along the car, two bands across.
 Slice edges fall on the stand edges, so a block never reaches below the mesh over a stand.
 """
-from math import atan2, pi, sqrt
+from math import atan2, degrees, pi, radians, sqrt
 
-from pxr import Gf, Usd, UsdGeom
+from pxr import Gf, PhysxSchema, Usd, UsdGeom, UsdPhysics
 
 from conveyor import collider, quaternion
 from physical_data import AMR_ACCELERATION, AMR_LIFT_MASS, AMR_LIFT_SPEED, AMR_MASS, AMR_SPEED_Y
 from physical_data import AMR_TRACTION_COEFFICIENT, BODY_MASS
 from fitment import ARCH_RADIUS
-from process import AMR_BAY_Y, AMR_LIFT_CARRY, AMR_LIFT_ENTRY, STATIONS
+from process import AMR_BAY_Y, AMR_GATE_X, AMR_LIFT_CARRY, AMR_LIFT_ENTRY, STATIONS
 from sim_util import cube, vec
 
 SILL_INNER = .65          # car y where the sill starts (inboard of it the shell is at 1.5-1.6 m)
@@ -93,15 +93,23 @@ def move_rigidly(stage, paths, moved):
 
 
 class BufferRun:
-    """AMR + hanger fetch a car from an inbound buffer slot: crab in under the parked car at the
-    entry height, lift it off the stands to the carry height, crab back out to the lane.
+    """AMR + hanger fetch the order's car from an inbound buffer slot and bring it to the gate:
+    lower to the entry height with the locating blocks down, crab in under the parked car, lift it
+    off the stands to the carry height (blocks up), crab back to the lane, turn from -90 to 0 deg at
+    the lane end, crab to the gate and set the car down to the gate height. The cell's Carrier
+    (gate -> dock) takes over from there.
 
-    Uses the cell's Carrier bodies and its traction/lift drives with its own targets (the cell's
-    gate -> dock logic is bypassed). Heights are hanger offsets from process.py (0 = docked)."""
+    Uses the cell's Carrier bodies and drives with its own targets. Heights are hanger offsets
+    from process.py (0 = docked). Contacts of the car or the hanger with the stands, other than the
+    car resting on its own stands before the lift and the pads carrying it after, are recorded in
+    `touches`."""
 
-    def __init__(self, carrier, slot_x, entry=AMR_LIFT_ENTRY, carry=AMR_LIFT_CARRY):
+    TURN_RATE = 15.          # deg/s, in place at the lane end
+
+    def __init__(self, carrier, slot_x, stands, entry=AMR_LIFT_ENTRY, carry=AMR_LIFT_CARRY):
         self.c = carrier
         self.slot_x = slot_x
+        self.own_stands = stands
         self.entry = entry
         self.carry = carry
         self.phase = "lower"
@@ -110,7 +118,10 @@ class BufferRun:
         self.previous = None
         self.velocity = Gf.Vec3d(0.)
         self.previous_yaw = None
+        self.heading_goal = -90.
         self.carrying = False
+        self.touches = {}
+        self.lift_off = None
 
     def lift_to(self, offset, dt):
         goal = offset-LIFT_DATUM
@@ -120,14 +131,15 @@ class BufferRun:
         self.c.lift_drive.Set(self.joint+load/self.c.stiffness)
         return abs(goal-self.joint) < 1e-6
 
-    def drive_to(self, api, x, dt):
+    def drive_to(self, api, x, y, dt):
+        """Planar traction toward (x, y) at crab speed, heading held at heading_goal."""
         state = api.get_rigidbody_transformation(self.c.path)
         point = Gf.Vec3d(*state["position"])
         if self.previous is None:
             self.previous = point
         measured = (point-self.previous)/dt
         self.previous = point
-        remaining = Gf.Vec3d(x-point[0], AMR_BAY_Y-point[1], 0.)
+        remaining = Gf.Vec3d(x-point[0], y-point[1], 0.)
         speed = min(AMR_SPEED_Y, sqrt(2*AMR_ACCELERATION*remaining.GetLength()))
         goal = remaining.GetNormalized()*speed if remaining.GetLength() > 1e-6 else Gf.Vec3d(0.)
         delta = goal-self.velocity
@@ -141,38 +153,101 @@ class BufferRun:
             force = force.GetNormalized()*limit
         self.c.force.Set(vec(force) if self.c.grounded else Gf.Vec3f(0.))
         front = Gf.Rotation(quaternion(state)).TransformDir(Gf.Vec3d(1, 0, 0))
-        yaw = atan2(front[1], front[0])+pi/2            # heading -90 deg along the bay
-        yaw = (yaw+pi) % (2*pi)-pi
-        rate = 0. if self.previous_yaw is None else (yaw-self.previous_yaw)/dt
-        self.previous_yaw = yaw
-        torque = -3600*yaw-900*rate
+        error = (atan2(front[1], front[0])-radians(self.heading_goal)+pi) % (2*pi)-pi
+        rate = 0. if self.previous_yaw is None else (error-self.previous_yaw)/dt
+        self.previous_yaw = error
+        torque = -3600*error-900*rate
         bound = limit*.31
         self.c.yaw_torque.Set(Gf.Vec3f(0., 0., max(-bound, min(bound, torque)) if self.c.grounded else 0.))
+        self.heading_error = degrees(error)
         return remaining.GetLength() < .006 and Gf.Vec3d(measured[0], measured[1], 0.).GetLength() < .025
 
     def step(self, api, dt):
         self.timer += dt
+        lane = (AISLE_X, AMR_BAY_Y)
         if self.phase == "lower":
             self.c.set_locators(False)
-            self.drive_to(api, AISLE_X, dt)
+            self.drive_to(api, *lane, dt)
             if self.lift_to(self.entry, dt) and self.timer > .5:
                 self.phase, self.timer = "enter", 0.
         elif self.phase == "enter":
             self.lift_to(self.entry, dt)
-            if self.drive_to(api, self.slot_x, dt) and self.timer > 1.:
+            if self.drive_to(api, self.slot_x, AMR_BAY_Y, dt) and self.timer > 1.:
                 self.phase, self.timer = "lift", 0.
         elif self.phase == "lift":
-            self.drive_to(api, self.slot_x, dt)
+            self.drive_to(api, self.slot_x, AMR_BAY_Y, dt)
             self.carrying = True
             if self.lift_to(self.carry, dt) and self.timer > .5:
                 self.c.set_locators(True)     # up beside the sills and body ends: the car cannot slide
                 self.phase, self.timer = "exit", 0.
         elif self.phase == "exit":
             self.lift_to(self.carry, dt)
-            if self.drive_to(api, AISLE_X, dt) and self.timer > 1.:
-                self.phase, self.timer = "done", 0.
-        else:
+            if self.drive_to(api, *lane, dt) and self.timer > 1.:
+                self.phase, self.timer = "turn", 0.
+        elif self.phase == "turn":
             self.lift_to(self.carry, dt)
-            self.drive_to(api, AISLE_X, dt)
+            self.heading_goal = min(0., self.heading_goal+self.TURN_RATE*dt)
+            self.drive_to(api, *lane, dt)
+            if self.heading_goal == 0. and abs(self.heading_error) < .3 and self.timer > 1.:
+                self.phase, self.timer = "to_gate", 0.
+        elif self.phase == "to_gate":
+            self.lift_to(self.carry, dt)
+            if self.drive_to(api, AMR_GATE_X, 0., dt) and self.timer > 1.:
+                self.phase, self.timer = "set_down", 0.
+        elif self.phase == "set_down":
+            # Down to the gate height the dock approach starts from (car at -0.12).
+            self.drive_to(api, AMR_GATE_X, 0., dt)
+            if self.lift_to(LIFT_DATUM, dt) and self.timer > .5:
+                self.phase, self.timer = "done", 0.
         return self.phase
 
+    def observe(self, car_path, now, car_z, parked_z, pairs):
+        """pairs: (collider, other, penetrating) for this step's contact reports."""
+        if self.lift_off is None and car_z > parked_z+.005:
+            self.lift_off = round(now, 2)
+        hanger = (self.c.path+"/", self.c.lift_path+"/", self.c.locator_root+"/")
+        for a, b, deep in pairs:
+            if not deep:
+                continue
+            for x, y in ((a, b), (b, a)):
+                stand = "/Stand_" in y and "VehicleBuffer" in y
+                if x.startswith(car_path+"/") and (stand or y.startswith(hanger)):
+                    intended = (y.startswith(self.own_stands) and self.phase in ("lower", "enter", "lift")) or (
+                        "/LoadPad_" in y and self.phase not in ("lower", "enter"))
+                    if not intended:
+                        key = (self.phase, x.rsplit("/", 1)[1], "/".join(y.rsplit("/", 2)[-2:]))
+                        self.touches[key] = self.touches.get(key, 0)+1
+                elif x.startswith(hanger) and stand:
+                    key = (self.phase, x.rsplit("/", 1)[1], "/".join(y.rsplit("/", 2)[-2:]))
+                    self.touches[key] = self.touches.get(key, 0)+1
+
+
+def place_at_buffer(stage, cell, slot):
+    """Before the simulation starts: the order's car (with its knuckles and hubs) takes the parked
+    car's place on inbound slot `slot`, slots nearer the lane are empty (fetched earlier), and the
+    AMR + hanger wait in the lane heading along the bay. Returns (stand prefix, parked car z)."""
+    buffers = [p for p in stage.Traverse() if p.GetName() == "Vehicle_0" and "VehicleBuffer" in str(p.GetPath())]
+    inbound = next(p.GetParent() for p in buffers
+                   if UsdGeom.Xformable(p).ComputeLocalToWorldTransform(Usd.TimeCode.Default()).ExtractTranslation()[1] > 0)
+    root = str(inbound.GetPath())
+    cache = UsdGeom.XformCache()
+    slot_pose = cache.GetLocalToWorldTransform(stage.GetPrimAtPath(f"{root}/Vehicle_{slot}"))
+    for k in range(slot+1):
+        stage.GetPrimAtPath(f"{root}/Vehicle_{k}").SetActive(False)
+    car = stage.GetPrimAtPath(cell.car_path)
+    corners = [s.hub_path.rsplit("/", 1)[0]+part for s in cell.stations for part in ("/Knuckle", "/Hub")]
+    move_rigidly(stage, [cell.car_path]+corners, cache.GetLocalToWorldTransform(car).GetInverse()*slot_pose)
+    deck = stage.GetPrimAtPath(cell.carrier.path)
+    start = cache.GetLocalToWorldTransform(deck)
+    lane = Gf.Matrix4d().SetRotate(Gf.Rotation(Gf.Vec3d(0, 0, 1), -90.))
+    lane.SetTranslateOnly(Gf.Vec3d(AISLE_X, AMR_BAY_Y, start.ExtractTranslation()[2]))
+    locators = [str(p.GetPath()) for p in stage.GetPrimAtPath(cell.carrier.locator_root).GetChildren()
+                if p.HasAPI(UsdPhysics.RigidBodyAPI)]
+    move_rigidly(stage, [cell.carrier.path, cell.carrier.lift_path]+locators, start.GetInverse()*lane)
+    # A machine waiting at rest must not fall asleep: a sleeping deck stops reporting the floor
+    # contact the traction needs, and nothing would wake it.
+    for path in [cell.car_path, cell.carrier.path, cell.carrier.lift_path]+locators:
+        PhysxSchema.PhysxRigidBodyAPI.Apply(stage.GetPrimAtPath(path)).CreateSleepThresholdAttr(0.)
+    PhysxSchema.PhysxContactReportAPI.Apply(stage.GetPrimAtPath(cell.car_path)).CreateThresholdAttr(0.)
+    PhysxSchema.PhysxContactReportAPI.Apply(stage.GetPrimAtPath(cell.carrier.lift_path)).CreateThresholdAttr(0.)
+    return f"{root}/Stand_{slot}_", slot_pose.ExtractTranslation()[2]

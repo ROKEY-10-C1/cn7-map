@@ -33,6 +33,7 @@ class Carrier:
         self.clamp_target=0.
         self.clamps=[]
         self.locators=[]
+        self.locator_root=ROOT+"/HangerLocator"
         self.clamp_contacts=set()
         self.grounded=False
         self.velocity=Gf.Vec3d(0.)

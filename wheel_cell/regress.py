@@ -7,9 +7,9 @@
     python3 map/wheel_cell/regress.py --area cycle    # one area of the cell only
     python3 map/wheel_cell/regress.py --changed       # areas touched by uncommitted changes
 
-Areas: supply (truck infeed), insertion (hub bench), cycle (seed 42: docking and pick zone),
-seeds (four seeds), rails (same-rail arm interlock), buffer (AMR fetches a car from the inbound
-vehicle buffer), full (everything).
+Areas: cycle (seed 42, the whole order: buffer -> gate -> dock, pick zone), gate (seed 42 from
+the gate), seeds (four seeds from the gate), buffer (only the buffer pick-up, slots 1 and 3),
+supply (truck infeed), insertion (hub bench), rails (same-rail arm interlock), full (everything).
 """
 import argparse
 import json
@@ -27,10 +27,11 @@ OUT = ROOT/"output"/"regress"
 
 # name: (arguments, what passing means)
 SCENARIOS = {
-    "seed42": (["--seed", "42"], "docked, all four tires pick-ready in the V, no equipment contact"),
-    "seed7": (["--seed", "7"], "same, another seed"),
-    "seed123": (["--seed", "123"], "same, another seed"),
-    "seed2024": (["--seed", "2024"], "same, another seed"),
+    "seed42": (["--seed", "42"], "whole order: car fetched from the buffer, docked, four tires pick-ready, no contact"),
+    "gate42": (["--seed", "42", "--start", "gate"], "from the gate: docked, four tires pick-ready, no contact"),
+    "gate7": (["--seed", "7", "--start", "gate"], "same, another seed"),
+    "gate123": (["--seed", "123", "--start", "gate"], "same, another seed"),
+    "gate2024": (["--seed", "2024", "--start", "gate"], "same, another seed"),
     "rails": (["--interference-probe"], "same-rail arms commanded together are stopped"),
     "insert_nominal": (["--insertion-probe", "nominal"], "bench: wheel pressed onto the hub seats on the face"),
     "insert_skew": (["--insertion-probe", "skew"], "bench: 4 mm radial offset is stopped by the studs"),
@@ -45,7 +46,8 @@ AREAS = {
     "supply": ("supply_left", "supply_right"),
     "insertion": ("insert_nominal", "insert_skew"),
     "cycle": ("seed42",),
-    "seeds": ("seed42", "seed7", "seed123", "seed2024"),
+    "gate": ("gate42",),
+    "seeds": ("gate42", "gate7", "gate123", "gate2024"),
     "rails": ("rails",),
     "buffer": ("buffer0", "buffer2"),
     "full": tuple(SCENARIOS),
@@ -63,7 +65,7 @@ FILE_AREAS = {
     "wheel.py": ("insertion", "cycle"),
     "station.py": ("insertion", "cycle"),
     "live_robot.py": ("cycle", "rails"),
-    "carrier.py": ("cycle", "rails", "buffer"),
+    "carrier.py": ("cycle", "gate", "rails", "buffer"),
     "vehicle.py": ("cycle", "buffer"),
     "cell.py": ("full",),
     "fitment.py": ("insertion", "cycle"),

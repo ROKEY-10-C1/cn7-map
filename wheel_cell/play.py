@@ -31,7 +31,7 @@ def live(app, stage, args):
     session.subLayerPaths.insert(0, live_layer.identifier)
     try:
         with Usd.EditContext(stage, live_layer):
-            cell = Cell(stage, seed, manual=False)
+            cell = Cell(stage, seed, manual=False, start=args.start)
             from datetime import datetime
             from perf import PerfMonitor, enable_viewport_hud
             monitor = PerfMonitor(Path(__file__).resolve().parent/"output"/"perf"/f"{datetime.now():%Y%m%d-%H%M%S}_seed{seed}.csv")
@@ -87,7 +87,7 @@ def live(app, stage, args):
                     frames += 1
                     if context.get_stage() == stage and timeline.is_stopped() and cell.seconds:
                         live_layer.Clear()
-                        cell = Cell(stage, seed, manual=False)
+                        cell = Cell(stage, seed, manual=False, start=args.start)
                         cell.timer = monitor.timer
             finally:
                 monitor.sample(cell.seconds, force=True)
@@ -103,7 +103,8 @@ def live(app, stage, args):
 
 
 def update_live_status(cell, labels, seed):
-    amr = "positioned" if cell.carrier.ready else "dock / lift" if cell.carrier.docked else "travel"
+    amr = ("positioned" if cell.carrier.ready else "dock / lift" if cell.carrier.docked
+           else f"buffer: {cell.buffer_run.phase}" if cell.buffer_active else "travel")
     labels["clock"].text = f"CPU PhysX   {cell.seconds:.1f} s   |   AMR {amr}   |   seed {seed}"
     for unit in cell.stations:
         zone = unit.zone
@@ -201,6 +202,7 @@ def main():
     parser.add_argument("--quality", choices=QUALITY, default="high")
     parser.add_argument("--replay", action="store_true")
     parser.add_argument("--seed", type=int)
+    parser.add_argument("--start", choices=("buffer", "gate"), default="buffer")
     args = parser.parse_args()
     args.stage = args.stage.resolve()
     width, height, renderer = QUALITY[args.quality]
