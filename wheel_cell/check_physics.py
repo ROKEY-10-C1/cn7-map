@@ -15,7 +15,7 @@ root = Path(__file__).resolve().parent
 sys.path.insert(0, str(root))
 
 from physical_data import AMR_LIFT_SPEED, AMR_SPEED_X, AMR_SPEED_Y, WHEEL_MASS
-from physics import Cell, DOCK_READY, HZ, MIN_RAIL_SPACING, ROOT, SOURCE_POSE, STATIONS
+from physics import Cell, DOCK_READY, HZ, MIN_RAIL_SPACING, REAR_SEAT, ROOT, SOURCE_POSE, STATIONS
 from physics import constrain, pose, qfloat, quaternion, reference, rotate
 from process import AMR_GATE_X, BELT_Z, LINE_Y
 
@@ -128,7 +128,7 @@ def check(path, seed, jam, robots, rail_probe, export, interference_probe, tip_d
         previous_deck=None
         previous_lift=None
         maximum_speed=[0.,0.,0.]
-        for i in range(int(DOCK_READY+34)*HZ):
+        for i in range(int(DOCK_READY+42)*HZ):
             if interference_probe and i==int(DOCK_READY+2)*HZ:
                 for robot in cell.rail_pairs[0]:
                     robot.rail.Set(0.)
@@ -167,7 +167,13 @@ def check(path, seed, jam, robots, rail_probe, export, interference_probe, tip_d
                     tracking_samples+=1
             if interference_probe and i>int(DOCK_READY+10)*HZ:
                 break
-            if cell.carrier.ready and drive_frame>=25*HZ and cell.finished and i%HZ==0:
+            # Keep running until the mount arms have withdrawn and parked: the exit path
+            # crosses the parked tip fixtures and was not exercised when the check stopped
+            # at the last seat.
+            parked=all(robot.paused_targets or (not robot.holds and robot.detour is None
+                                                and robot.clock>=REAR_SEAT+5.)
+                       for robot in cell.robots if "Mount" in robot.path)
+            if cell.carrier.ready and drive_frame>=25*HZ and cell.finished and parked and i%HZ==0:
                 break
         results={station.name: {"initial_deg":round(station.initial,3),
                                "final_error_deg":round(station.error,3),
