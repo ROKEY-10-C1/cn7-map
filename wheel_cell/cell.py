@@ -1,0 +1,265 @@
+"""The live cell: builds everything and steps stations, robots, AMR and contact reports."""
+
+import os
+from contextlib import nullcontext
+from random import Random
+
+from pxr import Gf, PhysicsSchemaTools, PhysxSchema, Sdf, Usd, UsdGeom, UsdPhysics, UsdShade, UsdUtils
+
+from conveyor import setup_factory
+from physical_data import BODY_MASS, PAD_DYNAMIC_FRICTION, PAD_STATIC_FRICTION
+from physical_data import box_inertia
+from physical_data import GUIDE_DYNAMIC_FRICTION, GUIDE_STATIC_FRICTION
+from physical_data import AMR_LIFT_MASS, AMR_MASS, AMR_SIZE
+from process import STATIONS
+from sim_util import body, cube, mass_properties, material, pose, reference, transform
+from live_params import HZ, INTERLOCK_FAULTS, MIN_RAIL_SPACING, REFERENCE, ROOT, TERMINAL_PHASES
+from carrier import Carrier
+from live_robot import Robot
+from station import make_station
+from wheel import collision_web
+
+
+class Cell:
+    def __init__(self, stage, seed, robots=True, branch_side=1, *, manual=True):
+        import omni.physx
+
+        self.stage=stage
+        self.api=omni.physx.get_physx_interface()
+        self.sim=omni.physx.get_physx_simulation_interface()
+        self.seconds=0.
+        self.timer=None                    # perf.StepTimer, set by the caller to profile each step
+        self._collider_paths={}
+        self._robot_by_collider={}
+        self.dock_ready_time=None
+        self.pending=[]
+        self.interference=[]
+        self.min_rail_spacing=float("inf")
+        transform(stage,ROOT)
+        UsdGeom.Scope.Define(stage,"/World/Orders").CreateVisibilityAttr().Set("invisible")
+        scene=UsdPhysics.Scene.Define(stage,ROOT+"/Physics")
+        scene.CreateGravityDirectionAttr(Gf.Vec3f(0,0,-1))
+        scene.CreateGravityMagnitudeAttr(9.81)
+        options=PhysxSchema.PhysxSceneAPI.Apply(scene.GetPrim())
+        options.CreateEnableGPUDynamicsAttr(False)
+        options.CreateBroadphaseTypeAttr("MBP")
+        options.CreateTimeStepsPerSecondAttr(HZ)
+        options.CreateEnableCCDAttr(True)
+        cube(stage,ROOT+"/Floor",(0,0,-.055),(20,15,.11))
+        # Keep the first car on the AMR at its low inbound datum until the dock closes.
+        source_amr=REFERENCE+"/Carrier"
+        source_lift=source_amr+"/Hanger"
+        deck_start,_=pose(stage,source_amr,0.)
+        car_start,_=pose(stage,source_lift,0.)
+        deck=body(stage,ROOT+"/DockedAMR",deck_start,None,AMR_MASS)
+        mass_properties(deck,(0.,0.,.23),box_inertia(AMR_MASS,AMR_SIZE))
+        lift=body(stage,ROOT+"/DockLift",car_start,None,AMR_LIFT_MASS)
+        mass_properties(lift,(0.,0.,.58),box_inertia(AMR_LIFT_MASS,(3.52,.88,.66)))
+        self.carrier=Carrier(stage,deck,lift)
+        reference(stage,ROOT+"/DockedAMR/Visual",REFERENCE+"/Carrier/AMR")
+        for axle in range(2):
+            for side in (0,2):
+                clamp=f"/DockClamp_{axle}_{side}"
+                self.carrier.add_clamp(stage,ROOT+clamp,REFERENCE+clamp)
+        car=body(stage,ROOT+"/CN7",car_start,None,BODY_MASS)
+        # The replay hierarchy contains wheel/nut animation, not just the car shell.
+        # Copy only static car parts so timeline scrubbing cannot reveal extra wheels.
+        visual=transform(stage,ROOT+"/CN7/Visual")
+        for child in stage.GetPrimAtPath(source_lift).GetChildren():
+            if child.GetName().startswith(("Support_","Crossmember_","ChassisPad_","SaddleRail_")):
+                reference(stage,ROOT+"/DockLift/"+child.GetName(),str(child.GetPath()))
+            elif not child.GetName().startswith("Wheel_"):
+                target=str(visual.GetPath())+"/"+child.GetName()
+                reference(stage,target,str(child.GetPath()))
+                if child.GetName() in STATIONS:
+                    for item in child.GetChildren():
+                        if item.GetName().startswith("Nut_"):
+                            stage.OverridePrim(target+"/"+item.GetName()).SetActive(False)
+        cube(stage,ROOT+"/CN7/Undertray",(0,0,1.10),(3.7,1.16,.23))
+        cube(stage,ROOT+"/CN7/Body",(0,0,1.55),(4.56,1.57,.36))
+        sections=collision_web(stage)
+        mats=(material(stage,"Steel",.27),material(stage,"Rubber",.82),material(stage,"RollerGrip",.62),
+              material(stage,"GripPad",PAD_STATIC_FRICTION,PAD_DYNAMIC_FRICTION,combine="min"),
+              # Cradle support rollers are free idlers; model their rolling resistance only.
+              material(stage,"IdlerRoller",.02,.02,combine="min"))
+        for ax in (-1,1):
+            for side in (-1,1):
+                pad=cube(stage,f"{ROOT}/DockLift/LoadPad_{ax+1}_{side+1}",(ax*1.65,side*.40,.927),
+                         (.16,.10,.116))
+                UsdShade.MaterialBindingAPI.Apply(stage.GetPrimAtPath(pad)).Bind(mats[1],materialPurpose="physics")
+        for side in (-1,1):
+            cube(stage,f"{ROOT}/DockLift/SideLocator_{side+1}",(0,side*.615,1.01),(.20,.06,.06))
+            cube(stage,f"{ROOT}/DockLift/EndLocator_{side+1}",(side*1.885,0,1.01),(.06,.20,.06))
+        guide=material(stage,"GuideUHMW",GUIDE_STATIC_FRICTION,GUIDE_DYNAMIC_FRICTION,combine="min")
+        setup_factory(stage,ROOT,mats[2],guide,branch_side)
+        rng=Random(seed)
+        self.stations=[make_station(stage,car,name,rng.uniform(-180.,180.),sections,mats,seed) for name in STATIONS]
+        self.robots=[Robot(stage,REFERENCE+"/"+prefix+role)
+                for prefix in ("Left","Right") for role in ("Mount","Fasten")] if robots else []
+        self.robots_by_path={robot.path:robot for robot in self.robots}
+        self.rail_pairs=list(zip(self.robots[::2],self.robots[1::2]))
+        self.pair_by_robot={robot.path:pair for pair in self.rail_pairs for robot in pair}
+        self.by_contact_face={station.face_path:station for station in self.stations}
+        self.by_wheel={station.wheel:station for station in self.stations}
+        self.by_wheel.update({station.tire:station for station in self.stations})
+        # Method 1 gripper on each mount robot's flange (Link_6).
+        from gripper import WheelGripper
+        self.grippers={}
+        grip=material(stage,"GripperRoller",.8)
+        for robot in self.robots:
+            if "Mount" in robot.path:
+                flange=UsdGeom.Xformable(stage.GetPrimAtPath(robot.path+"/Link_6")).ComputeLocalToWorldTransform(
+                    Usd.TimeCode.Default())
+                self.grippers[robot.path]=WheelGripper(stage,robot.path,flange,grip)
+        # Pick-zone moving parts: anything but their own tire touching them is reported.
+        self.zone_bodies=[path for station in self.stations for path in station.zone.contact_bodies]
+        self.zone_contacts=set()
+        self.stage_id=None
+        if manual:
+            self.stage_id=UsdUtils.StageCache.Get().Insert(stage)
+            self.sim.attach_stage(self.stage_id.ToLongInt())
+
+    def export_setup(self, path):
+        compiled=Usd.Stage.Open(self.stage.Flatten(False))
+        compiled.RemovePrim("/World/Orders")
+        self.carrier.author_inbound_drives(compiled)
+        texture=UsdShade.Shader.Get(compiled,"/Looks/Concrete/Texture")
+        if texture:
+            texture.GetInput("file").Set(Sdf.AssetPath("./concrete.png"))
+        return compiled.GetRootLayer().Export(str(path))
+
+    def robot_clearance(self):
+        for mount,fasten in self.rail_pairs:
+            paths=[r.path+"/RailCarriage" for r in (mount,fasten)]
+            poses=[self.api.get_rigidbody_transformation(p) for p in paths]
+            if mount.rail.Get()-fasten.rail.Get()<MIN_RAIL_SPACING:
+                self.stop_pair(mount,fasten,"rail_command")
+            if not all(p.get("ret_val") for p in poses):
+                continue
+            spacing=poses[0]["position"][0]-poses[1]["position"][0]
+            self.min_rail_spacing=min(self.min_rail_spacing,spacing)
+            if spacing<MIN_RAIL_SPACING:
+                self.stop_pair(mount,fasten,"rail_clearance")
+
+    def stop_pair(self,mount,fasten,reason):
+        if mount.paused_targets and fasten.paused_targets:
+            return
+        self.interference.append((self.seconds,mount.path,fasten.path,reason))
+        self.pending.append((self.seconds,mount.path.rsplit("/",1)[1],reason))
+        for robot in (mount,fasten):
+            robot.hold(self.api)
+        for station in self.stations:
+            if any((station.side>0)==("Left" in r.path) for r in (mount,fasten)) and station.phase not in TERMINAL_PHASES:
+                station.press.Set(station.gap-station.initial_gap)
+                station.phase="interference"
+
+    def section(self,name):
+        return self.timer.section(name) if self.timer else nullcontext()
+
+    def _collider(self,encoded):
+        # intToSdfPath + str() for every contact header cost ~2 ms per step; paths never change.
+        path=self._collider_paths.get(encoded)
+        if path is None:
+            path=self._collider_paths[encoded]=str(PhysicsSchemaTools.intToSdfPath(encoded))
+        return path
+
+    def _robot_of(self,path):
+        robot=self._robot_by_collider.get(path,False)
+        if robot is False:
+            robot=self._robot_by_collider[path]=self.robots_by_path.get("/".join(path.split("/")[:4]))
+        return robot
+
+    def prepare_step(self,dt):
+        with self.section("prepare"):
+            self._prepare_step(dt)
+
+    def _prepare_step(self,dt):
+        self.carrier.step(self.api,dt)
+        if self.carrier.ready and self.dock_ready_time is None:
+            self.dock_ready_time=self.seconds
+            self.pending.append((self.seconds,"AMR","docked"))
+        if round(self.seconds*HZ)%4==0:
+            # Robot motion is not part of the environment: the arms hold their start pose
+            # until robot control is added.
+            for robot in self.robots:
+                robot.advance(4*dt,False,lambda axle:True)
+        self.robot_clearance()
+        fault=next((station for station in self.stations if station.phase in INTERLOCK_FAULTS),None)
+        for station in self.stations:
+            if fault and station is not fault and not station.interlocked:
+                station.interlocked=True
+                self.pending.append((self.seconds,station.name,f"interlock_by_{fault.name}_{fault.phase}"))
+            old=station.phase
+            station.step(self.api,dt)
+            station.face_contact_now=False
+            if station.phase!=old:
+                self.pending.append((self.seconds,station.name,station.phase))
+
+    def finish_step(self,dt):
+        with self.section("finish"):
+            self._finish_step(dt)
+        if self.timer:
+            self.timer.count_step()
+
+    def _finish_step(self,dt):
+        headers,contacts=self.sim.get_contact_report()[:2]
+        self.carrier.grounded=False
+        self.carrier.clamp_contacts.clear()
+        for header in headers:
+            if not header.num_contact_data:
+                continue
+            collider0,collider1=self._collider(header.collider0),self._collider(header.collider1)
+            pair=[self._robot_of(path) for path in (collider0,collider1)]
+            if all(pair) and pair[0]!=pair[1]:
+                self.stop_pair(*pair,"robot_contact")
+            elif bool(pair[0])!=bool(pair[1]):
+                robot=pair[0] or pair[1]
+                first=header.contact_data_offset
+                if any(contacts[i].separation<-.001 for i in range(first,first+header.num_contact_data)):
+                    if os.environ.get("CELL_DEBUG"):
+                        print("CONTACTDBG",round(self.seconds,3),collider0,collider1,
+                              min(contacts[i].separation for i in range(first,first+header.num_contact_data)),
+                              [round(v,3) for v in contacts[first].position],"normal",[round(v,3) for v in contacts[first].normal],
+                              "sample",robot.sample,"clock",round(robot.clock,2),"detour",robot.detour,flush=True)
+                    self.stop_pair(*self.pair_by_robot[robot.path],"equipment_contact")
+            for face,other in ((collider0,collider1),(collider1,collider0)):
+                if face.startswith(self.carrier.path+"/Support_") and other in (ROOT+"/Floor","/World/Factory/DockPlate"):
+                    self.carrier.grounded=True
+                if face.startswith(ROOT+"/DockClamp_") and face.endswith("/Pad") and other==self.carrier.path+"/Collision":
+                    self.carrier.clamp_contacts.add(face)
+                station=self.by_contact_face.get(face)
+                if station and other.startswith(station.wheel+"/Web_"):
+                    station.face_contact=True
+                    station.face_contact_now=True
+                zone=next((z for z in self.zone_bodies if face.startswith(z+"/")),None)
+                if zone and not other.startswith(zone.rsplit("/",1)[0]+"/Wheel") \
+                        and not other.startswith(zone.rsplit("/",1)[0]+"/Tire"):
+                    self.zone_contacts.add((zone[len(ROOT)+1:],other[len(ROOT)+1:] if other.startswith(ROOT) else other))
+                parent=other.rsplit("/",1)[0]
+                unit=self.by_wheel.get(parent)
+                if unit:
+                    if "/Conveyor/" in face and "Guide_" in face:
+                        unit.guide_contact=True
+                    if face.startswith(unit.stopper+"/"):
+                        unit.stop_contact=True
+                    elif "roller" in face.lower() or "/TransferBed/" in face:
+                        unit.belt_contact=True
+        self.seconds+=dt
+
+    def step(self):
+        dt=1/HZ
+        self.prepare_step(dt)
+        with self.section("simulate"):
+            self.sim.simulate(dt,self.seconds)
+            self.sim.fetch_results()
+        self.finish_step(dt)
+
+    @property
+    def finished(self):
+        return all(item.phase in TERMINAL_PHASES for item in self.stations)
+
+    def close(self):
+        if self.stage_id is not None:
+            self.sim.detach_stage()
+            UsdUtils.StageCache.Get().Erase(self.stage_id)
+            self.stage_id=None
