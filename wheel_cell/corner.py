@@ -73,6 +73,11 @@ def build_corner(stage, car_pose, root, name, axle, side, hub_y, steel, seed):
     rng = Random(f"{seed}-{name}-corner")
     hub_cfg, susp = CONFIG["hub"], CONFIG["suspension"]
     angle = rng.uniform(0., 72.)          # the stopped car parks its hubs at any angle
+    if hub_cfg.get("stud_at_top"):
+        # Stud k sits at hub angle 72k deg; after laying the axle along Y its height is
+        # -side*sin(72k + angle), so a stud is on top at angle = -side*90 (mod 72): 54 left, 18 right.
+        # The random draw above is still taken so the tolerances below keep their per-seed values.
+        angle = (-side*90.) % 72.
     tolerance = Tolerance(rng)
     local = Gf.Vec3d(axle, hub_y, HUB_Z)
     world = car_pose.Transform(local)

@@ -28,6 +28,7 @@ DEFAULTS = {
     "hub": {
         "bearing_drag_nm": 1.2,           # wheel bearing + brake pad drag torque (estimated)
         "radial_play_mm": .03,            # bearing radial play
+        "stud_at_top": True,              # True: park every hub with one stud at 12 o'clock; False: random angle
     },
     "suspension": {                       # corner hangs on its rebound stop (car lifted)
         "wheel_rate_n_per_mm": 22.,       # CN7 wheel rate, ~22-25 N/mm (estimated)

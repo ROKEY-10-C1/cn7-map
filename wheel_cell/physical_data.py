@@ -4,10 +4,11 @@ from math import pi, sqrt
 
 # CN7 facelift, G1.6 IVT, 16-inch wheel, Hyundai catalog. Subtract four wheel assemblies.
 CURB_MASS = 1265.
-# Continental ProContact RX 15570360000, plus a comparable Konig 16-inch cast rim.
-# The aftermarket rim is a mass reference only. Use the CN7 dimensions for the geometry.
+# Continental ProContact RX 15570360000. Rim: CN7 OEM 16x6.5J ET46 (52910-AB200/AA230),
+# 9.1 kg as listed by wheel-size.com (single public source, unverified; heavier than the
+# earlier Konig aftermarket reference, so it is the conservative value for handling loads).
 TIRE_MASS = 8.
-RIM_MASS = 17.38 * .45359237
+RIM_MASS = 9.1
 WHEEL_MASS = TIRE_MASS + RIM_MASS
 BODY_MASS = CURB_MASS - 4 * WHEEL_MASS
 
