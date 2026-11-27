@@ -16,6 +16,7 @@ ap.add_argument("--mu-shoe", type=float, nargs=2, default=None)
 ap.add_argument("--mu-hub", type=float, nargs=2, default=None, help="alloy-steel static/dynamic at the hub")
 ap.add_argument("--out", default=None)
 ap.add_argument("--no-video", action="store_true")
+ap.add_argument("--gui", action="store_true", help="open the Isaac Sim window and play the run live (stays open at the end)")
 ap.add_argument("--debug-stop", default=None)
 ap.add_argument("--scenario", default="nominal",
                 choices=["nominal", "shoe45", "shoe20", "nosync", "joint_transfer", "novision", "position_insert"],
@@ -32,7 +33,7 @@ if FAST and args.speed == .35:
 
 from isaacsim import SimulationApp  # noqa: E402
 
-app = SimulationApp({"headless": True, "width": 960, "height": 540, "renderer": "RayTracedLighting",
+app = SimulationApp({"headless": not args.gui, "width": 1600 if args.gui else 960, "height": 900 if args.gui else 540, "renderer": "RayTracedLighting",
                      "anti_aliasing": 1, "multi_gpu": False})
 
 import numpy as np  # noqa: E402
@@ -80,6 +81,10 @@ cams = {"wide": camera("/World/CamWide", (3.1, 3.3, 2.0), (.45, .85, .75)),
         "hub": camera("/World/CamHub", (.95, .95, .62), tuple(S.H), focal=28.),
         "pick": camera("/World/CamPick", (S.TABLE_C[0]+.95, S.TABLE_C[1]-.85, 1.15), (S.TABLE_C[0], S.TABLE_C[1], .62),
                        focal=24.)}
+
+if args.gui:
+    from omni.kit.viewport.utility import get_active_viewport
+    get_active_viewport().camera_path = cams["wide"]          # switch with the viewport camera menu
 
 robot = world.scene.add(SingleArticulation(prim_path="/World/Robot", name="rs080n"))
 world.reset()
@@ -185,7 +190,7 @@ def jaw_state():
 
 def step():
     contacts.clear()
-    render = bool(writers) and step_count[0] % FRAME_EVERY == 0
+    render = (bool(writers) and step_count[0] % FRAME_EVERY == 0) or (args.gui and step_count[0] % 4 == 0)
     world.step(render=render)
     step_count[0] += 1
     t_sim[0] += DT
@@ -607,4 +612,8 @@ if writers:
         small = [Image.fromarray(fr).resize((480, 270)) for fr in frames[::2]]
         small[0].save(OUT/f"{k}.gif", save_all=True, append_images=small[1:], duration=133, loop=0)
 print("RESULT", result, OUT, flush=True)
+if args.gui:
+    print("GUI: close the Isaac Sim window to exit", flush=True)
+    while app.is_running():
+        world.step(render=True)
 app.close()
