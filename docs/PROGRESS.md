@@ -118,7 +118,7 @@ pull 후 다시 빌드할 필요는 없습니다. `scene/factory/vehicle_buffers
 | `.gitignore` | `.envrc`, `.direnv/` 제외. `wood_table_steel_ball.usda` 삭제(쓰지 않던 파일). |
 | `docs/PROCESS_SCENARIO.md` 1단계, `scene/README.md` "변경 기록" | AMR 픽업·반납 흐름, 받침대 위치·높이 표. |
 
-AMR 흐름(정한 내용): 입고 칸은 **1 → 2 → 3**(통로 쪽부터) 꺼내고, 출고 칸은 **3 → 2 → 1**(먼 칸부터) 채웁니다. 차를 실은 채로는 다른 차 밑을 못 지나가서 빈 칸만 지나가게 하는 순서입니다. 회전은 통로 끝 (-7, ±`AMR_BAY_Y`)에서 제자리 90°입니다 (RS080N 배치로 버퍼 중심을 6.55 → 9.69로 옮김, 2026-11-27).
+AMR 흐름(정한 내용): 입고 칸은 **1 → 2 → 3**(통로 쪽부터) 꺼내고, 출고 칸은 **3 → 2 → 1**(먼 칸부터) 채웁니다. 차를 실은 채로는 다른 차 밑을 못 지나가서 빈 칸만 지나가게 하는 순서입니다. 회전은 통로 끝 (-7.5, ±`AMR_BAY_Y`)에서 제자리 90°입니다 (RS080N 배치로 버퍼 중심을 6.55 → 9.69로 옮김, 통로를 x -7 → -7.5로 옮겨 셀 모서리 신호등 기둥까지 0.45 m, 2026-11-27).
 
 아직 안 된 것: Isaac 물리 검증(`check_physics.sh`), 키프레임 시연(주문 차량은 아직 통로 끝에서 실린 채 나타남), 주문 4대 중 4번째 차를 둘 칸.
 
@@ -130,7 +130,7 @@ pull 후 다시 빌드할 필요는 없습니다. 바뀐 레이어 3개를 Isaac
 | 파일 | 내용 |
 |---|---|
 | `wheel_cell/build.py` | 바닥 남쪽(출고 쪽) 끝 `FLOOR_S = FLOOR_Y + 8` → 바닥 y -18 ~ +10. 슬래브·콘크리트·줄눈·오른쪽 끝 벽을 새 끝까지 늘림 |
-| `wheel_cell/build.py` `amr_zones()` | AMR 주행 구역 바닥 표시 `/World/AMRZone`: 연한 황토색 면(z 1.8 mm) + 노란 테두리(z 4 mm). 통로 띠(x -7 ± 2.455), 입고·출고 칸 줄 띠(칸 3 끝까지), 통로 양 끝 회전 원(반지름 2.68 m = 실은 차 대각선 절반 + 0.1 m). 표시만 있고 충돌체 없음 |
+| `wheel_cell/build.py` `amr_zones()` | AMR 주행 구역 바닥 표시 `/World/AMRZone`: 연한 황토색 면(z 1.8 mm) + 노란 테두리(z 4 mm). 통로 띠(x `AMR_GATE_X` -7.5 ± 2.455), 입고·출고 칸 줄 띠(칸 3 끝까지), 통로 양 끝 회전 원(반지름 2.68 m = 실은 차 대각선 절반 + 0.1 m). 표시만 있고 충돌체 없음 |
 | `wheel_cell/split_scene.py` | `AMRZone`을 `factory/floor` 레이어로 보냄 (없으면 `factory/misc`가 새로 생김) |
 | `scene/factory/floor.usdc`, `building.usdc`, `shared/materials.usdc` | 위 변경으로 다시 생성 |
 

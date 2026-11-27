@@ -25,7 +25,9 @@ REJECT_GATE_HALF = .365
 REJECT_CRATE_Y = LINE_Y+1.05
 BELT_Z = .50
 SPEED = .30
-AMR_GATE_X = -7.0
+# Aisle 0.5 m west of the old -7.0 so a car carried at yaw 0 clears the cell corner signal posts
+# (x -4.61) by 0.46 m and the AMR guard (x -4.52) by 0.63 m (2026-11-27).
+AMR_GATE_X = -7.5
 # AMR legs timed to KUKA KMP 1500 limits (crab 0.56 m/s, straight 1.0 m/s) with ~10 % margin,
 # plus the 0.05 m/s lift: buffer -> gate (crab), gate -> dock (straight), lift 0.12 m.
 AMR_AT_GATE = 20.                 # lateral transfer from the outer buffer

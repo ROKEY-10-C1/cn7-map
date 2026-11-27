@@ -44,6 +44,7 @@ from fitment import (
     STUD_PROJECTION, WHEELBASE, WHEEL_MASS, fit, half_track,
 )
 from physical_data import AMR_SIZE, AMR_WHEEL_RADIUS, DOCK_CLAMP_CLOSED, DOCK_CLAMP_OPEN, ROLLER_RADIUS
+from kmp1500_urdf import SCANNER_X, SCANNER_Y, SCANNER_Z, S300_SIZE
 from process import (
     AMR_AT_GATE, AMR_BAY_Y, AMR_DOCKED, AMR_GATE_X, AMR_LIFTED, AMR_OUT_GATE, AXLE, BELT_Z, BUFFER_CAR_Z,
     BUFFER_SLOT_X, BUFFER_STAND_X, BUFFER_STAND_Y, CELL_Y, CN7_R16, DOCK_X, FASTEN_BASE_X, FEED_START_X, MOUNT_BASE_X, MOUNT_CLEAR, ROBOT_BASE_Y, FEED, FPS,
@@ -69,8 +70,11 @@ BUFFER_GUARD_Y = AMR_BAY_Y-2.65
 OUTER_GUARD_Y = AMR_BAY_Y+2.65
 HALL_Y = OUTER_GUARD_Y+.40
 FLOOR_Y = HALL_Y+.40
-# The outbound (-y) side is open (no hall wall); the floor runs 8 m further there.
-FLOOR_S = FLOOR_Y+8.
+# The outbound (-y) side is open (no hall wall); the floor ends as far out as on the inbound side.
+FLOOR_S = FLOOR_Y
+# Floor x range: 1 m extra on the aisle (west) side so the aisle paint keeps 1.05 m to the floor edge.
+FLOOR_X0, FLOOR_X1 = -11., 10.
+FLOOR_XMID, FLOOR_W = (FLOOR_X0+FLOOR_X1)/2, FLOOR_X1-FLOOR_X0
 FLOOR_MID, FLOOR_LEN = (FLOOR_Y-FLOOR_S)/2, FLOOR_Y+FLOOR_S
 # AMR travel zones painted on the floor: the car-carrying AMR's swept area (CN7 body 4.71 x 1.825 m
 # plus 0.1 m) and the in-place turn circles at the aisle ends.
@@ -300,11 +304,11 @@ def amr_zones(stage, path):
         ring(stage, path+f"/{label}TurnEdge", (gx, y, .004), turn+.03, turn-.03, .003, AMBER, 96)
 
 def concrete_floor(stage, path):
-    box(stage,path+"/Slab",(0,FLOOR_MID,-.108),(20,FLOOR_LEN,.2),CONCRETE)
-    floor=mesh(stage,path+"/Concrete", [(-10,-FLOOR_S,0),(10,-FLOOR_S,0),(10,FLOOR_Y,0),(-10,FLOOR_Y,0)],
+    box(stage,path+"/Slab",(FLOOR_XMID,FLOOR_MID,-.108),(FLOOR_W,FLOOR_LEN,.2),CONCRETE)
+    floor=mesh(stage,path+"/Concrete", [(FLOOR_X0,-FLOOR_S,0),(FLOOR_X1,-FLOOR_S,0),(FLOOR_X1,FLOOR_Y,0),(FLOOR_X0,FLOOR_Y,0)],
                [4],[0,1,2,3],CONCRETE)
     uv=UsdGeom.PrimvarsAPI(floor).CreatePrimvar("st", Sdf.ValueTypeNames.TexCoord2fArray,"vertex")
-    uv.Set([(0.,0.),(5.,0.),(5.,FLOOR_LEN/4),(0.,FLOOR_LEN/4)])
+    uv.Set([(0.,0.),(FLOOR_W/4,0.),(FLOOR_W/4,FLOOR_LEN/4),(0.,FLOOR_LEN/4)])
     shader=UsdShade.Shader.Get(stage,"/Looks/Concrete/Surface")
     coords=UsdShade.Shader.Define(stage,"/Looks/Concrete/UV")
     coords.CreateIdAttr("UsdPrimvarReader_float2")
@@ -337,14 +341,14 @@ def write_concrete(path):
 def factory(stage, arm):
     path="/World/Factory"
     concrete_floor(stage,path)
-    for i in range(1,8):
-        box(stage,path+f"/FloorJoint_{i}",(-10+i*2.5,FLOOR_MID,.001),(.007,FLOOR_LEN-.05,.002),(.17,.19,.20))
+    for i,k in enumerate(range(int(FLOOR_X0//2.5)+1,ceil(FLOOR_X1/2.5)),1):   # every 2.5 m inside the edges
+        box(stage,path+f"/FloorJoint_{i}",(k*2.5,FLOOR_MID,.001),(.007,FLOOR_LEN-.05,.002),(.17,.19,.20))
     joints,south=int(FLOOR_Y//2.5),int(FLOOR_S//2.5)
     for j in range(-south,joints+1):
-        box(stage,path+f"/TransverseJoint_{j+south}",(0,j*2.5,.001),(19.96,.007,.002),(.17,.19,.20))
+        box(stage,path+f"/TransverseJoint_{j+south}",(FLOOR_XMID,j*2.5,.001),(FLOOR_W-.04,.007,.002),(.17,.19,.20))
     box(stage,path+"/DockPlate",(DOCK_X+WHEELBASE/2,0,-.012),(4.95+WHEELBASE,2.22,.024),(.15,.18,.20))
-    for i in range(9):
-        box(stage,path+f"/AMR_Center_{i}",(-6.53+i*.48,0,.003),(.265,.045,.005),(.04,.54,.78))
+    for i in range(int((-2.69-(AMR_GATE_X+.47))/.48)+1):     # gate -> dock arrow
+        box(stage,path+f"/AMR_Center_{i}",(AMR_GATE_X+.47+i*.48,0,.003),(.265,.045,.005),(.04,.54,.78))
     arrow_points=[(-2.62,0.,.004),(-3.06,.20,.004),(-3.06,.071,.004),
                   (-3.52,.071,.004),(-3.52,-.071,.004),(-3.06,-.071,.004),(-3.06,-.20,.004)]
     mesh(stage,path+"/DockDirection",arrow_points,[3,4],[0,1,6,2,3,4,5],(.04,.54,.78),True)
@@ -361,7 +365,8 @@ def factory(stage, arm):
         for i in range(4):
             box(stage,path+f"/AMR_{label}Loop_{i}",(AMR_GATE_X+.30+i*.48,side*AMR_BAY_Y,.005),
                 (.26,.044,.005),(.04,.54,.78))
-        tip=[(-4.62,side*AMR_BAY_Y,.006),(-4.98,side*AMR_BAY_Y+.20,.006),(-4.98,side*AMR_BAY_Y-.20,.006)]
+        tip=[(AMR_GATE_X+2.38,side*AMR_BAY_Y,.006),(AMR_GATE_X+2.02,side*AMR_BAY_Y+.20,.006),
+             (AMR_GATE_X+2.02,side*AMR_BAY_Y-.20,.006)]
         mesh(stage,path+f"/AMR_{label}LoopArrow",tip,[3],[0,1,2],(.04,.54,.78),True)
         parking(stage,path+f"/{label}VehicleBuffer",side)
         mount_flange = fixed_robot(stage, f"{path}/{label}MountRobot", arm, MOUNT_BASE_X, side, "mount")
@@ -459,14 +464,15 @@ def beacon(stage, root, xy):
 
 def industrial_hall(stage, root):
     wall = (.51, .55, .58)
+    bay = FLOOR_W/4
     for i in range(4):
-        center = -7.5+i*5
-        box(stage, root+f"/WallBase_{i}", (center, HALL_Y, .59), (4.98, .16, 1.18), CONCRETE)
-        box(stage, root+f"/Cladding_{i}", (center, HALL_Y+.03, 2.20), (4.98, .12, 2.1), wall)
-        box(stage, root+f"/Clerestory_{i}", (center, HALL_Y+.02, 3.83), (4.75, .11, 1.12), GLASS)
+        center = FLOOR_X0+(i+.5)*bay
+        box(stage, root+f"/WallBase_{i}", (center, HALL_Y, .59), (bay-.02, .16, 1.18), CONCRETE)
+        box(stage, root+f"/Cladding_{i}", (center, HALL_Y+.03, 2.20), (bay-.02, .12, 2.1), wall)
+        box(stage, root+f"/Clerestory_{i}", (center, HALL_Y+.02, 3.83), (bay-.25, .11, 1.12), GLASS)
         for j in range(5):
-            box(stage, root+f"/Mullion_{i}_{j}", (center-2+j, HALL_Y-.05, 3.83), (.047, .09, 1.11), BRUSHED)
-        box(stage, root+f"/UpperCladding_{i}", (center, HALL_Y+.03, 4.77), (4.98, .12, .74), wall)
+            box(stage, root+f"/Mullion_{i}_{j}", (center+(j-2)*bay/5, HALL_Y-.05, 3.83), (.047, .09, 1.11), BRUSHED)
+        box(stage, root+f"/UpperCladding_{i}", (center, HALL_Y+.03, 4.77), (bay-.02, .12, .74), wall)
     # End wall from the open front edge to the side wall, in equal bays.
     bays = 4
     y0, y1 = -FLOOR_S+.5, HALL_Y
@@ -479,7 +485,7 @@ def industrial_hall(stage, root):
                 (.035, width*.37, .86), GLASS)
     for i in range(bays-1):
         box(stage, root+f"/EndUpright_{i}", (9.82, y0+(i+1)*width, 2.45), (.16, .17, 4.9), BRUSHED)
-    for i, x in enumerate((-9.8, -5., 0., 5., 9.8)):
+    for i, x in enumerate((FLOOR_X0+.2, *(FLOOR_X0+k*bay for k in (1, 2, 3)), FLOOR_X1-.2)):
         box(stage, root+f"/Column_{i}", (x, HALL_Y-.26, 2.61), (.28, .24, 5.2), BRUSHED)
         box(stage, root+f"/ColumnFoot_{i}", (x, HALL_Y-.26, .10), (.43, .37, .20), ZINC)
         box(stage, root+f"/RoofBeam_{i}", (x, HALL_Y-.52, 5.13), (.16, 1.24, .24), BRUSHED)
@@ -490,7 +496,7 @@ def industrial_hall(stage, root):
             rect.CreateWidthAttr(1.92)
             rect.CreateHeightAttr(.19)
             rect.CreateIntensityAttr(650 if i in (1, 2, 3) else 380)
-    box(stage,root+"/RoofEdge",(0.,HALL_Y-.39,5.16),(19.75,.16,.23),BRUSHED)
+    box(stage,root+"/RoofEdge",(FLOOR_XMID,HALL_Y-.39,5.16),(FLOOR_W-.25,.16,.23),BRUSHED)
     for i, x in enumerate((7.20, 7.92, 8.64, 9.36)):
         cabinet = root+f"/Panel_{i}"
         box(stage, cabinet+"/Housing", (x, -4.88, .96), (.66, .52, 1.86), PANEL)
@@ -523,7 +529,11 @@ def amr_housing(stage, root):
             status=box(stage,root+f"/StatusBar_{i}_{side+1}",(x*1.32,side*.224,.338),
                        (.024,.123,.039),(.03,.43,.76))
             finish(status,(.03,.43,.76),("AMRStatus",0.,.24))
-        box(stage,root+f"/SafetyScanner_{i}",(x*1.33,0,.28),(.065,.27,.075),GLASS)
+    for name, x, y, yaw in (("FrontLeft", SCANNER_X, SCANNER_Y, 45.),
+                            ("RearRight", -SCANNER_X, -SCANNER_Y, -135.)):
+        scanner, _ = xform(stage, root+f"/SafetyScanner_{name}", (x, y, SCANNER_Z))
+        scanner.AddRotateZOp().Set(yaw)
+        box(stage, root+f"/SafetyScanner_{name}/Housing", (0, 0, 0), S300_SIZE, GLASS)
     for i in range(6):
         box(stage,root+f"/Vent_{i}",(-.1-i*.061,0,.466),(.029,.29,.009),RUBBER)
 
