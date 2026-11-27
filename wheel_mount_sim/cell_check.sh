@@ -5,7 +5,7 @@ cell_dir="$here/../wheel_cell"
 sim_dir="${ISAAC_SIM_ROOT:-$HOME/isaacsim}"
 sandbox_dir="$(mktemp -d)"
 trap 'rm -rf -- "$sandbox_dir"' EXIT
-printf -v script_args '"%s"' "$here/cell_check.py"
+printf -v script_args '"%s"' "$here/${CELL_CHECK_SCRIPT:-cell_check.py}"
 for arg; do
     # The Kit --exec parser uses shell-like argument splitting.
     printf -v quoted ' %q' "$arg"

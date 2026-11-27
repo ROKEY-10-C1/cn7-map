@@ -16,6 +16,18 @@
 ~/isaacsim/python.sh wheel_mount_sim/run.py --mu-hub .30 .25     # 휠-허브 마찰 민감도
 ```
 
+조립 셀 맵(`scene/`)에서 좌우 장착로봇 함께 돌리기:
+
+```bash
+~/isaacsim/python.sh wheel_mount_sim/cell_mount_run.py --no-video --out wheel_mount_sim/output/cell/run1   # 계산 (~45 s)
+~/isaacsim/python.sh wheel_mount_sim/cell_mount_run.py --replay wheel_mount_sim/output/cell/run1           # 창에서 실제 속도(1.0x)로 재생, 반복
+~/isaacsim/python.sh wheel_mount_sim/cell_mount_run.py --gui        # 계산하면서 보기: 이 PC에서는 실제의 약 0.4-0.7배 속도
+```
+
+셀은 바퀴 4개의 트레드 충돌체(각 545개) 때문에 물리 계산만으로 실제 시간의 약 0.9배가 걸린다.
+그래서 모든 실행이 움직이는 물체 30개의 위치를 초당 30번 `replay.npz`에 기록하고, `--replay`는 물리 없이
+벽시계에 맞춰 그 기록을 그린다. 결과(접촉·힘)는 계산 실행의 `summary.json`이 기준이다.
+
 ### 장면 USD
 
 `wheel_mount_sim/scene/wheel_mount.usda`는 `run.py`가 만드는 장면을 그대로 내보낸 파일이다(시드 1: 바퀴·허브 각도 고정).
@@ -42,6 +54,8 @@ Isaac Sim에서 **File → Open**으로 열어 형상·충돌체·관절·재질
 | `tools/` | 에셋 받기, USD 구조 조사 도구 |
 | `docs/troubleshooting/` | 트러블슈팅 기록과 이미지(노션 「트러블슈팅 → 장착로봇팔」 원본) |
 | `cell_mount.py`, `cell_check.py/.sh` | 조립 셀 라이브 물리에 장착로봇·장착 물리를 넣는 모듈과 셀 안 대기 검사 ([`docs/CELL_INTEGRATION.md`](docs/CELL_INTEGRATION.md)) |
+| `cell_mount_run.py` | 조립 셀 맵에서 우리 부분만(AMR 이송 제외): 좌우 장착로봇이 벨트 끝 타이어를 집어 앞 허브에 끼움 |
+| `cell_layout.py`, `tools/extend_belt_end.py`, `cell_feed_check.py` | 벨트 끝 적재식 공급(연장 벨트, V 끝 스토퍼: `scene/overrides/factory.usda`), 그 검사 |
 | `docs/GOALS.md` | **목표와 합격 기준** (공정 시간, 단계별 수치 범위와 근거) |
 
 ## 현재 상태 (2026-11-27)

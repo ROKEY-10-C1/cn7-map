@@ -91,6 +91,19 @@ def _wheel(stage, station, M, V):
     """Keep the cell's CAD pad triangles; add the hub-side bore chamfer, our alloy friction and contact offset."""
     wheel = stage.GetPrimAtPath(station.wheel)
     ch, rb = P.BORE_CHAMFER, P.BORE/2
+    # The CAD triangles have 72 points on the 67.1 mm bore. With the points on the circle the chords sit 0.03 mm
+    # inside it and leave 0.06 of the 0.09 mm radial pilot clearance (the bore jammed on the pilot at 9 mm), so the
+    # points are moved out until the chords lie on the bore circle (vertices +0.03 mm). A ring of 144 thin sectors
+    # (chords on the circle) was tried instead: PhysX gave 1e5 N contact impulses between the 2.5 deg sectors and
+    # the pilot and pushed a released wheel 62 mm into the hub (fastB3), so it is not used.
+    angles = set()
+    for child in wheel.GetChildren():
+        if child.GetName().startswith("Web_") and child.IsA(UsdGeom.Mesh):
+            for q in UsdGeom.Mesh(child).GetPointsAttr().Get():
+                if abs(np.hypot(q[0], q[1])-rb) < 2e-5:
+                    angles.add(round(float(np.arctan2(q[1], q[0])), 5))
+    n_bore = max(len(angles), 3)
+    rb_v = rb/np.cos(np.pi/n_bore)
     for child in list(wheel.GetChildren()):
         name = child.GetName()
         if not name.startswith("Web_") or not child.IsA(UsdGeom.Mesh):
@@ -100,9 +113,11 @@ def _wheel(stage, station, M, V):
         tri = [(float(p[0]), float(p[1])) for p in pts[:n]]
         child.SetActive(False)
         on_bore = [abs(np.hypot(x, y)-rb) < 2e-5 for x, y in tri]
+        tri = [((x*rb_v/np.hypot(x, y), y*rb_v/np.hypot(x, y)) if f else (x, y)) for (x, y), f in zip(tri, on_bore)]
         z0 = P.OFFSET
         if any(on_bore):
-            low = [((x*(rb+ch)/np.hypot(x, y), y*(rb+ch)/np.hypot(x, y)) if f else (x, y)) for (x, y), f in zip(tri, on_bore)]
+            low = [((x*(rb_v+ch)/np.hypot(x, y), y*(rb_v+ch)/np.hypot(x, y)) if f else (x, y))
+                   for (x, y), f in zip(tri, on_bore)]
             p = prism(stage, station.wheel+f"/{name}MSCh", [(x, y, P.OFFSET) for x, y in low],
                       [(x, y, P.OFFSET+ch) for x, y in tri], phys=M["alloy"], offset=P.PAD_CONTACT_OFFSET)
             UsdGeom.Imageable(p).CreatePurposeAttr("guide")

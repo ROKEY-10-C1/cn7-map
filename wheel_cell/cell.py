@@ -108,19 +108,24 @@ class Cell:
             self.carrier.add_locator(stage,f"{ROOT}/HangerLocator/Side_{side+1}",(0,side*.615,1.01),(.20,.06,.06))
             self.carrier.add_locator(stage,f"{ROOT}/HangerLocator/End_{side+1}",(side*1.885,0,1.01),(.06,.20,.06))
         guide=material(stage,"GuideUHMW",GUIDE_STATIC_FRICTION,GUIDE_DYNAMIC_FRICTION,combine="min")
+        # Feed belts end in a fixed V stop (scene/overrides/factory.usda): it replaces the pick zone. Does nothing
+        # on a stage without that stop. See wheel_mount_sim/cell_layout.py.
+        import sys
+        from pathlib import Path
+        sys.path.append(str(Path(__file__).resolve().parent.parent/"wheel_mount_sim"))
+        import cell_layout
+        cell_layout.pre_build(stage)
         setup_factory(stage,ROOT,mats[2],guide,branch_side)
         self.buffer_stands=buffer_stands(stage)
         rng=Random(seed)
         self.stations=[make_station(stage,car,name,rng.uniform(-180.,180.),sections,mats,seed) for name in STATIONS]
         # Mount robots and mount physics (hub pins, wheel pad, ring tire) from map/wheel_mount_sim;
         # the layout stays as built. See wheel_mount_sim/cell_mount.py.
-        import sys
-        from pathlib import Path
-        sys.path.append(str(Path(__file__).resolve().parent.parent/"wheel_mount_sim"))
         from cell_mount import install as install_mount
         from process import MOUNT_BASE_X, ROBOT_BASE_Y
         self.mount_arms=(install_mount(stage,self.stations,MOUNT_BASE_X,ROBOT_BASE_Y,arms=robots)
                          if os.environ.get("CELL_MOUNT_SIM","1")!="0" else {})
+        cell_layout.post_build(stage,self.stations)
         # Earlier saved stages have rail actors under Orders. Fixed RS080N arms
         # are permanent Factory equipment and already visible in the live stage.
         sources = [REFERENCE + f"/{prefix}Mount" for prefix in ("Left", "Right")]
