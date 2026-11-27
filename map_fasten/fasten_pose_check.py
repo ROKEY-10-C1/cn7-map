@@ -190,7 +190,7 @@ def setup_dual_scene(stage):
     print(f"[SETUP] base={DUAL_BASE}, rear={tuple(rear_pose.ExtractTranslation())}, reload={RELOAD_XY}", flush=True)
 
 
-def run(app, headless, captures, json_log=False, wheel_order=("RL", "FL")):
+def run(app, headless, captures, json_log=False, wheel_order=("RL", "FL"), physical_threads=False):
     """장면과 재생 상태를 관리한다. 로봇의 단계별 작업은 TaskController가 맡는다."""
     import omni.timeline
     import omni.usd
@@ -290,7 +290,8 @@ def run(app, headless, captures, json_log=False, wheel_order=("RL", "FL")):
                 sim.initialize_physics()
                 with Usd.EditContext(stage, cycle_layer):
                     last_result = TaskController(app, stage, dt, step, captures, state_changed,
-                                                 json_log=json_log, wheel_order=wheel_order).run()
+                                                 json_log=json_log, wheel_order=wheel_order,
+                                                 physical_threads=physical_threads).run()
             except CycleInterrupted:
                 if headless:
                     return 1
@@ -347,11 +348,12 @@ class TaskController:
     RELOAD는 박스에서 신규 너트를 생성·결합하는 공급 모사이다.
     """
 
-    def __init__(self, app, stage, dt, step, captures, on_state=None, json_log=False, wheel_order=("RL", "FL")):
+    def __init__(self, app, stage, dt, step, captures, on_state=None, json_log=False, wheel_order=("RL", "FL"), physical_threads=False):
         self.app, self.stage, self.dt = app, stage, dt
         self.step, self.captures = step, captures
         self.on_state = on_state
         self.json_log = json_log
+        self.physical_threads = physical_threads
         self.state = FastenState.IDLE
         self.completed = []
         self.metrics = {}
@@ -447,7 +449,8 @@ class TaskController:
         # STEP 08: 너트별 안착 위치와 회전수 오차 검사.
         seated = self.transition(FastenState.SEATING_CHECK, lambda: self.seat(start, turns))
         # STEP 09: 안착된 너트를 World Joint로 고정 (고정 시험 전용).
-        self.transition(FastenState.LOCK, self.lock)
+        if not self.physical_threads:
+            self.transition(FastenState.LOCK, self.lock)
         # STEP 10: 소켓의 유지 Joint를 해제하고 분리 여부 확인.
         self.transition(FastenState.RELEASE, self.release)
         # STEP 11: 공구 후퇴 후 이격 거리 및 너트 잔류 확인.
@@ -668,14 +671,17 @@ class TaskController:
             self.step(frame)
 
     def align(self):
-        self.move_nuts(self.tips, 360)
-        errors = np.linalg.norm(self.nut_positions()-self.tips,axis=1)
+        entry = self.tips + self.outward * (.005 if self.physical_threads else 0.)
+        self.move_nuts(entry, 360)
+        errors = np.linalg.norm(self.nut_positions()-entry,axis=1)
         self.metrics["entry_error_mm"] = (errors*1000).tolist()
         for n,e in zip(self.nut_status,errors):
             n["aligned"] = bool(e <= ENTRY_TOL)
         self.require(all(n["aligned"] for n in self.nut_status), "Stud entry position error exceeds 0.7 mm")
 
     def engage(self):
+        if self.physical_threads:
+            return self.enable_thread_contact()
         # 기본 맵에는 활성 나사산 접촉이 없다. 진입 좌표만 검사한다.
         errors = np.linalg.norm(self.nut_positions()-self.tips,axis=1)
         self.metrics = {"mode":"geometric_entry_only", "physical_contact_verified":False,
@@ -683,6 +689,113 @@ class TaskController:
         for n,e in zip(self.nut_status,errors):
             n["engaged_model"] = bool(n["loaded"] and e<=ENTRY_TOL)
         self.require(all(n["engaged_model"] for n in self.nut_status), "Geometric entry check failed")
+
+    def enable_thread_contact(self):
+        from pxr import PhysxSchema, Usd, UsdPhysics
+
+        def enable(prim, approximation):
+            self.require(bool(prim), "Missing thread collider")
+            UsdPhysics.CollisionAPI.Apply(prim).CreateCollisionEnabledAttr(True)
+            UsdPhysics.MeshCollisionAPI.Apply(prim).CreateApproximationAttr(approximation)
+            config = PhysxSchema.PhysxCollisionAPI.Apply(prim)
+            config.CreateContactOffsetAttr(.00005)
+            config.CreateRestOffsetAttr(0.)
+
+        self.thread_guides, self.thread_springs = [], []
+        for i, path in enumerate(self.nut_paths):
+            for name in ("Stud", "Thread"):
+                enable(self.stage.GetPrimAtPath(f"{self.hub_path}/{name}_{i}"), "none")
+            thread = self.stage.GetPrimAtPath(path + "/Visual/InternalThread")
+            self.require(bool(thread), f"Missing internal thread on nut {i+1}")
+            for part in Usd.PrimRange(thread):
+                if part.HasAPI(UsdPhysics.CollisionAPI):
+                    enable(part, "convexHull")
+
+            # 소켓은 회전과 자세를 전달한다. 너트는 소켓을 따라 축 방향으로 미끄러질 수 있다.
+            hold = UsdPhysics.FixedJoint.Get(self.stage, self.hold_paths[i])
+            guide = UsdPhysics.Joint.Define(self.stage, path + "/ThreadGuide")
+            guide.CreateBody0Rel().SetTargets(hold.GetBody0Rel().GetTargets())
+            guide.CreateBody1Rel().SetTargets(hold.GetBody1Rel().GetTargets())
+            guide.CreateLocalPos0Attr(hold.GetLocalPos0Attr().Get())
+            guide.CreateLocalPos1Attr(hold.GetLocalPos1Attr().Get())
+            guide.CreateCollisionEnabledAttr(False)
+            guide.CreateExcludeFromArticulationAttr(True)
+            for dof in ("transX", "transY", "rotX", "rotY", "rotZ"):
+                limits = UsdPhysics.LimitAPI.Apply(guide.GetPrim(), dof)
+                limits.CreateLowAttr(1.)
+                limits.CreateHighAttr(-1.)
+            # 소켓 밖으로 무제한 밀려나지 않도록 후방 4 mm, 전방 32 mm의 기계적 스트로크를 둔다.
+            travel = UsdPhysics.LimitAPI.Apply(guide.GetPrim(), "transZ")
+            travel.CreateLowAttr(-.004)
+            travel.CreateHighAttr(.032)
+            spring = UsdPhysics.DriveAPI.Apply(guide.GetPrim(), "transZ")
+            spring.CreateStiffnessAttr(1500.)
+            spring.CreateDampingAttr(8.)
+            spring.CreateMaxForceAttr(2.)
+            spring.CreateTargetPositionAttr(0.)
+            hold.CreateJointEnabledAttr(False)
+            self.thread_guides.append(guide)
+            self.thread_springs.append(spring)
+        self.metrics = {"mode": "physical_threads", "axial_compliance_force_n": 2.}
+
+    def spin_physical(self):
+        # 동일한 로봇팔과 스핀들을 구동한다. 팔은 3 mm/s로 8 mm 전진하고 멈춘다.
+        start = self.nut_positions()
+        flange_start = self.arm.fk(self.base_xyz, self.angles)[-1][0]
+        tcp_start = self.tcp.get_world_pose()[0]
+        try:
+            for drive in self.speeds:
+                drive.Set(360.)
+            for frame in range(int(np.ceil(.008 / (.003 * self.dt)))):
+                if frame % 12 == 0:
+                    distance = min((frame + 12) * .003 * self.dt, .008)
+                    target = flange_start - self.outward * distance
+                    self.angles = self.solve_pose(target, self.rotation, self.angles)
+                    self.command_arm(self.angles)
+                self.step(frame)
+                retreat = (self.nut_positions() - start) @ self.outward
+                if np.any(retreat > .006):
+                    self.metrics = {"mode": "physical_threads",
+                                    "nut_backout_mm": (retreat * 1000).tolist(),
+                                    "physical_contact_verified": False}
+                    print(f"THREADS {self.target_wheel}: {self.metrics}", flush=True)
+                    raise RuntimeError("Nut backed out during thread entry")
+
+            # 스프링을 끈 뒤에는 팔이 움직이지 않는다. 너트의 자력 전진과 피치만으로 물림을 판정한다.
+            pushed = self.nut_positions()
+            for spring in self.thread_springs:
+                spring.GetStiffnessAttr().Set(0.)
+                spring.GetDampingAttr().Set(0.)
+                spring.GetMaxForceAttr().Set(0.)
+            last = self.phases()
+            turns = np.zeros(len(SPINDLES))
+            for frame in range(int(12 / self.dt)):
+                self.step(frame)
+                phase = self.phases()
+                turns += np.angle(np.exp(1j * (phase - last))) / tau
+                last = phase
+                end = self.nut_positions()
+                if np.max(np.linalg.norm(end - self.seats, axis=1)) < SEAT_TOL:
+                    break
+            advance = (pushed - end) @ self.outward
+            pitch_error = advance - turns * PITCH
+            engaged = (turns >= 1.) & (np.abs(pitch_error) < .0005)
+            self.metrics = {
+                "mode": "physical_threads",
+                "tcp_push_mm": float((tcp_start - self.tcp.get_world_pose()[0]) @ self.outward * 1000),
+                "push_advance_mm": (((start - pushed) @ self.outward) * 1000).tolist(),
+                "free_advance_mm": (advance * 1000).tolist(),
+                "free_turns": turns.tolist(),
+                "pitch_error_mm": (pitch_error * 1000).tolist(),
+                "physical_contact_verified": bool(np.all(engaged)),
+            }
+            print(f"THREADS {self.target_wheel}: {self.metrics}", flush=True)
+            for nut, verified in zip(self.nut_status, engaged):
+                nut["engaged_model"] = bool(verified)
+            self.require(np.all(engaged), "Physical thread engagement failed")
+            return pushed, turns
+        finally:
+            self.stop_spindles()
 
     def phases(self):
         rotations = [Rotation.from_quat(nut.get_world_pose()[1], scalar_first=True) for nut in self.nuts]
@@ -694,6 +807,8 @@ class TaskController:
             speed.Set(0.)
 
     def spin(self):
+        if self.physical_threads:
+            return self.spin_physical()
         last = self.phases()
         turns = np.zeros(len(SPINDLES))
         start = self.nut_positions()
@@ -719,6 +834,14 @@ class TaskController:
             self.stop_spindles()
 
     def seat(self,start,turns):
+        if self.physical_threads:
+            end = self.nut_positions()
+            errors = np.linalg.norm(end-self.seats, axis=1)
+            self.metrics = {"physical_seat_error_mm": (errors*1000).tolist()}
+            for nut, error in zip(self.nut_status, errors):
+                nut["seated"] = bool(error < SEAT_TOL)
+            self.require(np.all(errors < SEAT_TOL), "Physical nuts did not seat")
+            return end
         self.move_nuts(self.seats,120)
         end = self.nut_positions()
         errors = np.linalg.norm(end-self.seats,axis=1)
@@ -750,6 +873,9 @@ class TaskController:
 
     def release(self):
         from pxr import UsdPhysics
+        if self.physical_threads:
+            for guide in self.thread_guides:
+                guide.CreateJointEnabledAttr(False)
         for i,root in enumerate(SPINDLES):
             hold = UsdPhysics.FixedJoint.Get(self.stage,self.hold_paths[i])
             hold.CreateJointEnabledAttr(False)
@@ -1182,7 +1308,129 @@ def validate_head(stage, flange):
 
 
 # 접촉 시험 옵션. 암나사·수나사의 물리 접촉만으로 생기는 축 이동을 측정한다.
-def check_thread_contact(app):
+class ThreadContactView:
+    """접촉 시험의 카메라와 표시만 관리하고, 물리 제어는 시험 루프에 맡긴다."""
+
+    def __init__(self, app, sim, ctx, stage, hub_frame, bodies):
+        import carb.settings
+        import omni.timeline
+        import omni.ui as ui
+        from omni.kit.viewport.utility import get_active_viewport
+        from omni.physx.bindings._physx import SETTING_DISPLAY_COLLIDERS
+        from pxr import Gf, UsdGeom, UsdPhysics
+
+        self.app, self.sim, self.ctx, self.stage = app, sim, ctx, stage
+        self.timeline = omni.timeline.get_timeline_interface()
+        self.viewport = get_active_viewport()
+        self.settings = carb.settings.get_settings()
+        self.collider_setting = SETTING_DISPLAY_COLLIDERS
+        self.original_display = self.settings.get_as_int(SETTING_DISPLAY_COLLIDERS)
+        self.zoomed = False
+        self.show_colliders = False
+        self.finished = False
+        self.restart_requested = False
+        # 확대 시 외피만 숨겨 실제 PhysX 콜라이더를 드러낸다.
+        self.shells = [
+            UsdGeom.Imageable(prim) for prim in bodies[0].GetChild("Geometry").GetChildren()
+            if prim.IsA(UsdGeom.Gprim) and not prim.HasAPI(UsdPhysics.CollisionAPI)
+        ]
+        hub_center = hub_frame.Transform(Gf.Vec3d(0, 0, OFFSET + .016))
+        nut_center = UsdGeom.XformCache().GetLocalToWorldTransform(bodies[0]).ExtractTranslation()
+        nut_center += hub_frame.TransformDir(Gf.Vec3d(0, 0, -.003))
+        for name, target, offset, focal in (
+            ("Hub", hub_center, (.12, .13, .25), 27.),
+            ("Thread", nut_center, (.044, .020, .010), 36.),
+        ):
+            camera = UsdGeom.Camera.Define(stage, f"/World/ContactViews/{name}")
+            eye = target + hub_frame.TransformDir(Gf.Vec3d(*offset))
+            camera.AddTransformOp().Set(Gf.Matrix4d().SetLookAt(
+                eye, target, Gf.Vec3d(0, 0, 1)
+            ).GetInverse())
+            camera.CreateFocalLengthAttr(focal)
+            camera.CreateClippingRangeAttr(Gf.Vec2f(.001, 10.))
+
+        self.window = ui.Window("Thread Contact | FL", width=440, height=105)
+        with self.window.frame, ui.VStack(spacing=4):
+            self.status = ui.Label("나사면 접촉 시험 · 너트 5개")
+            with ui.HStack(spacing=4):
+                self.pause_button = ui.Button("Pause", clicked_fn=self.toggle_pause)
+                self.restart_button = ui.Button("Restart", enabled=False, clicked_fn=self.request_restart)
+                ui.Button("Hub view", clicked_fn=lambda: self.set_view(False))
+                ui.Button("Thread zoom", clicked_fn=lambda: self.set_view(True))
+                self.collider_button = ui.Button("Colliders: Off", clicked_fn=self.toggle_colliders)
+        self.set_view(False)
+
+    def set_view(self, zoomed):
+        from pxr import Sdf
+
+        self.zoomed = zoomed
+        self.viewport.camera_path = Sdf.Path(f"/World/ContactViews/{'Thread' if zoomed else 'Hub'}")
+        self.show_colliders = zoomed
+        self.update_colliders()
+
+    def toggle_colliders(self):
+        self.show_colliders = not self.show_colliders
+        self.update_colliders()
+
+    def update_colliders(self):
+        self.settings.set_int(self.collider_setting, 2 if self.show_colliders else 0)
+        self.collider_button.text = "Colliders: On" if self.show_colliders else "Colliders: Off"
+        for shell in self.shells:
+            if self.zoomed and self.show_colliders:
+                shell.MakeInvisible()
+            else:
+                shell.MakeVisible()
+
+    def toggle_pause(self):
+        if self.finished:
+            return
+        if self.timeline.is_playing():
+            self.timeline.pause()
+        else:
+            self.timeline.play()
+        self.timeline.commit()
+
+    def is_open(self):
+        return self.app.is_running() and self.ctx.get_stage() == self.stage
+
+    def step(self, frame):
+        # 480 Hz 물리 스텝은 그대로 실행하고 8스텝마다 화면만 갱신한다.
+        if frame % 8 == 0:
+            self.sim.render()
+        while self.is_open() and not self.timeline.is_playing() and not self.timeline.is_stopped():
+            self.pause_button.text = "Resume"
+            self.sim.render()
+        if not self.is_open() or self.timeline.is_stopped():
+            raise CycleInterrupted
+        self.pause_button.text = "Pause"
+        self.sim.step(render=False)
+
+    def hold_result(self, passed):
+        self.finished = True
+        self.timeline.pause()
+        self.timeline.commit()
+        self.pause_button.enabled = False
+        self.restart_button.enabled = True
+        self.status.text = f"{'PASS' if passed else 'FAIL'} · 최종 자세"
+        while self.is_open() and not self.restart_requested:
+            self.sim.render()
+
+    def request_restart(self):
+        self.restart_requested = True
+
+    def close(self):
+        self.settings.set_int(self.collider_setting, self.original_display)
+        self.window.destroy()
+
+
+def check_thread_contact(app, gui=False, approach=False):
+    while True:
+        result = run_thread_contact(app, gui, approach)
+        if result is not None:
+            return result
+
+
+def run_thread_contact(app, gui, approach):
     """맞물린 스터드와 너트를 회전시켜 나사면 접촉만으로 생기는 전진량을 검사한다."""
     import omni.usd
     from isaacsim.core.api import SimulationContext
@@ -1216,6 +1464,8 @@ def check_thread_contact(app):
 
     bodies = []
     hinges = []
+    pushers = []
+    approach_offset = .012 if approach else 0.
     for i, root in enumerate(SPINDLES):
         stud = stage.GetPrimAtPath(f"{hub.GetPath()}/Stud_{i}")
         thread = stage.GetPrimAtPath(f"{hub.GetPath()}/Thread_{i}")
@@ -1224,7 +1474,7 @@ def check_thread_contact(app):
         pts = np.array(UsdGeom.Mesh(stud).GetPointsAttr().Get())
         center = (pts.min(axis=0)+pts.max(axis=0))/2
         # 암나사 돌기가 수나사 골 사이에 오도록 미리 맞물린 위치를 정한다.
-        center[2] = OFFSET+.00125+14.5*PITCH
+        center[2] = OFFSET+.00125+14.5*PITCH + approach_offset
         origin = hub_frame.Transform(Gf.Vec3d(*center.tolist()))
         path = f"/World/Contact/Nut_{i}"
         item = UsdGeom.Xform.Define(stage,path)
@@ -1255,10 +1505,26 @@ def check_thread_contact(app):
         drive.CreateDampingAttr(.001)
         drive.CreateMaxForceAttr(.12)
         hinges.append(drive.CreateTargetVelocityAttr(0.))
+        if approach:
+            # 로봇팔의 축 방향 밀기를 힘 제한 속도 드라이브로 모사한다.
+            # 위치 목표를 주지 않으므로 나사면에 걸리면 실제 이동은 느려지거나 멈춘다.
+            pusher = UsdPhysics.DriveAPI.Apply(joint.GetPrim(), "transZ")
+            pusher.CreateDampingAttr(1000.)
+            pusher.CreateMaxForceAttr(2.)
+            pusher.CreateTargetVelocityAttr(0.)
+            pushers.append(pusher)
         bodies.append(prim)
 
     stage.GetPrimAtPath("/World/Head").SetActive(False)
     sim = SimulationContext(physics_dt=1/480, stage_units_in_meters=1,physics_prim_path="/World/Physics")
+    if gui:
+        import omni.timeline
+
+        # GUI 타임라인이 물리 시험의 제한 시간보다 먼저 끝나지 않도록 한다.
+        timeline = omni.timeline.get_timeline_interface()
+        timeline.set_end_time(60.)
+        timeline.set_current_time(0.)
+        timeline.commit()
     sim.initialize_physics()
     sim.play()
 
@@ -1273,27 +1539,82 @@ def check_thread_contact(app):
         directions = [m.TransformDir(Gf.Vec3d(1,0,0)) for m in local]
         return xyz@axis,np.array([np.arctan2(v[1],v[0]) for v in directions])
 
-    for _ in range(120):
-        sim.step(render=False)
-    start,last = measure()
-    for speed in hinges:
-        speed.Set(-360.)
-    turns = np.zeros(5)
-    for frame in range(480*12):
-        sim.step(render=False)
-        if frame%4 == 0:
-            end,phase = measure()
-            turns -= np.angle(np.exp(1j*(phase-last)))/tau
-            last = phase
-            if turns.min()>=8:
-                break
-    advance = start-end
-    for i in range(5):
-        print(f"CONTACT nut {i+1}: turns={turns[i]:.3f} advance_mm={advance[i]*1000:.3f} "
-              f"pitch_error_mm={(advance[i]-turns[i]*PITCH)*1000:.3f}",flush=True)
-    passed = bool(np.all(turns>=8) and np.all(np.abs(advance-turns*PITCH)<.0005))
-    print("PASS" if passed else "FAIL","rotation-only thread contact",flush=True)
-    return passed
+    view = ThreadContactView(app, sim, ctx, stage, hub_frame, bodies) if gui else None
+
+    def step(frame):
+        if view is None:
+            sim.step(render=False)
+        else:
+            view.step(frame)
+
+    try:
+        for frame in range(120):
+            step(frame)
+        start,last = measure()
+        for speed in hinges:
+            speed.Set(-360.)
+        if approach:
+            for pusher in pushers:
+                pusher.GetTargetVelocityAttr().Set(.003)
+            initial, _ = measure()
+            for frame in range(480 * 12):
+                step(frame)
+                if frame % 4 == 0:
+                    reached, _ = measure()
+                    if np.all(initial - reached >= approach_offset):
+                        break
+            advance_mm = (initial - reached) * 1000
+            print(f"PUSH advance_mm={advance_mm}", flush=True)
+            if not np.all(advance_mm >= approach_offset * 1000):
+                print("FAIL push: one or more nuts did not reach the engagement depth", flush=True)
+                if view is not None:
+                    view.hold_result(False)
+                    if view.restart_requested and view.is_open():
+                        reset_thread_contact(sim, view, ctx)
+                        return None
+                return False
+            # 이후 전진은 나사면 접촉으로만 일어나야 한다.
+            for pusher in pushers:
+                pusher.GetDampingAttr().Set(0.)
+                pusher.GetMaxForceAttr().Set(0.)
+            start, last = measure()
+        turns = np.zeros(5)
+        for frame in range(480*12):
+            step(frame)
+            if frame%4 == 0:
+                end,phase = measure()
+                turns -= np.angle(np.exp(1j*(phase-last)))/tau
+                last = phase
+                if turns.min()>=8:
+                    break
+        advance = start-end
+        for i in range(5):
+            print(f"CONTACT nut {i+1}: turns={turns[i]:.3f} advance_mm={advance[i]*1000:.3f} "
+                  f"pitch_error_mm={(advance[i]-turns[i]*PITCH)*1000:.3f}",flush=True)
+        passed = bool(np.all(turns>=8) and np.all(np.abs(advance-turns*PITCH)<.0005))
+        print("PASS" if passed else "FAIL","rotation-only thread contact",flush=True)
+        if view is not None:
+            view.hold_result(passed)
+            if view.restart_requested and view.is_open():
+                # 시험 중 생성한 너트·조인트와 물리 상태를 버리고 원본 장면을 다시 연다.
+                reset_thread_contact(sim, view, ctx)
+                return None
+        return passed
+    except CycleInterrupted:
+        print("Contact test interrupted", flush=True)
+        return False
+    finally:
+        if view is not None:
+            view.close()
+
+
+def reset_thread_contact(sim, view, ctx):
+    from isaacsim.core.api import SimulationContext
+
+    sim.stop()
+    view.timeline.commit()
+    SimulationContext.clear_instance()
+    ctx.close_stage()
 
 
 
@@ -1302,6 +1623,9 @@ def main():
     parser.add_argument("--json-log", action="store_true", help="상세 상태 JSON도 함께 출력")
     parser.add_argument("--wheel-order", nargs="+", choices=("RL","FL"), default=["RL","FL"],
                         help="체결 대상 및 순서 (기본 RL FL)")
+    parser.add_argument("--gui", action="store_true", help="나사면 접촉 시험을 GUI에서 관찰")
+    parser.add_argument("--physical-threads", action="store_true", help="전체 공정에서 나사산 접촉으로 체결 검증")
+    parser.add_argument("--push-to-engage", action="store_true", help="간격을 두고 축 방향으로 밀어 물림을 시험")
     parser.add_argument("--headless", action="store_true", help="Check motion and exit")
     parser.add_argument("--captures", type=Path, help="Save loaded and seated close-ups")
     modes = parser.add_mutually_exclusive_group()
@@ -1311,7 +1635,15 @@ def main():
     args = parser.parse_args()
     if len(set(args.wheel_order)) != len(args.wheel_order):
         parser.error("Duplicate wheel in --wheel-order")
-    headless = args.headless or args.build_robot is not None or args.build_head or args.check_thread_contact
+    if args.gui and (not args.check_thread_contact or args.headless):
+        parser.error("--gui requires --check-thread-contact and cannot be used with --headless")
+    if args.push_to_engage and not args.check_thread_contact:
+        parser.error("--push-to-engage requires --check-thread-contact")
+    if args.physical_threads and (args.check_thread_contact or args.build_head or args.build_robot):
+        parser.error("--physical-threads runs the full robot cycle")
+    headless = args.headless or args.build_robot is not None or args.build_head or (
+        args.check_thread_contact and not args.gui
+    )
     app = SimulationApp({"headless": headless, "renderer": "RayTracedLighting",
                          "multi_gpu": False, "max_gpu_count": 1})
     try:
@@ -1322,8 +1654,9 @@ def main():
             build_head()
             return 0
         if args.check_thread_contact:
-            return 0 if check_thread_contact(app) else 1
-        return run(app, args.headless, args.captures, json_log=args.json_log, wheel_order=args.wheel_order)
+            return 0 if check_thread_contact(app, gui=args.gui, approach=args.push_to_engage) else 1
+        return run(app, args.headless, args.captures, json_log=args.json_log, wheel_order=args.wheel_order,
+                   physical_threads=args.physical_threads)
     finally:
         # USD 생성은 동기 Export로 끝난다. 생성 모드는 렌더러와 캡처 종료를 기다릴 필요가 없다.
         app.close(skip_cleanup=args.build_robot is not None or args.build_head)
