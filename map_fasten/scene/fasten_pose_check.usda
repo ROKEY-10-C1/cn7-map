@@ -72,7 +72,7 @@ def Xform "World"
             # 플랜지 로컬 +Z 방향 464 mm에 체결기 중심 TCP를 둔다.
             def Xform "TCP"
             {
-                double3 xformOp:translate = (0, 0, 0.464)
+                double3 xformOp:translate = (0, 0, 0.235)
                 uniform token[] xformOpOrder = ["xformOp:translate"]
             }
         }
