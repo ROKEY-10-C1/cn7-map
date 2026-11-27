@@ -29,9 +29,10 @@ class Arm:
             frames.append((p, rot, axis_world))
         return frames
 
-    def solve(self, base, target, side, previous=None, fallback=True):
-        # Flange +Z points from the flange toward the wheel.
-        rotation = np.array([[1, 0, 0], [0, 0, -side], [0, side, 0]])
+    def solve(self, base, target, side, previous=None, fallback=True, rotation=None):
+        # Default: flange +Z points from the flange toward the wheel (along -side*y).
+        if rotation is None:
+            rotation = np.array([[1, 0, 0], [0, 0, -side], [0, side, 0]])
         seeds = [previous] if previous is not None else []
         rng = np.random.default_rng(41)
         if fallback:

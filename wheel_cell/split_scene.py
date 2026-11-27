@@ -21,7 +21,7 @@ FACTORY_PARTS = (
     ("building", r"^(Cladding|Clerestory|Column|EndUpright|EndWall|EndWindow|Mullion|Panel|"
                  r"RoofBeam|RoofEdge|UpperCladding|WallBase)"),
     ("conveyor", r"(Feed|AxleTransfer|ConveyorBend|Diverter|QA_Reject|RejectCrate|RejectGuard)"),
-    ("fasten_robots", r"(Left|Right)FastenRobot"),
+    ("fasten_robots", r"(Left|Right)(FastenRobot|NutMagazine)"),
     ("mount_robots", r"(Left|Right)MountRobot"),
     ("vehicle_buffers", r"VehicleBuffer"),
     ("safety", r"(Guard|Signal)"),

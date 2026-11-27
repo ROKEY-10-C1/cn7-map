@@ -35,6 +35,9 @@ AMR_OUT_GATE = 10.                 # dock -> gate after departure; gate -> outbo
 AMR_OUT_BUFFER = AMR_AT_GATE
 # RS080N bases on each side of the central dock. The fastening arm sits between axles.
 MOUNT_BASE_X = 2.60
+# Tyre stop on the feed belt (belt end x 1.68 + tyre radius): the mount RS080N turns round to it.
+# At the axle line (x 1.36) the flat wheel is out of reach; x 1.86-2.16 leaves >= 20 deg joint margin.
+PICK_X = 2.00
 FASTEN_BASE_X = 0.
 ROBOT_BASE_Y = 2.50
 # Keep 1.55 m clear beside the control button (0.21 m) and buffer posts (0.03 m).
@@ -124,14 +127,14 @@ def schedule(inject, mixed_sizes=False):
     start = 0.
     for number, wheel in enumerate(WHEELS if mixed_sizes else (CN7_R16,)*4, 1):
         def delivery(name, launch):
-            return list(motion(route(AXLE, STATIONS[name][1]), launch))
+            return list(motion(route(PICK_X, STATIONS[name][1]), launch))
 
         deliveries = {name: delivery(name, start+4.2*i) for i,name in enumerate(("FL","FR"))}
         reject = None
         if inject and number == 1:
             original = deliveries["FL"]
             reject_start = max(original[-1][0], deliveries["FR"][-1][0])+1.
-            reject = original + list(motion(((AXLE,LINE_Y),(REJECT_X,LINE_Y),
+            reject = original + list(motion(((PICK_X,LINE_Y),(REJECT_X,LINE_Y),
                                               (REJECT_X,REJECT_CRATE_Y)), reject_start))
             deliveries["FL"] = delivery("FL", reject[-1][0]+1.)
         front_seat = max(path[-1][0] for path in deliveries.values())+7.

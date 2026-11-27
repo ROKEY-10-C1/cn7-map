@@ -47,11 +47,13 @@ from physical_data import AMR_SIZE, AMR_WHEEL_RADIUS, DOCK_CLAMP_CLOSED, DOCK_CL
 from process import (
     AMR_AT_GATE, AMR_BAY_Y, AMR_DOCKED, AMR_GATE_X, AMR_LIFTED, AMR_OUT_GATE, AXLE, BELT_Z, BUFFER_CAR_Z,
     BUFFER_SLOT_X, BUFFER_STAND_X, BUFFER_STAND_Y, CELL_Y, CN7_R16, FASTEN_BASE_X, MOUNT_BASE_X, ROBOT_BASE_Y, FEED, FPS,
-    HUB_Z, INDEX_TRAVEL, LINE_Y, NUT_CYCLE, NUT_DRIVE, NUT_ENGAGE, NUT_FINAL, NUT_PICKUP,
+    HUB_Z, INDEX_TRAVEL, LINE_Y, NUT_CYCLE, NUT_DRIVE, NUT_ENGAGE, NUT_FINAL,
     REJECT_CRATE_Y, REJECT_GATE_HALF, REJECT_X, STATIONS, bend, schedule,
 )
 from wheel_geometry import barrel, center_web, hub as make_hub, nut as make_nut, wheelhouse
 from robot import Arm
+from cell_motion import (GRIP_AT, GRIP_CENTRE, MAGAZINE, NUT_PICK_AT, fasten_keys, mount_keys,
+                         samples, solve_plan)
 from visuals import (ALLOY, BRUSHED, CONCRETE, GLASS, LIB, PANEL, RUBBER, ZINC, VisualAssets, add_instance,
                      copy_mesh, finish, mesh)
 
@@ -62,7 +64,6 @@ AMBER = (.85, .60, .039)
 WHITE = (.72, .77, .79)
 RED = (.73, .10, .08)
 TEAL = (.08, .58, .43)
-TOOL = .20
 # Plant layout outside the cell: fence at CELL_Y (process.py), walkway, buffer guard, buffers, outer guard, wall.
 BUFFER_GUARD_Y = AMR_BAY_Y-2.65
 OUTER_GUARD_Y = AMR_BAY_Y+2.65
@@ -371,6 +372,7 @@ def factory(stage, arm):
         mount_gripper(stage, mount_flange+"/PHL_W_63_080_S")
         fasten_flange = fixed_robot(stage, f"{path}/{label}FastenRobot", arm, FASTEN_BASE_X, side, "tighten")
         fasten_head(stage, fasten_flange+"/FastenHead")
+        magazine(stage, f"{path}/{label}NutMagazine", side)
         # Enclose the outboard conveyors. Maintenance doors open onto the walkway.
         fy = side*CELL_Y
         fence(stage,path+f"/{label}InnerGuard",(-2.70,fy),(6.65,fy),1.80)
@@ -618,37 +620,6 @@ def wheel_visual(stage, assets, path, wheel, damaged):
     cylinder(stage, path+"/ValveStem", (-.88*wheel.inner, .049, .083), .005, .017, RUBBER)
 
 
-def jig(stage, root, x, side, roller):
-    y = side*LINE_Y
-    box(stage, root+"/Base", (x, y, .065), (.58, .58, .13), AMBER)
-    box(stage, root+"/Column", (x, y+side*.24, .34), (.23, .14, .57), BRUSHED)
-    for i, offset in enumerate((-.078, .078)):
-        cylinder(stage, root+f"/LinearGuide_{i}", (x+offset, y+side*.151, .373),
-                 .017, .59, ALLOY)
-        box(stage, root+f"/GuideSeat_{i}", (x+offset, y+side*.151, .13),
-            (.049, .044, .062), DARK)
-    cylinder(stage, root+"/LiftScrew", (x, y+side*.151, .363), .022, .56, ZINC)
-    box(stage, root+"/DriveMotor", (x+.16, y+side*.205, .175), (.12, .135, .105), DARK)
-    for i in range(4):
-        position = (x+(-1 if i%2 else 1)*.224, y+(-1 if i//2 else 1)*.228, .134)
-        ring(stage, root+f"/Anchor_{i}", position, .017, .007, .009, ALLOY, 6)
-    _, carriage = xform(stage, root+"/Carriage")
-    box(stage, root+"/Carriage/Fork", (0, 0, -.068), (.51, .32, .06), BRUSHED)
-    for i in range(2):
-        offset = (i-.5)*.29
-        cylinder(stage, root+f"/Carriage/Roller{i}", (offset, 0, 0), .033, .24, RUBBER, "Y")
-        for side_sign in (-1, 1):
-            cylinder(stage, root+f"/Carriage/Bearing{i}_{side_sign+1}",
-                     (offset, side_sign*.132, 0), .023, .028, ALLOY, "Y")
-    for i,direction in enumerate((-1,1)):
-        box(stage,root+f"/Carriage/GuideUpright_{i}",(direction*.272,side*.16,.157),
-            (.034,.046,.35),AMBER)
-    box(stage,root+"/Carriage/GuideBridge",(0.,side*.16,.323),(.57,.043,.046),AMBER)
-    cylinder(stage,root+"/Carriage/AlignmentHandle",(0.,side*.16,roller+.10),
-             .016,.085,ALLOY,"Y")
-    return carriage
-
-
 def rs080n_library(stage):
     """RS080N link meshes (link frames, zero pose) as visual-only prototypes, no physics APIs."""
     source=Usd.Stage.Open(str(RS080N_ASSETS/"RS080N.usdc"))
@@ -660,6 +631,9 @@ def rs080n_library(stage):
         copy_mesh(stage,f"{LIB}/rs080n_Link_{i}/Housing",housing,Gf.Matrix4d(1),KAWASAKI_GRAY)
 
 
+ROBOT_LINKS = {}   # robot prim path -> [(translate op, orient op)] of Link_1..6
+
+
 def fixed_robot(stage, path, arm, base_x, side, role):
     """Place the six RS080N links at their parked joint angles, facing the car."""
     node,_=xform(stage,path,(base_x,side*ROBOT_BASE_Y,0.))
@@ -669,12 +643,27 @@ def fixed_robot(stage, path, arm, base_x, side, role):
     prim.CreateAttribute("cell:model",Sdf.ValueTypeNames.String).Set("RS080N")
     prim.CreateAttribute("cell:fixedBase",Sdf.ValueTypeNames.Bool).Set(True)
     add_instance(stage,path+"/Base/Housing",f"{LIB}/rs080n_Link_0")
+    ops=[]
     for i,(p,rot,_) in enumerate(arm.fk((0.,0.,0.),RS080N_PARK),1):
-        link,_=xform(stage,path+f"/Link_{i}",p)
+        link,position=xform(stage,path+f"/Link_{i}",p)
         qx,qy,qz,qw=Rotation.from_matrix(rot).as_quat()
-        link.AddOrientOp().Set(Gf.Quatf(qw,qx,qy,qz))
+        orient=link.AddOrientOp()
+        orient.Set(Gf.Quatf(qw,qx,qy,qz))
+        ops.append((position,orient))
         add_instance(stage,path+f"/Link_{i}/Housing",f"{LIB}/rs080n_Link_{i}")
+    ROBOT_LINKS[path]=ops
     return path+"/Link_6"
+
+
+def animate_arm(stage, arm, path, plan):
+    """Key the six links (robot frame) along a joint plan; joint targets go on cell:jointTargetDeg."""
+    for seconds,q in samples(plan):
+        for i,((position,orient),(p,rot,_)) in enumerate(zip(ROBOT_LINKS[path],arm.fk((0.,0.,0.),q)),1):
+            move(position,seconds,p)
+            qx,qy,qz,qw=Rotation.from_matrix(rot).as_quat()
+            orient.Set(Gf.Quatf(qw,qx,qy,qz),frame(seconds))
+            stage.GetPrimAtPath(path+f"/Link_{i}").CreateAttribute(
+                "cell:jointTargetDeg",Sdf.ValueTypeNames.Double).Set(degrees(q[i-1]),frame(seconds))
 
 
 def mount_gripper(stage, path):
@@ -702,14 +691,13 @@ def fasten_head(stage, head):
 
 
 def magazine(stage, path, side):
-    pocket=(.30,side*1.23,1.135)
+    pocket=(MAGAZINE[0],side*MAGAZINE[1],MAGAZINE[2])
     px,py,pz=pocket
     box(stage,path+"/Stand",(px,py-side*.095,.715),(.098,.10,.77),BRUSHED)
     # Nut presenter: five outlets on the stud pattern, filled for one wheel per pick.
     box(stage,path+"/Cassette",(px,py-side*.065,pz),(.17,.11,.17),PANEL)
     for i,(sx,sy) in enumerate(SOCKET_LAYOUT):
         cylinder(stage,path+f"/Outlet_{i}",(px+sx,py-side*.018,pz+side*sy),.020,.041,BRUSHED,"Y")
-    return np.array(pocket)+(0.,side*TOOL,0.)
 
 
 def dock_clamps(stage, root, dock, release, *, base_x=0., prefix="DockClamp"):
@@ -728,7 +716,7 @@ def dock_clamps(stage, root, dock, release, *, base_x=0., prefix="DockClamp"):
                 move(slide,t,(clamp_x,side*y,0))
 
 
-def order(stage, assets, data, record):
+def order(stage, assets, arm, data, record):
     number,wheel,start,deliveries,reject,front,rear,rear_tight,front_tight,departure,end=data
     vehicle=f"CN7-{number:03}"
     root=f"/World/Orders/CN7_{number:03}"
@@ -757,58 +745,41 @@ def order(stage, assets, data, record):
     record(departure,vehicle,"","depart","AMR leaving the dock")
     record(end,vehicle,"","outbound","AMR reached outbound apron")
     record(staged,vehicle,"","staged","AMR leaves inbound buffer for the gate")
-    shared_supports={}
-    if reject:
-        item,pos,_,_=make_wheel(stage,assets,root+"/RejectedWheel",wheel,damaged=True)
-        visibility(item,reject[0][0],reject[-1][0]+.65)
-        for t,(x,y) in reject:
-            move(pos,t,(x,y,BELT_Z+wheel.width/2))
-        record(reject[-3][0],vehicle,"FL","E102","Injected surface defect")
-        record(deliveries["FL"][0][0],vehicle,"FL","resupply",wheel.name)
     for name,(x,side) in STATIONS.items():
         wheel_y=side*half_track(x)
         seated,tight=(front,front_tight) if x>0 else (rear,rear_tight)
-        item,pos,tilt,spin=make_wheel(stage,assets,root+f"/SupplyWheel_{name}",wheel)
+        label="Left" if side>0 else "Right"
+        mount=f"/World/Factory/{label}MountRobot"
+        fasten=f"/World/Factory/{label}FastenRobot"
+        item,pos,_,_=make_wheel(stage,assets,root+f"/SupplyWheel_{name}",wheel)
         path=deliveries[name]
-        visibility(item,path[0][0],seated)
+        # Flat on the belt until the mount arm's jaws close on the tread.
+        visibility(item,path[0][0],seated+GRIP_AT)
         for t,(wx,wy) in path:
             move(pos,t,(wx,wy,BELT_Z+wheel.width/2))
-        y=side*LINE_Y
-        upright=BELT_Z+wheel.radius+.04
-        roller=sqrt(wheel.radius**2-.145**2)+.033
-        for t,offset,wy,z in ((seated-5.,0.,y,BELT_Z+wheel.width/2),
-                             (seated-4.,0.,y,upright),(seated-3.,0.,y,upright),
-                             (seated-2.,.012,y,HUB_Z+.01),(seated-1.,0.,y,HUB_Z),
-                             (seated,0.,wheel_y,HUB_Z)):
-            move(pos,t,(AXLE+offset,wy,z))
-        for t,angle in ((seated-4.,0.),(seated-3.,-side*90)):
-            tilt.Set(angle,frame(t))
-        for t,angle in ((seated-4.,11.),(seated-2.,11.),(seated-1.,0.)):
-            spin.Set(angle,frame(t))
+        # Carried in the PHL-W jaws: wheel axis on the flange Z, outboard face toward the flange.
+        held,held_pos,held_tilt,_=make_wheel(stage,assets,mount+f"/Link_6/HeldWheel_{number:03}_{name}",wheel)
+        held_pos.Set(vector((0,0,GRIP_CENTRE)))
+        held_tilt.Set(180)
+        visibility(held,seated+GRIP_AT,seated)
+        animate_arm(stage,arm,mount,solve_plan(arm,MOUNT_BASE_X,side,mount_keys(side,seated,wheel,x)))
+        animate_arm(stage,arm,fasten,solve_plan(arm,FASTEN_BASE_X,side,fasten_keys(side,tight,x)))
+        for k,(sx,sy) in enumerate(SOCKET_LAYOUT):
+            carried_root=fasten+f"/Link_6/CarriedNut_{number:03}_{name}_{k}"
+            carried,_=xform(stage,carried_root,(sx,sy,HEAD_LENGTH+NUT_LENGTH))
+            carried.AddRotateXOp().Set(180.)
+            make_nut(stage,carried_root)
+            visibility(carried,tight+NUT_PICK_AT,tight+NUT_ENGAGE)
         installed,mounted,mounted_tilt,_=make_wheel(stage,assets,root+f"/Carrier/Hanger/Wheel_{name}",wheel)
         mounted.Set(vector((x,wheel_y,HUB_Z)))
         for name_key,value in fit(wheel).items():
             installed.GetPrim().CreateAttribute("cell:clearance_"+name_key,Sdf.ValueTypeNames.Double).Set(value)
         mounted_tilt.Set(-side*90)
         visibility(installed,seated,end)
-        if side not in shared_supports:
-            shared_supports[side]=jig(stage,root+f"/LoadSupport_{name}",AXLE,side,roller)
-            move(shared_supports[side],start,(AXLE,y,.467))
-        carriage=shared_supports[side]
-        for t,cx,cy,z in ((seated-5.,AXLE,y,.467),
-                         (seated-4.,AXLE,y,upright-wheel.width/2-.033),
-                         (seated-3.,AXLE,y,upright-roller),
-                         (seated-2.,AXLE+.012,y,HUB_Z+.01-roller),
-                         (seated-1.,AXLE,y,HUB_Z-roller),
-                         (seated,AXLE,wheel_y,HUB_Z-roller),
-                         (tight+NUT_CYCLE,AXLE,wheel_y,HUB_Z-roller),
-                         (tight+NUT_CYCLE+1,AXLE,wheel_y,.45),
-                         (tight+NUT_CYCLE+2,AXLE,y,.45)):
-            move(carriage,t,(cx,cy,z))
         record(path[-1][0],vehicle,name,"inspect","Simulated wheel inspection")
         record(seated-1,vehicle,name,"aligned",
                f"Nominal static envelope: pilot clearance {fit(wheel)['pilot_m']*1000:.2f} mm radial")
-        record(seated,vehicle,name,"seated","Nominal alignment, wheel retained by load support")
+        record(seated,vehicle,name,"seated","Hung on the hub studs by the mount RS080N, jaws open")
         t=tight+NUT_ENGAGE
         for index,(bx,by) in enumerate(BOLT_CENTERS):
             nut_root=root+f"/Carrier/Hanger/{name}/Nut_{index}"
@@ -821,7 +792,7 @@ def order(stage, assets, data, record):
                 move(nut_pos,seconds,(bx,by,NUT_SEAT+distance))
                 nut_spin.Set(spin_angle,frame(seconds))
             record(t+NUT_DRIVE+NUT_FINAL,vehicle,name,"tightened",f"Nut {index+1}; virtual {DEMO_TORQUE:.0f} N m (accept {NUT_TORQUE[0]}–{NUT_TORQUE[1]})")
-        record(tight+NUT_CYCLE+2,vehicle,name,"complete","Five nuts in one multi-spindle cycle, support withdrawn")
+        record(tight+NUT_CYCLE+2,vehicle,name,"complete","Five nuts in one multi-spindle cycle, head withdrawn")
     # Only the staged AMR and its car are shown before the order starts; the cell
     # equipment of this order would otherwise overlap the previous order's.
     for child in cycle.GetPrim().GetChildren():
@@ -873,7 +844,7 @@ def main():
         margins=fit(data[1])
         if min(margins.values())<=0:
             raise ValueError(f"Nominal wheel interference for {data[1].name}: {margins}")
-        order(stage, assets, data, record)
+        order(stage, assets, fasten_arm, data, record)
         reject=data[4]
         if reject:
             closed=reject_gate.Get()
