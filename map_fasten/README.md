@@ -33,6 +33,7 @@ CN7 좌전륜의 5개 너트를 고정식 Kawasaki RS080N으로 정렬하고 체
 
 - `634054e`의 고정식 **Kawasaki RS080N**과 **QST50-150CT 5축** 구성을 반영했다. RS080N의 링크 메시와 관절 축·한계는 Kawasaki ROS 에셋을 사용했다. 링크 질량은 URDF 값을 사용했고 관절 드라이브와 공구의 질량 분포는 시뮬레이션용 근사다. [Kawasaki 원본](https://github.com/Kawasaki-Robotics/khi_robot/tree/678dd3fbc4f75fd76c1fd5277116d0edc6528f13/khi_rs_description)
 - 컴팩트 시험 헤드는 PCD 114.3 mm와 72° 간격을 유지한다. 기존 QST50-150CT 구성의 전체 길이 464 mm와 하우징 외경 51 mm를 각각 235 mm와 40 mm로 줄였다. 고정 공구 질량은 6.8 kg으로 근사했고, 독립 스트로크·D405·반력 핀은 모델링 범위에서 제외했다.
+- 전체 셀(`wheel_cell`)의 체결 RS080N 네 동작(좌우 × 앞뒤)도 이 235 mm 헤드와 80 mm 준비 거리를 쓴다. 셀 배치와 시간표는 [진행 기록](../docs/PROGRESS.md)에 있다.
 - `6f838b8`과 `2d1e510`의 인계 자료는 휠이 허브에 걸린 뒤 기울어질 수 있음을 보여 준다. 체결 방향은 허브 축에서, 정렬점은 스터드 메시에서 읽는다. [장착 결과 인계](../wheel_cell/HANDOVER.md)
 
 ## 현재 시험 범위

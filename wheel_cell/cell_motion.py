@@ -9,7 +9,7 @@ from math import ceil, pi
 import numpy as np
 
 from fitment import NUT_LENGTH, NUT_SEAT, PITCH, half_track
-from process import (AXLE, BELT_Z, FASTEN_BASE_X, HUB_Z, LINE_Y, MOUNT_BASE_X, NUT_CYCLE, NUT_DRIVE,
+from process import (MOUNT_HUB_X, BELT_Z, FASTEN_BASE_X, HUB_Z, LINE_Y, MOUNT_BASE_X, NUT_CYCLE, NUT_DRIVE,
                      NUT_ENGAGE, NUT_FINAL, GRIP_AT, MOUNT_CLEAR, PICK_X, ROBOT_BASE_Y)
 
 PARK = np.deg2rad([0, -30, -65, 0, -130, 0])
@@ -20,8 +20,8 @@ GRIP_CENTRE = .32
 RELEASE_AT = .6
 # Fasten: sockets take the five nuts at this offset from the tighten time.
 NUT_PICK_AT = -2.0
-# Five-spindle head, flange to socket tip (map_fasten/README.md).
-HEAD_LENGTH = .464
+# Compact five-spindle head of map_fasten (TOOL_LENGTH, flange to socket tip; e32662d, 2026-11-27).
+HEAD_LENGTH = .235
 NUT_ADVANCE = 5*PITCH
 # Nut presenter pocket (socket tips meet it), beside the fastening arm, clear of the car and AMR.
 MAGAZINE = (FASTEN_BASE_X+.90, 1.45, 1.135)
@@ -81,7 +81,7 @@ def mount_keys(side, seat, wheel, car_x):
     pick = np.array([PICK_X, side*LINE_Y, BELT_Z+wheel.width/2])
     toward_base = np.array([MOUNT_BASE_X-PICK_X, side*(ROBOT_BASE_Y-LINE_Y), 0.])
     toward_base /= np.linalg.norm(toward_base)
-    hub = np.array([AXLE, side*half_track(car_x), HUB_Z])
+    hub = np.array([MOUNT_HUB_X, side*half_track(car_x), HUB_Z])
     down, car = FACE_DOWN, toward_car(side)
     out = np.array([0., side, 0.])
     grip = lambda centre, rotation: (flange_for(centre, rotation, GRIP_CENTRE), rotation)

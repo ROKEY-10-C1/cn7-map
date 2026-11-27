@@ -33,14 +33,18 @@ AMR_DOCKED = 8.                    # order start (at the gate) -> docked
 AMR_LIFTED = AMR_DOCKED+3.
 AMR_OUT_GATE = 10.                 # dock -> gate after departure; gate -> outbound buffer follows
 AMR_OUT_BUFFER = AMR_AT_GATE
-# Two stops of the car (car centre x): A = 0, B = WHEELBASE. The mount arm serves only the hub at
-# x = AXLE (front wheels at A, rear wheels at B); the fastening arm sits midway between the hubs at
-# B (x AXLE and AXLE+WHEELBASE), so front fastening at B overlaps rear mounting.
-MOUNT_BASE_X = AXLE-1.24
-FASTEN_BASE_X = AXLE+WHEELBASE/2
+# Two stops of the car (car centre x): A = DOCK_X, B = DOCK_X+WHEELBASE. The mount arm serves only
+# the hub at MOUNT_HUB_X (front wheels at A, rear wheels at B); the fastening arm sits midway between
+# the hubs at B, so front fastening at B overlaps rear mounting.
+# DOCK_X: at B the front bumper (x DOCK_X+WHEELBASE+2.355) keeps 0.54 m to the tyre splitter bend
+# (nearest belt edge x 5.16); ISO 13854 gives 500 mm as the minimum gap against crushing the body.
+DOCK_X = -.45
+MOUNT_HUB_X = DOCK_X+AXLE
+MOUNT_BASE_X = MOUNT_HUB_X-1.24
+FASTEN_BASE_X = MOUNT_HUB_X+WHEELBASE/2
 # Tyre stop on the feed belt, behind the mount arm: the arm turns round to it. 0.64 m from the hub
 # line toward the base side keeps >= 20 deg joint margin (mirror of the x 1.86-2.16 scan, 2026-11-27).
-PICK_X = AXLE-.64
+PICK_X = MOUNT_HUB_X-.64
 FEED_START_X = PICK_X-.32          # belt end just behind the stopped tyre (radius 0.316)
 # Mount arm timing relative to the seat time (cell_motion.mount_keys): jaws close on the flat wheel,
 # arm parked again after hanging it.
@@ -151,7 +155,7 @@ def schedule(inject, mixed_sizes=False):
         # wheels hung on the studs (retention during the move is handled outside this model).
         index_start = front_seat+MOUNT_CLEAR
         redock = index_start+INDEX_TRAVEL
-        # Stop B: fasten the front (hub AXLE+WHEELBASE) while the rear is mounted at hub AXLE.
+        # Stop B: fasten the front (hub MOUNT_HUB_X+WHEELBASE) while the rear is mounted at MOUNT_HUB_X.
         front_tighten = redock+2.
         # Rear wheels follow the front ones on the trunk (4.2 s apart), wait at the queue spot and
         # move onto the stop once the front wheel of their side has been lifted (0.7 s after the grip).

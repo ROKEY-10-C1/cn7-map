@@ -1,7 +1,7 @@
 #usda 1.0
 (
     defaultPrim = "World"
-    endTimeCode = 10700.615578861509
+    endTimeCode = 10844.615578861509
     framesPerSecond = 24
     metersPerUnit = 1
     startTimeCode = 0

@@ -46,14 +46,14 @@ from fitment import (
 from physical_data import AMR_SIZE, AMR_WHEEL_RADIUS, DOCK_CLAMP_CLOSED, DOCK_CLAMP_OPEN, ROLLER_RADIUS
 from process import (
     AMR_AT_GATE, AMR_BAY_Y, AMR_DOCKED, AMR_GATE_X, AMR_LIFTED, AMR_OUT_GATE, AXLE, BELT_Z, BUFFER_CAR_Z,
-    BUFFER_SLOT_X, BUFFER_STAND_X, BUFFER_STAND_Y, CELL_Y, CN7_R16, FASTEN_BASE_X, FEED_START_X, MOUNT_BASE_X, MOUNT_CLEAR, ROBOT_BASE_Y, FEED, FPS,
+    BUFFER_SLOT_X, BUFFER_STAND_X, BUFFER_STAND_Y, CELL_Y, CN7_R16, DOCK_X, FASTEN_BASE_X, FEED_START_X, MOUNT_BASE_X, MOUNT_CLEAR, ROBOT_BASE_Y, FEED, FPS,
     HUB_Z, INDEX_TRAVEL, LINE_Y, NUT_CYCLE, NUT_DRIVE, NUT_ENGAGE, NUT_FINAL,
     REJECT_CRATE_Y, REJECT_GATE_HALF, REJECT_X, STATIONS, bend, schedule,
 )
 from wheel_geometry import barrel, center_web, hub as make_hub, nut as make_nut, wheelhouse
 from robot import Arm
-from cell_motion import (GRIP_AT, GRIP_CENTRE, MAGAZINE, NUT_PICK_AT, fasten_keys, mount_keys,
-                         samples, solve_plan)
+from cell_motion import (GRIP_AT, GRIP_CENTRE, HEAD_LENGTH, MAGAZINE, NUT_ADVANCE, NUT_PICK_AT, fasten_keys,
+                         mount_keys, samples, solve_plan)
 from visuals import (ALLOY, BRUSHED, CONCRETE, GLASS, LIB, PANEL, RUBBER, ZINC, VisualAssets, add_instance,
                      copy_mesh, finish, mesh)
 
@@ -84,10 +84,6 @@ KAWASAKI_GRAY = (.84, .85, .86)    # displayColor of map_fasten/assets/RS080N.us
 # facing down. In the robot frame (+y = toward the car) every joint origin and the socket tips stay
 # within y -0.30..+0.50 m and below z 2.32 m in the parked pose.
 RS080N_PARK = np.deg2rad([0, -30, -65, 0, -130, 0])
-# Five-spindle head (map_fasten/README.md): QST50-150CT spindles, OD 51 mm, flange to socket tip 464 mm.
-HEAD_LENGTH = .464
-SPINDLE_RADIUS = .0255
-NUT_ADVANCE = 5*PITCH
 # Flange frame of the fastening tool (see Arm.solve): x = world x, y = world z * side, so
 # stud k at hub angle a sits at (PCD/2 cos a, -PCD/2 sin a) on either side of the car.
 SOCKET_LAYOUT = tuple((PCD/2*cos(a), -PCD/2*sin(a)) for a in BOLT_ANGLES)
@@ -346,7 +342,7 @@ def factory(stage, arm):
     joints,south=int(FLOOR_Y//2.5),int(FLOOR_S//2.5)
     for j in range(-south,joints+1):
         box(stage,path+f"/TransverseJoint_{j+south}",(0,j*2.5,.001),(19.96,.007,.002),(.17,.19,.20))
-    box(stage,path+"/DockPlate",(WHEELBASE/2,0,-.012),(4.95+WHEELBASE,2.22,.024),(.15,.18,.20))
+    box(stage,path+"/DockPlate",(DOCK_X+WHEELBASE/2,0,-.012),(4.95+WHEELBASE,2.22,.024),(.15,.18,.20))
     for i in range(9):
         box(stage,path+f"/AMR_Center_{i}",(-6.53+i*.48,0,.003),(.265,.045,.005),(.04,.54,.78))
     arrow_points=[(-2.62,0.,.004),(-3.06,.20,.004),(-3.06,.071,.004),
@@ -355,7 +351,7 @@ def factory(stage, arm):
     amr_zones(stage,path+"/AMRZone")
     cell_floor=(.36,.43,.52)  # inside-cell tint from the layout legend; the dock plate stays dark
     for name,(x0,x1,y0,y1) in (("Left",(-4.52,6.65,1.11,CELL_Y)),("Right",(-4.52,6.65,-CELL_Y,-1.11)),
-                               ("Entry",(-4.52,-2.475,-1.11,1.11)),("Exit",(2.475+WHEELBASE,5.65,-1.11,1.11))):
+                               ("Entry",(-4.52,DOCK_X-2.475,-1.11,1.11)),("Exit",(DOCK_X+2.475+WHEELBASE,5.65,-1.11,1.11))):
         box(stage,path+f"/CellFloor_{name}",((x0+x1)/2,(y0+y1)/2,.0015),(x1-x0,y1-y0,.002),cell_floor)
     for side,label in ((1,"Left"),(-1,"Right")):
         for i in range(int((AMR_BAY_Y-.24)/.48)+1):
@@ -428,8 +424,8 @@ def factory(stage, arm):
     for name,eye,target,focal in (
             ("Overview",(-17.6,0.,16.6),(.65,0.,.44),20.8),
             ("Assembly",(-6.0,-4.35,3.34),(.18,0.,1.0),26),
-            ("WheelDetail",(2.37,2.76,1.95),(1.40,1.13,.82),30),
-            ("HubDetail",(1.94,2.13,1.53),(AXLE,.81,.97),48),
+            ("WheelDetail",(DOCK_X+2.37,2.76,1.95),(DOCK_X+1.40,1.13,.82),30),
+            ("HubDetail",(DOCK_X+1.94,2.13,1.53),(DOCK_X+AXLE,.81,.97),48),
             ("TopView",(0.,0.,22.),(0.,0.,0.),35)):
         cam=UsdGeom.Camera.Define(stage,f"/World/{name}")
         up=Gf.Vec3d(0,1,0) if name=="TopView" else Gf.Vec3d(0,0,1)
@@ -447,7 +443,7 @@ def factory(stage, arm):
     for side,tag in ((1,"Left"),(-1,"Right")):
         for axle,kind in ((AXLE,"Front"),(-AXLE,"Rear")):
             spot=UsdLux.SphereLight.Define(stage,f"/World/Lighting/{tag}{kind}Inspection")
-            spot.AddTranslateOp().Set(Gf.Vec3d(axle+.11,side*1.13,.76))
+            spot.AddTranslateOp().Set(Gf.Vec3d(DOCK_X+axle+.11,side*1.13,.76))
             spot.CreateRadiusAttr(.035)
             spot.CreateIntensityAttr(14)
             spot.CreateColorAttr((.12,.43,1.))
@@ -677,16 +673,16 @@ def mount_gripper(stage, path):
 
 
 def fasten_head(stage, head):
-    """Five-spindle head in the flange frame, with +Z pointing to the sockets."""
-    cylinder(stage,head+"/AdapterPlate",(0,0,.015),.11,.03,BRUSHED)
-    cylinder(stage,head+"/FloatingPlate",(0,0,.050),.125,.024,ALLOY)
+    """Compact five-spindle head of map_fasten (build_head, e32662d) in the flange frame, +Z to the
+    sockets: adapter r 55 mm, main plate r 81 mm, housings r 20 mm, socket tip at HEAD_LENGTH 235 mm.
+    The D405, floating stroke and reaction pins are left out as in map_fasten."""
+    rotor=HEAD_LENGTH-.048
+    cylinder(stage,head+"/FlangeAdapter",(0,0,.015),.055,.030,ALLOY)
+    cylinder(stage,head+"/MainPlate",(0,0,.070),.081,.080,ALLOY)
     for i,(sx,sy) in enumerate(SOCKET_LAYOUT):
-        cylinder(stage,head+f"/Spindle_{i}",(sx,sy,.062+.17),SPINDLE_RADIUS,.34,BRUSHED)
-        cylinder(stage,head+f"/Socket_{i}",(sx,sy,HEAD_LENGTH-.03),.016,.06,DARK)
-    for j in (-1,1):
-        # Anti-rotation pins between the spindles, outside the PCD.
-        cylinder(stage,head+f"/ReactionPin_{j+1}",(0,j*.095,.062+.20),.009,.40,AMBER)
-    box(stage,head+"/D405",(0,0,.34),(.042,.042,.023),DARK)
+        cylinder(stage,head+f"/Housing_{i}",(sx,sy,(.110+rotor-.007)/2),.020,rotor-.007-.110,DARK)
+        cylinder(stage,head+f"/Spindle_{i}",(sx,sy,rotor),.013,.018,BRUSHED)
+        cylinder(stage,head+f"/Socket_{i}",(sx,sy,rotor+.028),.016,.040,AMBER)
 
 
 def magazine(stage, path, side):
@@ -727,11 +723,11 @@ def order(stage, assets, arm, data, record):
     amr,lift=carrier(stage,assets,root+"/Carrier")
     index_start=front+MOUNT_CLEAR
     redock=index_start+INDEX_TRAVEL
-    dock_clamps(stage,root,start+AMR_DOCKED,index_start)
-    dock_clamps(stage,root,redock,departure,base_x=WHEELBASE,prefix="RearDockClamp")
-    route=((start-AMR_AT_GATE,AMR_GATE_X,AMR_BAY_Y),(start,AMR_GATE_X,0.),(start+AMR_DOCKED,0.,0.),
-           (index_start,0.,0.),(redock,WHEELBASE,0.),
-           (departure,WHEELBASE,0.),(departure+AMR_OUT_GATE,AMR_GATE_X,0.),(end,AMR_GATE_X,-AMR_BAY_Y))
+    dock_clamps(stage,root,start+AMR_DOCKED,index_start,base_x=DOCK_X)
+    dock_clamps(stage,root,redock,departure,base_x=DOCK_X+WHEELBASE,prefix="RearDockClamp")
+    route=((start-AMR_AT_GATE,AMR_GATE_X,AMR_BAY_Y),(start,AMR_GATE_X,0.),(start+AMR_DOCKED,DOCK_X,0.),
+           (index_start,DOCK_X,0.),(redock,DOCK_X+WHEELBASE,0.),
+           (departure,DOCK_X+WHEELBASE,0.),(departure+AMR_OUT_GATE,AMR_GATE_X,0.),(end,AMR_GATE_X,-AMR_BAY_Y))
     for t,x,y in route:
         move(amr,t,(x,y,0.))
     for t,height in ((start-AMR_AT_GATE,-.12),(start+AMR_DOCKED,-.12),(start+AMR_LIFTED,0.),
@@ -762,7 +758,7 @@ def order(stage, assets, arm, data, record):
         held_tilt.Set(180)
         visibility(held,seated+GRIP_AT,seated)
         animate_arm(stage,arm,mount,solve_plan(arm,MOUNT_BASE_X,side,mount_keys(side,seated,wheel,x)))
-        animate_arm(stage,arm,fasten,solve_plan(arm,FASTEN_BASE_X,side,fasten_keys(side,tight,x,AXLE+(WHEELBASE if x>0 else 0.))))
+        animate_arm(stage,arm,fasten,solve_plan(arm,FASTEN_BASE_X,side,fasten_keys(side,tight,x,DOCK_X+AXLE+(WHEELBASE if x>0 else 0.))))
         for k,(sx,sy) in enumerate(SOCKET_LAYOUT):
             carried_root=fasten+f"/Link_6/CarriedNut_{number:03}_{name}_{k}"
             carried,_=xform(stage,carried_root,(sx,sy,HEAD_LENGTH+NUT_LENGTH))
@@ -779,6 +775,10 @@ def order(stage, assets, arm, data, record):
         record(seated-1,vehicle,name,"aligned",
                f"Nominal static envelope: pilot clearance {fit(wheel)['pilot_m']*1000:.2f} mm radial")
         record(seated,vehicle,name,"seated","Hung on the hub studs by the mount RS080N, jaws open")
+        # Fastening steps of map_fasten (FastenState) on the keyframe clock.
+        record(tight+1.94,vehicle,name,"tool_aligned","Head centre, axis and 5-nut pattern aligned 80 mm off the nuts")
+        record(tight+NUT_ENGAGE,vehicle,name,"engaged","Five nuts at the stud tips (geometric entry)")
+        record(tight+NUT_ENGAGE+NUT_DRIVE+NUT_FINAL+.1,vehicle,name,"released","Socket retention released, nuts stay seated")
         t=tight+NUT_ENGAGE
         for index,(bx,by) in enumerate(BOLT_CENTERS):
             nut_root=root+f"/Carrier/Hanger/{name}/Nut_{index}"
