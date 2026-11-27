@@ -13,7 +13,7 @@ scene/
 │   └── shared.usda            #   재질·공용 메시
 ├── shared/                    # 🔁 생성됨: asset_library.usdc, materials.usdc
 ├── environment/               # 🔁 생성됨: lighting_cameras.usdc
-├── factory/                   # 🔁 생성됨: building, floor, conveyor, robot_rails, safety, vehicle_buffers, truck
+├── factory/                   # 🔁 생성됨: building, floor, conveyor, mount_robots, fasten_robots, safety, vehicle_buffers, truck
 ├── orders/                    # 🔁 생성됨: CN7_001 … CN7_004
 ├── concrete.png
 └── production.sqlite3         # 시연 이벤트 로그
