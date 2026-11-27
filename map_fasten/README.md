@@ -25,14 +25,14 @@ CN7 좌전륜의 5개 너트를 고정식 Kawasaki RS080N으로 정렬하고 체
 |---|---|
 | [`fasten_pose_check.py`](fasten_pose_check.py) | `TaskController.run()`이 준비 → 접근 → 스터드 정렬 → 회전 → 안착 → 소켓 분리 → 후퇴를 실행한다. 같은 파일에서 에셋 생성과 나사면 시험도 실행한다. |
 | [`scene/fasten_pose_check.usda`](scene/fasten_pose_check.usda) | RS080N·CN7 차체·좌전륜의 시험 배치, 베이스 고정, TCP를 정의한다. |
-| [`scene/fasten_head.usdc`](scene/fasten_head.usdc) | 5개 스핀들 하우징, 소켓·너트·관절과 중앙 D405, 플로팅 판, 반력 핀의 근사 형상이다. |
+| [`scene/fasten_head.usdc`](scene/fasten_head.usdc) | 헤드 생성 결과다. link_6의 어댑터·본체·하우징과 독립 로터·너트·관절을 정의한다. |
 | [`assets/`](assets/) | RS080N의 USD와 IK용 URDF, Kawasaki 라이선스다. |
 | [`images/`](images/) | 체결 시험 그림이다. `previous_` 접두사가 붙은 그림은 이전 M1509 시험 기록이다. |
 
 ## 최신 main 인계 사양 반영
 
 - `634054e`의 고정식 **Kawasaki RS080N**과 **QST50-150CT 5축** 구성을 반영했다. RS080N의 링크 메시와 관절 축·한계는 Kawasaki ROS 에셋을 사용했다. 링크 질량은 URDF 값을 사용했고 관절 드라이브와 공구의 질량 분포는 시뮬레이션용 근사다. [Kawasaki 원본](https://github.com/Kawasaki-Robotics/khi_robot/tree/678dd3fbc4f75fd76c1fd5277116d0edc6528f13/khi_rs_description)
-- 헤드는 PCD 114.3 mm, 스핀들 외경 51 mm, 플랜지부터 소켓 끝까지 464 mm를 기준으로 배치했다. 스핀들 질량 5.8 kg씩을 반영했고 50 mm 스트로크는 설계값으로 기록했다. [Atlas Copco 공구 카탈로그](https://www.atlascopco.com/content/dam/atlas-copco/industrial-technique/general/documents/catalogs/2024_industrial_tools_catalogue_nordic_version.pdf) · [스핀들 제원](https://www.atlascopcogroup.com/content/dam/atlas-copco/industrial-technique/products/fixtured-applications/general-documents/W_Fixturedapplications.pdf)
+- 컴팩트 시험 헤드는 PCD 114.3 mm와 72° 간격을 유지한다. 기존 QST50-150CT 구성의 전체 길이 464 mm와 하우징 외경 51 mm를 각각 235 mm와 40 mm로 줄였다. 고정 공구 질량은 6.8 kg으로 근사했고, 독립 스트로크·D405·반력 핀은 모델링 범위에서 제외했다.
 - `6f838b8`과 `2d1e510`의 인계 자료는 휠이 허브에 걸린 뒤 기울어질 수 있음을 보여 준다. 체결 방향은 허브 축에서, 정렬점은 스터드 메시에서 읽는다. [장착 결과 인계](../wheel_cell/HANDOVER.md)
 
 ## 현재 시험 범위
@@ -44,6 +44,8 @@ CN7 좌전륜의 5개 너트를 고정식 Kawasaki RS080N으로 정렬하고 체
 고정 시험 장면에서 TCP 준비 위치 오차는 0.46 mm, 스터드 진입의 최대 오차는 0.12 mm였다. 너트 5개가 안착하고 공구가 약 102 mm 후퇴한 뒤 너트가 휠에 남았다. [소켓에 너트 장착](images/loaded_sockets.png) · [공구 후퇴 후 너트 안착](images/seated_nuts.png)
 
 ## 모델 다시 생성
+
+컴팩트 헤드를 실행하기 전에 `--build-head`로 헤드 USD를 다시 생성한다. 생성기는 초기 관절의 연결 대상과 월드 기준점, TCP 위치를 검증한 후 USD를 교체한다.
 
 RS080N USD는 저장소에 포함되어 있다. 수정 후 다시 만들 경우 Kawasaki 원본 저장소의 해당 버전 STL 폴더를 사용한다.
 

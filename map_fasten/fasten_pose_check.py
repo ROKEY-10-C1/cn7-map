@@ -24,11 +24,8 @@ STAGE_PATH = HERE / "scene" / "fasten_pose_check.usda"
 ROBOT_PATH = "/World/FastenRobot"
 HUB_PATH = "/World/Car/Visuals/FL"
 ROBOT_URDF = HERE / "assets" / "rs080n.urdf"
-TOOL_LENGTH = .235          # 기존 464mm -> 235mm로 축소
-SPINDLE_RADIUS = .020
-SPINDLE_MASS = 3.0
-SPINDLE_STROKE = .030
-SPINDLES = tuple(f"/World/Head/Axes/Axis_{i}" for i in range(5))
+TOOL_LENGTH = 0.235
+SPINDLES = tuple(f"/World/Head/Axis_{i}" for i in range(5))
 
 
 # 실행 환경. 장면을 열고 재생·정지·재시작에 맞춰 체결 작업의 수명을 관리한다.
@@ -51,7 +48,8 @@ def run(app, headless, captures):
         app.update()
 
     stage = context.get_stage()
-    attach_head_to_robot(stage)
+    if not stage.GetPrimAtPath(SPINDLES[0] + "/Bearing"):
+        raise RuntimeError("Run --build-head to regenerate the compact fastening head USD")
 
     dt = 1 / 120
     sim = SimulationContext(physics_dt=dt, rendering_dt=1 / 60, stage_units_in_meters=1,
@@ -210,7 +208,7 @@ class TaskController:
         ):
             raise ValueError("The approach solver expects the left-side fixture orientation")
 
-        # 너트 외측 기준면에서 80 mm 바깥이 TCP 목표다. 공구 길이 464 mm를 더해 플랜지 목표를 구한다.
+        # 너트 외측 기준면에서 80 mm 바깥이 TCP 목표다. 공구 길이를 더해 플랜지 목표를 구한다.
         self.target = self.hub_xyz + self.outward * (NUT_SEAT + NUT_LENGTH + .08)
         self.flange_target = self.target + self.outward * TOOL_LENGTH
         self.arm = Arm(ROBOT_URDF)
@@ -482,217 +480,143 @@ def build_thread_flank(stage, path, a, b):
 
 
 def build_head():
-    from math import cos, sin, tau
+    """플랜지에 연결할 스핀들 5개와 소켓·너트를 USD 레이어로 생성한다."""
+    from tempfile import TemporaryDirectory
+
     from pxr import Gf, Sdf, Usd, UsdGeom, UsdPhysics
+    from sim_util import body, constrain, drive, mass_properties, tensor_properties
+    from visuals import ALLOY, ROBOT_YELLOW
+    from wheel_geometry import nut, profile
 
-    head_path = HERE / "scene" / "fasten_head.usdc"
-    stage = Usd.Stage.CreateNew(str(head_path))
-    stage.SetDefaultPrim(stage.DefinePrim("/World", "Xform"))
-    UsdGeom.SetStageUpAxis(stage, UsdGeom.Tokens.z)
-    stage.SetMetadata("metersPerUnit", 1)
+    head_layer = STAGE_PATH.with_name("fasten_head.usdc")
+    stage = Usd.Stage.Open(str(STAGE_PATH))
+    stage.MuteLayer(str(head_layer))
+    layer = Sdf.Layer.CreateAnonymous()
+    stage.GetSessionLayer().subLayerPaths.append(layer.identifier)
+    stage.SetEditTarget(layer)
+    flange = stage.GetPrimAtPath(f"{ROBOT_PATH}/link_6")
+    mat = UsdGeom.XformCache().GetLocalToWorldTransform(flange)
+    tool = str(flange.GetPath()) + "/Tool"
+    UsdGeom.Xform.Define(stage, tool)
+    parts = []
 
-    world = stage.GetPrimAtPath("/World")
-    head = UsdGeom.Xform.Define(stage, "/World/Head")
-    base_xf = UsdGeom.Xform.Define(stage, "/World/Head/Base")
-    axes_root = UsdGeom.Xform.Define(stage, "/World/Head/Axes")
+    def fixed_mesh(name, xy, radius, start, end, mass, color):
+        path = tool + "/" + name
+        profile(stage, path, [(.001, start), (radius, start), (radius, end), (.001, end)],
+                color, 48, xy=xy)
+        prim = stage.GetPrimAtPath(path)
+        UsdPhysics.CollisionAPI.Apply(prim)
+        UsdPhysics.MeshCollisionAPI.Apply(prim).CreateApproximationAttr("convexHull")
+        height = end - start
+        transverse = mass * (3 * radius**2 + height**2) / 12
+        parts.append((mass, (*xy, (start + end) / 2),
+                      (transverse, transverse, mass * radius**2 / 2)))
 
-    # ------------------------------------------------------------------
-    # helper
-    # ------------------------------------------------------------------
-    def make_cyl(path, radius, height, z, color=(0.75, 0.75, 0.75),
-                 body=False, mass=1.0):
-        prim = UsdGeom.Cylinder.Define(stage, path)
-        prim.CreateRadiusAttr(radius)
-        prim.CreateHeightAttr(height)
-        prim.CreateAxisAttr("Z")
-        prim.AddTranslateOp().Set(Gf.Vec3d(0, 0, z))
-        prim.CreateDisplayColorAttr([Gf.Vec3f(*color)])
+    rotor_z = TOOL_LENGTH - .048
+    fixed_mesh("FlangeAdapter", (0., 0.), .055, 0., .030, .8, ALLOY)
+    fixed_mesh("MainPlate", (0., 0.), .081, .030, .110, 2., ALLOY)
+    for i, (root, (x, y)) in enumerate(zip(SPINDLES, BOLT_CENTERS)):
+        # 플랜지 +Z는 허브를 향한다. 기존 스터드 순서와 Y 부호를 유지한다.
+        fixed_mesh(f"Housing_{i}", (x, -y), .020, .110, rotor_z - .007,
+                   .8, (.20, .22, .23))
+        offset = Gf.Vec3d(x, -y, rotor_z)
+        rotor = body(stage, root+"/Rotor", mat.Transform(offset), mat.ExtractRotationQuat(), .12)
+        mass_properties(rotor, (0,0,.024), (4e-5,4e-5,2e-5))
+        # 스핀들과 중공 소켓의 표시 메시를 만든다. 이 두 메시에는 외형 콜라이더를 적용하지 않는다.
+        profile(stage, root+"/Rotor/Spindle", [(.003,-.009),(.013,-.009),(.013,.009),(.003,.009)], ALLOY, 48)
+        profile(stage, root+"/Rotor/Socket", [(.0125,.008),(.016,.008),(.016,.048),(.0125,.048)], ROBOT_YELLOW, 24)
+        # 스핀들마다 로컬 Z축 회전 관절과 독립 속도 드라이브를 만든다.
+        bearing = constrain(UsdPhysics.RevoluteJoint.Define(stage,root+"/Bearing"), flange, rotor, offset)
+        bearing.CreateAxisAttr("Z")
+        drive(bearing,"angular",0.,0.,.15,2.)
+        # 너트를 별도 강체로 만들고 원추형 안착면이 스터드를 향하게 배치한다.
+        seat = .060
+        nut_body = body(stage,root+"/Nut",mat.Transform(offset+Gf.Vec3d(0,0,seat)),
+                        mat.ExtractRotationQuat(),.045)
+        mass_properties(nut_body,(0,0,-.012),(3e-6,3e-6,3e-6))
+        visual = UsdGeom.Xform.Define(stage,root+"/Nut/Visual")
+        visual.AddRotateXOp().Set(180)
+        nut(stage,str(visual.GetPath()))
+        for k in range(48):
+            build_thread_flank(stage, f"{visual.GetPath()}/InternalThread/Flank_{k}",tau*k/24,tau*(k+1)/24)
+        # 초기에는 너트를 소켓에 고정해 함께 회전시킨다. 조립 시험에서 안착하면 이 고정을 해제한다.
+        hold = constrain(UsdPhysics.FixedJoint.Define(stage,root+"/SocketRetention"),
+                         rotor,nut_body,(0,0,seat))
+        hold.CreateExcludeFromArticulationAttr(True)
+    # 기존 링크 형상의 로컬 경계 상자로 링크 자체의 질량 분포를 근사한다.
+    flange_mass = UsdPhysics.MassAPI(flange)
+    link_mass = flange_mass.GetMassAttr().Get()
+    bounds = UsdGeom.Mesh.Get(stage, str(flange.GetPath()) + "/Housing").GetExtentAttr().Get()
+    low, high = np.asarray(bounds)
+    size = high - low
+    parts.append((link_mass, (low + high) / 2,
+                  link_mass / 12 * (np.sum(size**2) - size**2)))
+    total_mass = sum(mass for mass, _, _ in parts)
+    center = sum(mass * np.asarray(pos) for mass, pos, _ in parts) / total_mass
+    inertia = np.zeros((3, 3))
+    for mass, pos, diagonal in parts:
+        delta = np.asarray(pos) - center
+        inertia += np.diag(diagonal) + mass * (delta @ delta * np.eye(3) - np.outer(delta, delta))
+    flange_mass.CreateMassAttr(total_mass)
+    tensor_properties(flange, center, inertia)
 
-        if body:
-            UsdPhysics.CollisionAPI.Apply(prim.GetPrim())
-            UsdPhysics.RigidBodyAPI.Apply(prim.GetPrim())
-            UsdPhysics.MassAPI.Apply(prim.GetPrim()).CreateMassAttr(mass)
+    validate_head(stage, flange)
+    with TemporaryDirectory(dir=head_layer.parent) as directory:
+        candidate = Path(directory) / head_layer.name
+        if not layer.Export(str(candidate)):
+            raise RuntimeError(f"Could not export {candidate}")
+        candidate.replace(head_layer)
+    print(f"BUILT {head_layer}", flush=True)
 
-        return prim
 
-    def make_box(path, size, pos, color=(0.85, 0.85, 0.85), body=False, mass=1.0):
-        prim = UsdGeom.Cube.Define(stage, path)
-        prim.CreateSizeAttr(1.0)
-        prim.AddTranslateOp().Set(Gf.Vec3d(*pos))
-        prim.AddScaleOp().Set(Gf.Vec3d(size[0], size[1], size[2]))
-        prim.CreateDisplayColorAttr([Gf.Vec3f(*color)])
-        if body:
-            UsdPhysics.CollisionAPI.Apply(prim.GetPrim())
-            UsdPhysics.RigidBodyAPI.Apply(prim.GetPrim())
-            UsdPhysics.MassAPI.Apply(prim.GetPrim()).CreateMassAttr(mass)
-        return prim
+def validate_head(stage, flange):
+    from pxr import Gf, Usd, UsdGeom, UsdPhysics
 
-    def fixed_joint(path, body0, body1):
-        joint = UsdPhysics.FixedJoint.Define(stage, path)
-        joint.CreateBody0Rel().SetTargets([Sdf.Path(body0)])
-        joint.CreateBody1Rel().SetTargets([Sdf.Path(body1)])
-        joint.CreateLocalPos0Attr(Gf.Vec3f(0, 0, 0))
-        joint.CreateLocalPos1Attr(Gf.Vec3f(0, 0, 0))
-        joint.CreateLocalRot0Attr(Gf.Quatf(1))
-        joint.CreateLocalRot1Attr(Gf.Quatf(1))
-        joint.CreateCollisionEnabledAttr(False)
-        return joint
-
-    def revolute_joint(path, body0, body1, local_pos0, local_pos1):
-        joint = UsdPhysics.RevoluteJoint.Define(stage, path)
-        joint.CreateAxisAttr("Z")
-        joint.CreateBody0Rel().SetTargets([Sdf.Path(body0)])
-        joint.CreateBody1Rel().SetTargets([Sdf.Path(body1)])
-        joint.CreateLocalPos0Attr(Gf.Vec3f(*local_pos0))
-        joint.CreateLocalPos1Attr(Gf.Vec3f(*local_pos1))
-        joint.CreateLocalRot0Attr(Gf.Quatf(1))
-        joint.CreateLocalRot1Attr(Gf.Quatf(1))
-        joint.CreateCollisionEnabledAttr(False)
-        return joint
-
-    # ------------------------------------------------------------------
-    # Base body : link_6에 붙을 헤드 베이스
-    # ------------------------------------------------------------------
-    base_body = make_cyl(
-        "/World/Head/Base/Adapter",
-        radius=0.055,
-        height=0.030,
-        z=0.015,
-        color=(0.92, 0.92, 0.92),
-        body=True,
-        mass=2.0
-    )
-
-    # 짧은 메인 바디
-    make_cyl(
-        "/World/Head/Base/MainBody",
-        radius=0.075,
-        height=0.060,
-        z=0.060,
-        color=(0.88, 0.88, 0.88)
-    )
-
-    # 축 배치용 전면 플레이트
-    make_cyl(
-        "/World/Head/Base/FrontPlate",
-        radius=0.090,
-        height=0.012,
-        z=0.100,
-        color=(0.95, 0.95, 0.95)
-    )
-
-    # ------------------------------------------------------------------
-    # 5축 배치 : PCD 114.3 mm
-    # ------------------------------------------------------------------
-    pcd = 0.1143
-    ring_r = pcd / 2.0
-
-    for i in range(5):
-        a = i * tau / 5.0
-        x = ring_r * cos(a)
-        y = ring_r * sin(a)
-
-        axis_root = UsdGeom.Xform.Define(stage, f"/World/Head/Axes/Axis_{i}")
-        axis_root.AddTranslateOp().Set(Gf.Vec3d(x, y, 0.110))
-
-        # 하우징
-        housing = make_cyl(
-            f"/World/Head/Axes/Axis_{i}/Housing",
-            radius=0.020,
-            height=0.090,
-            z=0.045,
-            color=(0.65, 0.67, 0.70),
-            body=True,
-            mass=0.8
-        )
-
-        # 로터(회전부)
-        rotor_xf = UsdGeom.Xform.Define(stage, f"/World/Head/Axes/Axis_{i}/Rotor")
-        rotor_xf.AddTranslateOp().Set(Gf.Vec3d(0, 0, 0.045))
-
-        rotor = make_cyl(
-            f"/World/Head/Axes/Axis_{i}/Rotor/SpindleBody",
-            radius=0.012,
-            height=0.050,
-            z=0.000,
-            color=(0.55, 0.55, 0.58),
-            body=True,
-            mass=0.4
-        )
-
-        # 소켓
-        socket = make_cyl(
-            f"/World/Head/Axes/Axis_{i}/Rotor/Socket",
-            radius=0.013,
-            height=0.028,
-            z=0.039,
-            color=(0.87, 0.70, 0.15),
-            body=False
-        )
-
-        # 스핀들 회전 조인트
-        revolute_joint(
-            f"/World/Head/Axes/Axis_{i}/Bearing",
-            f"/World/Head/Axes/Axis_{i}/Housing",
-            f"/World/Head/Axes/Axis_{i}/Rotor/SpindleBody",
-            (0, 0, 0.045),
-            (0, 0, 0.0),
-        )
-
-    # 중앙 가이드핀(짧게)
-    guide = make_cyl(
-        "/World/Head/Base/CentreGuide",
-        radius=0.008,
-        height=0.060,
-        z=0.128,
-        color=(0.80, 0.80, 0.82)
-    )
-
-    stage.GetRootLayer().Save()
-    print(f"Saved compact 5-axis head to {head_path}")
-
-def attach_head_to_robot(stage):
-    from pxr import Gf, Sdf, UsdGeom, UsdPhysics
-
-    link6_path = f"{ROBOT_PATH}/link_6"
-    base_path = "/World/Head/Base/Adapter"
-
-    link6 = stage.GetPrimAtPath(link6_path)
-    base = stage.GetPrimAtPath(base_path)
-
-    if not link6.IsValid():
-        raise RuntimeError(f"Missing {link6_path}")
-    if not base.IsValid():
-        raise RuntimeError(f"Missing {base_path}")
-
-    # Head 전체를 link_6 아래 정렬
+    flange_path = str(flange.GetPath())
+    tool = stage.GetPrimAtPath(flange_path + "/Tool")
+    fixed_names = ["FlangeAdapter", "MainPlate"] + [f"Housing_{i}" for i in range(5)]
+    for name in fixed_names:
+        if not UsdGeom.Mesh.Get(stage, tool.GetPath().AppendChild(name)):
+            raise RuntimeError(f"Missing fixed tool mesh: {name}")
+    if any(prim.HasAPI(UsdPhysics.RigidBodyAPI) for prim in Usd.PrimRange(tool)):
+        raise RuntimeError("Fixed tool meshes must belong to link_6")
     cache = UsdGeom.XformCache()
-    link6_world = cache.GetLocalToWorldTransform(link6)
+    tcp = stage.GetPrimAtPath(flange_path + "/TCP")
+    flange_frame = cache.GetLocalToWorldTransform(flange)
+    tip = cache.GetLocalToWorldTransform(tcp).ExtractTranslation()
+    if (tip - flange_frame.Transform(Gf.Vec3d(0, 0, TOOL_LENGTH))).GetLength() > 1e-6:
+        raise RuntimeError("TCP does not match the socket tip")
+    for root in SPINDLES:
+        rotor = root + "/Rotor"
+        nut_body = root + "/Nut"
+        for path in (rotor, nut_body):
+            if not stage.GetPrimAtPath(path).HasAPI(UsdPhysics.RigidBodyAPI):
+                raise RuntimeError(f"Missing rigid body: {path}")
+        for name in ("Spindle", "Socket"):
+            if not UsdGeom.Mesh.Get(stage, rotor + "/" + name):
+                raise RuntimeError(f"Missing rotor mesh: {rotor}/{name}")
+        bearing = UsdPhysics.RevoluteJoint.Get(stage, root + "/Bearing")
+        hold = UsdPhysics.FixedJoint.Get(stage, root + "/SocketRetention")
+        if not bearing or bearing.GetAxisAttr().Get() != "Z" or not bearing.GetPrim().HasAPI(
+            UsdPhysics.DriveAPI, "angular"
+        ):
+            raise RuntimeError(f"Missing Z-axis bearing drive: {root}")
+        for joint, path0, path1 in ((bearing, flange_path, rotor), (hold, rotor, nut_body)):
+            if (not joint or list(map(str, joint.GetBody0Rel().GetTargets())) != [path0]
+                    or list(map(str, joint.GetBody1Rel().GetTargets())) != [path1]):
+                raise RuntimeError(f"Invalid joint bodies: {root}")
+            frame0 = cache.GetLocalToWorldTransform(stage.GetPrimAtPath(path0))
+            frame1 = cache.GetLocalToWorldTransform(stage.GetPrimAtPath(path1))
+            anchor0 = frame0.Transform(Gf.Vec3d(joint.GetLocalPos0Attr().Get()))
+            anchor1 = frame1.Transform(Gf.Vec3d(joint.GetLocalPos1Attr().Get()))
+            rot0 = frame0.ExtractRotation() * Gf.Rotation(Gf.Quatd(joint.GetLocalRot0Attr().Get()))
+            rot1 = frame1.ExtractRotation() * Gf.Rotation(Gf.Quatd(joint.GetLocalRot1Attr().Get()))
+            if (anchor0 - anchor1).GetLength() > 1e-6 or any(
+                (rot0.TransformDir(axis) - rot1.TransformDir(axis)).GetLength() > 1e-6
+                for axis in (Gf.Vec3d.XAxis(), Gf.Vec3d.ZAxis())
+            ):
+                raise RuntimeError(f"Mismatched world joint frames: {joint.GetPath()}")
 
-    head = stage.GetPrimAtPath("/World/Head")
-    head_xf = UsdGeom.Xformable(head)
-
-    ops = head_xf.GetOrderedXformOps()
-    if not any(op.GetOpType() == UsdGeom.XformOp.TypeTranslate for op in ops):
-        head_xf.AddTranslateOp()
-    if not any(op.GetOpType() == UsdGeom.XformOp.TypeOrient for op in ops):
-        head_xf.AddOrientOp()
-
-    head.GetAttribute("xformOp:translate").Set(link6_world.ExtractTranslation())
-    head.GetAttribute("xformOp:orient").Set(Gf.Quatf(link6_world.ExtractRotationQuat()))
-    head.GetAttribute("xformOpOrder").Set(["xformOp:translate", "xformOp:orient"])
-
-    joint_path = "/World/Head/HeadMountJoint"
-    joint_prim = stage.GetPrimAtPath(joint_path)
-    if not joint_prim.IsValid():
-        joint = UsdPhysics.FixedJoint.Define(stage, joint_path)
-        joint.CreateBody0Rel().SetTargets([Sdf.Path(link6_path)])
-        joint.CreateBody1Rel().SetTargets([Sdf.Path(base_path)])
-        joint.CreateLocalPos0Attr(Gf.Vec3f(0, 0, 0))
-        joint.CreateLocalPos1Attr(Gf.Vec3f(0, 0, 0))
-        joint.CreateLocalRot0Attr(Gf.Quatf(1))
-        joint.CreateLocalRot1Attr(Gf.Quatf(1))
-        joint.CreateCollisionEnabledAttr(False)
 
 # 접촉 시험 옵션. 암나사·수나사의 물리 접촉만으로 생기는 축 이동을 측정한다.
 def check_thread_contact(app):
