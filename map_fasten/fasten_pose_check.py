@@ -1,4 +1,4 @@
-"""Isaac Sim 좌전륜 체결 시험. 기본 실행은 TaskController를 시작한다."""
+"""Isaac Sim 고정 차량 좌측 전·후륜 연속 체결 및 모사 재장전 시험."""
 
 import argparse
 import json
@@ -28,6 +28,20 @@ HUB_PATH = "/World/Car/Visuals/FL"
 ROBOT_URDF = HERE / "assets" / "rs080n.urdf"
 TOOL_LENGTH = 0.235
 SPINDLES = tuple(f"/World/Head/Axis_{i}" for i in range(5))
+WHEEL_TARGETS = {"FL": (HUB_PATH, "/World/Wheel"),
+                 "RL": ("/World/Car/Visuals/RL", "/World/WheelRear")}
+DUAL_BASE = (0., 2.45, 0.)  # 정적 시험용 베이스; 양쪽 목표의 IK 검증 후 사용
+RELOAD_BOX = "/World/NutReloadBox"
+RELOAD_PORT = RELOAD_BOX + "/ReloadTCP"
+RELOAD_XY = (0., 1.65)
+RELOAD_TOP = .65
+RELOAD_DOCK_GAP = .025  # 소켓 TCP와 상판 간격; 너트 12mm 돌출 여유 포함
+RELOAD_APPROACH = .20
+RELOAD_POS_TOL = .001
+RELOAD_AXIS_TOL = 1.0
+RELOAD_HOLD_SECONDS = .5
+NUT_ROTOR_OFFSET = .060  # 기존 build_head()와 동일
+
 
 # 초기 시험 기준. 실제 공차/PhysX 결과에 맞추어 조정한다.
 CENTER_TOL = .0005          # m, 축에 수직한 중심 오차
@@ -55,7 +69,7 @@ class FastenState(Enum):
     RELEASE = 10       # 소켓-너트 고정 Joint 해제
     RETRACT = 11       # 로봇 후퇴 및 너트 잔류 확인
     COMPLETE = 12      # 한 휠의 체결 모사 종료
-    RELOAD = 13        # 재장전 필요 (자동 장전 미구현)
+    RELOAD = 13        # 박스 접근·정렬·신규 너트 결합·후퇴 (공급 모사)
     ERROR = 99         # 오류 발생, 공정 중단
 
 
@@ -74,7 +88,7 @@ STEP_NAMES = {
     FastenState.RELEASE: "소켓과 너트 분리",
     FastenState.RETRACT: "공구 후퇴 및 너트 유지 확인",
     FastenState.COMPLETE: "한 휠 체결 모사 완료",
-    FastenState.RELOAD: "너트 재장전 대기",
+    FastenState.RELOAD: "너트 재장전",
     FastenState.ERROR: "공정 오류",
 }
 
@@ -117,7 +131,7 @@ def format_step_report(state, event, metrics, nuts, **extra):
         elif state == FastenState.COMPLETE:
             detail = f"안착 {count('seated')}/5 | 분리 {count('released')}/5 | 나사 물림·토크 미검증"
         elif state == FastenState.RELOAD:
-            detail = f"장전 {count('loaded')}/5 | 자동 재장전 미구현"
+            detail = f"장전 {count('loaded')}/5 | {m.get('mode', '박스 장전 모사')}"
         elif state == FastenState.ERROR:
             detail = f"실패 단계: {extra.get('failed_state', '?')} | 원인: {extra.get('reason', '?')}"
     return f"{prefix} : {label}" + (f" | {detail}" if detail else "")
@@ -128,7 +142,55 @@ class CycleInterrupted(Exception):
     """타임라인 정지나 창 닫기에 맞춰 실행 중인 체결을 중단한다."""
 
 
-def run(app, headless, captures, json_log=False):
+def setup_dual_scene(stage):
+    """고정 차량 시험: 원본 USD/USDC는 건드리지 않고 세션 레이어에만 구성한다."""
+    from pxr import Gf, UsdGeom, UsdPhysics
+
+    # 기존 헤드의 Rotor/Nut는 월드 위치에 작성되어 있어 베이스와 함께 평행 이동.
+    base_attr = stage.GetPrimAtPath(ROBOT_PATH).GetAttribute("xformOp:translate")
+    delta = np.array(DUAL_BASE) - np.array(base_attr.Get())
+    base_attr.Set(Gf.Vec3d(*DUAL_BASE))
+    stage.GetPrimAtPath(ROBOT_PATH + "/Joints/root_joint").GetAttribute(
+        "physics:localPos0").Set(Gf.Vec3f(*DUAL_BASE))
+    for root in SPINDLES:
+        for part in ("Rotor", "Nut"):
+            attr = stage.GetPrimAtPath(root + "/" + part).GetAttribute("xformOp:translate")
+            if not attr or attr.Get() is None:
+                raise RuntimeError(f"Missing initial head transform: {root}/{part}")
+            attr.Set(Gf.Vec3d(*(np.array(attr.Get())+delta).tolist()))
+
+    # 후륜은 실제 차량 에셋의 RL 허브 중심에서 기존 휠 에셋을 재사용.
+    rear_hub = stage.GetPrimAtPath(WHEEL_TARGETS["RL"][0])
+    if not rear_hub:
+        raise RuntimeError("Rear hub RL is missing from the car asset")
+    rear_pose = UsdGeom.XformCache().GetLocalToWorldTransform(rear_hub)
+    rear = stage.DefinePrim(WHEEL_TARGETS["RL"][1], "Xform")
+    rear.GetReferences().AddInternalReference("/World/Wheel")
+    UsdGeom.Xformable(rear).MakeMatrixXform().Set(rear_pose)
+    rear.GetAttribute("physics:rigidBodyEnabled").Set(False)
+
+    # 박스는 고정 Collider, 상단 원은 장전 구역을 표시하는 시각 형상.
+    x,y = RELOAD_XY
+    UsdGeom.Xform.Define(stage, RELOAD_BOX)
+    box = UsdGeom.Cube.Define(stage, RELOAD_BOX+"/Body")
+    box.CreateSizeAttr(1.)
+    box.AddTranslateOp().Set(Gf.Vec3d(x,y,RELOAD_TOP/2))
+    box.AddScaleOp().Set(Gf.Vec3d(.42,.36,RELOAD_TOP))
+    box.CreateDisplayColorAttr([Gf.Vec3f(.24,.29,.34)])
+    UsdPhysics.CollisionAPI.Apply(box.GetPrim())
+    disk = UsdGeom.Cylinder.Define(stage, RELOAD_BOX+"/ReloadPort")
+    disk.CreateAxisAttr("Z")
+    disk.CreateRadiusAttr(.102)
+    disk.CreateHeightAttr(.003)
+    disk.AddTranslateOp().Set(Gf.Vec3d(x,y,RELOAD_TOP+.0015))
+    disk.CreateDisplayColorAttr([Gf.Vec3f(.12,.45,.72)])
+    port = UsdGeom.Xform.Define(stage, RELOAD_PORT)
+    port.AddTranslateOp().Set(Gf.Vec3d(x,y,RELOAD_TOP+RELOAD_DOCK_GAP))
+    port.AddRotateXOp().Set(180.)  # 공구 +Z는 아래쪽
+    print(f"[SETUP] base={DUAL_BASE}, rear={tuple(rear_pose.ExtractTranslation())}, reload={RELOAD_XY}", flush=True)
+
+
+def run(app, headless, captures, json_log=False, wheel_order=("RL", "FL")):
     """장면과 재생 상태를 관리한다. 로봇의 단계별 작업은 TaskController가 맡는다."""
     import omni.timeline
     import omni.usd
@@ -150,7 +212,7 @@ def run(app, headless, captures, json_log=False):
     sim = SimulationContext(physics_dt=dt, rendering_dt=1 / 60, stage_units_in_meters=1,
                             physics_prim_path="/World/Physics")
     timeline = omni.timeline.get_timeline_interface()
-    timeline.set_end_time(60.)
+    timeline.set_end_time(300.)
     timeline.set_looping(False)
     timeline.commit()
     restart = False
@@ -172,7 +234,7 @@ def run(app, headless, captures, json_log=False):
             restart = True
             timeline.stop()
 
-        set_camera_view(eye=[4.4, 5.4, 3.0], target=[1.3, 1.5, 1.1])
+        set_camera_view(eye=[4.4, 5.4, 3.5], target=[0., 1.5, 1.1])
         window = ui.Window("CN7 Fastening", width=520, height=120)
         with window.frame, ui.VStack(spacing=4):
             status = ui.Label("Ready")
@@ -186,9 +248,9 @@ def run(app, headless, captures, json_log=False):
 
     active_status = "IDLE"
 
-    def state_changed(state, event):
+    def state_changed(state, event, wheel_id):
         nonlocal active_status
-        active_status = f"STEP {state.value:02d} | {state.name} | {event}"
+        active_status = f"{wheel_id} | STEP {state.value:02d} | {state.name} | {event}"
         if not headless:
             status.text = active_status
 
@@ -208,7 +270,17 @@ def run(app, headless, captures, json_log=False):
     session = stage.GetSessionLayer()
     # 관절 명령과 안착 조인트는 임시 레이어에 쓴다. 재시작 때 비우면 너트가 소켓에 고정된 초기 상태로 돌아간다.
     cycle_layer = Sdf.Layer.CreateAnonymous("fasten_cycle.usda")
+    setup_layer = Sdf.Layer.CreateAnonymous("fasten_dual_setup.usda")
+    session.subLayerPaths.insert(0, setup_layer.identifier)
     session.subLayerPaths.insert(0, cycle_layer.identifier)
+    try:
+        with Usd.EditContext(stage, setup_layer):
+            setup_dual_scene(stage)
+    except Exception:
+        session.subLayerPaths.remove(cycle_layer.identifier)
+        session.subLayerPaths.remove(setup_layer.identifier)
+        stop_subscription.unsubscribe()
+        raise
     last_result = 0
     timeline.play()
     timeline.commit()
@@ -217,7 +289,8 @@ def run(app, headless, captures, json_log=False):
             try:
                 sim.initialize_physics()
                 with Usd.EditContext(stage, cycle_layer):
-                    last_result = TaskController(app, stage, dt, step, captures, state_changed, json_log=json_log).run()
+                    last_result = TaskController(app, stage, dt, step, captures, state_changed,
+                                                 json_log=json_log, wheel_order=wheel_order).run()
             except CycleInterrupted:
                 if headless:
                     return 1
@@ -231,7 +304,7 @@ def run(app, headless, captures, json_log=False):
             if not stopped and not restart:
                 timeline.pause()
                 timeline.commit()
-                status.text = "COMPLETE · Reload required · Restart resets scene" if last_result == 0 else f"Failed · {active_status} · Restart to retry"
+                status.text = "COMPLETE · Reloaded · Restart resets scene" if last_result == 0 else f"Failed · {active_status} · Restart to retry"
                 while not stopped and not restart and is_open():
                     if timeline.is_playing():
                         timeline.pause()
@@ -262,6 +335,7 @@ def run(app, headless, captures, json_log=False):
             timeline.stop()
             timeline.commit()
         session.subLayerPaths.remove(cycle_layer.identifier)
+        session.subLayerPaths.remove(setup_layer.identifier)
     return last_result
 
 
@@ -270,10 +344,10 @@ class TaskController:
     """명시적 공정 상태 + 완료 조건. 기존 단독 시험용 blocking 실행 방식 유지.
 
     ENGAGE/LOCK은 좌표 및 Joint 기반 모사이며 실제 나사 물림/토크가 아니다.
-    RELOAD는 필요한 상태만 보고한다. 자동 재장전 장치는 아직 없다.
+    RELOAD는 박스에서 신규 너트를 생성·결합하는 공급 모사이다.
     """
 
-    def __init__(self, app, stage, dt, step, captures, on_state=None, json_log=False):
+    def __init__(self, app, stage, dt, step, captures, on_state=None, json_log=False, wheel_order=("RL", "FL")):
         self.app, self.stage, self.dt = app, stage, dt
         self.step, self.captures = step, captures
         self.on_state = on_state
@@ -288,15 +362,23 @@ class TaskController:
         self.speeds = []
         self.reload_required = False
         self.cycle_complete = False
+        self.wheel_order = tuple(wheel_order)
+        self.target_wheel = self.wheel_order[0]
+        self.wheel_status = {w: "WAITING" for w in self.wheel_order}
+        self.nut_paths = [root+"/Nut" for root in SPINDLES]
+        self.hold_paths = [root+"/SocketRetention" for root in SPINDLES]
+        self.batch_id = 0
+        self.finished_nuts = {}  # 체결 완료 너트의 경로와 안착 위치 저장
+        self.angles = np.zeros(6)  # 현재 명령 관절각; 다음 휠에서도 유지
 
     def report(self, event, **extra):
         payload = dict(state=self.state.name, event=event, metrics=self.metrics,
-                       nuts=self.nut_status, **extra)
-        print(format_step_report(self.state, event, self.metrics, self.nut_status, **extra), flush=True)
-        #if self.json_log:
-            #print("FASTEN_STATE " + json.dumps(payload, ensure_ascii=False), flush=True)
+                       nuts=self.nut_status, wheel=self.target_wheel, wheel_status=self.wheel_status, **extra)
+        print(f"[{self.target_wheel}] " + format_step_report(self.state, event, self.metrics, self.nut_status, **extra), flush=True)
+        if self.json_log:
+            print("FASTEN_STATE " + json.dumps(payload, ensure_ascii=False), flush=True)
         if self.on_state:
-            self.on_state(self.state, event)
+            self.on_state(self.state, event, self.target_wheel)
 
     def transition(self, state, action):
         self.state = state
@@ -314,98 +396,121 @@ class TaskController:
             raise RuntimeError(reason)
 
     def run(self):
+        """상위 공정: 대상 휠 변경 → STEP 01~12 → STEP 13 → 다음 휠."""
         try:
-            self.report("READY")
-            # STEP 01: GT 좌표 및 장전 확인. 조건 불충족 시 즉시 ERROR.
-            self.transition(FastenState.DETECT, self.prepare)
-            self.capture("loaded_sockets", [2.12, 2.45, 3.70], [1.8, 2.80, 3.10])
-            # STEP 02: 안전 준비 위치에서 중심 오차와 접근 거리 확인.
-            self.transition(FastenState.CENTER_ALIGN, self.center_align)
-            # STEP 03: 공구 축과 허브 축이 반대 방향으로 평행한지 확인.
-            self.transition(FastenState.AXIS_ALIGN, self.axis_align)
-            # STEP 04: 72도 대칭을 고려해 볼트와 너트 5개 패턴 정렬.
-            self.transition(FastenState.PATTERN_ALIGN, self.pattern_align)
-            # STEP 05: 너트별 스터드 진입점까지 이동 및 오차 판정.
-            self.transition(FastenState.APPROACH, self.align)
-            # STEP 06: 기하학적 진입 확인. 실제 나사산 물림은 미구현.
-            self.transition(FastenState.ENGAGE, self.engage)
-            # STEP 07: 실측 회전수로 피치 기반 전진량 계산.
-            start, turns = self.transition(FastenState.FASTENING, self.spin)
-            # STEP 08: 너트별 안착 위치와 회전수 오차 검사.
-            seated = self.transition(FastenState.SEATING_CHECK, lambda: self.seat(start, turns))
-            # STEP 09: 안착된 너트를 World Joint로 고정 (고정 시험 전용).
-            self.transition(FastenState.LOCK, self.lock)
-            # STEP 10: 소켓의 유지 Joint를 해제하고 분리 여부 확인.
-            self.transition(FastenState.RELEASE, self.release)
-            # STEP 11: 공구 후퇴 후 이격 거리 및 너트 잔류 확인.
-            self.transition(FastenState.RETRACT, lambda: self.retract(seated))
-            self.capture("seated_nuts", [1.66, 1.10, 1.07], [1.36, .85, .94])
-            self.state = FastenState.COMPLETE
-            self.metrics = {"completion_mode": "joint_based_simulation",
-                            "physical_thread_engagement_verified": False,
-                            "torque_verified": False}
+            for wheel_id in self.wheel_order:
+                self.target_wheel = wheel_id
+                self.wheel_status[wheel_id] = "FASTENING"
+                self.completed = []
+                self.state = FastenState.IDLE
+                self.metrics = {}
+                self.report("READY")
+                self.run_fastening()
+                self.reload_required = True
+                self.transition(FastenState.RELOAD, self.reload)
+                self.verify_finished_nuts()
             self.cycle_complete = True
-            self.completed.append(self.state.name)
-            self.report("PASS")
-            self.state = FastenState.RELOAD
-            self.reload_required = True
-            self.metrics = {"implemented": False, "required": True, "loaded_count": 0}
-            self.report("PENDING", reason="Single-wheel test complete; automatic reload not implemented")
-            return 0   # 한 휠의 모사 체결 성공. 재장전 성공이 아님.
+            self.state = FastenState.IDLE
+            self.metrics = {"loaded_count": 5}
+            self.report("READY")
+            print(f"[SIDE COMPLETE] {self.wheel_status} | 장전 5/5 | 고정 차량 체결 모사", flush=True)
+            return 0
         except CycleInterrupted:
             self.report("INTERRUPTED")
             raise
         except Exception as exc:
             failed_state = self.state.name
+            if self.wheel_status[self.target_wheel] != "COMPLETE":
+                self.wheel_status[self.target_wheel] = "ERROR"
             self.state = FastenState.ERROR
             self.report("FAIL", failed_state=failed_state, reason=str(exc))
             raise
         finally:
             self.stop_spindles()
 
+    def run_fastening(self):
+        """하위 공정: 하나의 휠에 대해 기존 STEP 01~12를 재사용."""
+        self.transition(FastenState.DETECT, self.prepare)
+        self.capture(f"{self.target_wheel}_loaded_sockets", self.hub_xyz + [1., 2., 1.5], self.hub_xyz)
+        # STEP 02: 안전 준비 위치에서 중심 오차와 접근 거리 확인.
+        self.transition(FastenState.CENTER_ALIGN, self.center_align)
+        # STEP 03: 공구 축과 허브 축이 반대 방향으로 평행한지 확인.
+        self.transition(FastenState.AXIS_ALIGN, self.axis_align)
+        # STEP 04: 72도 대칭을 고려해 볼트와 너트 5개 패턴 정렬.
+        self.transition(FastenState.PATTERN_ALIGN, self.pattern_align)
+        # STEP 05: 너트별 스터드 진입점까지 이동 및 오차 판정.
+        self.transition(FastenState.APPROACH, self.align)
+        # STEP 06: 기하학적 진입 확인. 실제 나사산 물림은 미구현.
+        self.transition(FastenState.ENGAGE, self.engage)
+        # STEP 07: 실측 회전수로 피치 기반 전진량 계산.
+        start, turns = self.transition(FastenState.FASTENING, self.spin)
+        # STEP 08: 너트별 안착 위치와 회전수 오차 검사.
+        seated = self.transition(FastenState.SEATING_CHECK, lambda: self.seat(start, turns))
+        # STEP 09: 안착된 너트를 World Joint로 고정 (고정 시험 전용).
+        self.transition(FastenState.LOCK, self.lock)
+        # STEP 10: 소켓의 유지 Joint를 해제하고 분리 여부 확인.
+        self.transition(FastenState.RELEASE, self.release)
+        # STEP 11: 공구 후퇴 후 이격 거리 및 너트 잔류 확인.
+        self.transition(FastenState.RETRACT, lambda: self.retract(seated))
+        self.capture(f"{self.target_wheel}_seated_nuts", self.hub_xyz + [.30, .40, .13], self.hub_xyz)
+        self.finished_nuts[self.target_wheel] = (tuple(self.nut_paths), seated.copy())
+        self.verify_finished_nuts()
+        self.state = FastenState.COMPLETE
+        self.metrics = {"completion_mode": "joint_based_simulation",
+                        "physical_thread_engagement_verified": False,
+                        "torque_verified": False}
+        self.wheel_status[self.target_wheel] = "COMPLETE"
+        self.completed.append(self.state.name)
+        self.report("PASS")
+
     def prepare(self):
         from isaacsim.core.prims import SingleXFormPrim
         from pxr import UsdPhysics, UsdGeom
 
-        wheel = SingleXFormPrim("/World/Wheel", reset_xform_properties=False)
+        self.hub_path, wheel_path = WHEEL_TARGETS[self.target_wheel]
+        self.require(bool(self.stage.GetPrimAtPath(wheel_path)), f"Missing wheel: {wheel_path}")
+        wheel = SingleXFormPrim(wheel_path, reset_xform_properties=False)
         base = SingleXFormPrim(f"{ROBOT_PATH}/base_link", reset_xform_properties=False)
         self.tcp = SingleXFormPrim(f"{ROBOT_PATH}/link_6/TCP", reset_xform_properties=False)
         self.wheel_xyz, wheel_wxyz = wheel.get_world_pose()
         self.base_xyz, base_wxyz = base.get_world_pose()
-        hub = SingleXFormPrim(HUB_PATH, reset_xform_properties=False)
+        hub = SingleXFormPrim(self.hub_path, reset_xform_properties=False)
         self.hub_xyz, hub_wxyz = hub.get_world_pose()
         for pose in (self.wheel_xyz, wheel_wxyz, self.base_xyz, base_wxyz, self.hub_xyz, hub_wxyz):
             self.require(np.all(np.isfinite(pose)), "Invalid ground truth pose")
         self.outward = Rotation.from_quat(hub_wxyz, scalar_first=True).apply([0, 0, 1])
-        # 원래 Arm FK와 고정 FL 시험 씬의 제한을 명시적으로 유지한다.
+        # 원래 Arm FK와 고정 좌측 시험 씬의 제한을 명시적으로 유지한다.
         self.require(np.allclose(self.outward, [0, 1, 0], atol=1e-5) and
                      np.allclose(np.abs(base_wxyz), [1, 0, 0, 0], atol=1e-5),
-                     "Only fixed left-front fixture and unrotated robot base are supported")
+                     "Only fixed left-side fixtures and unrotated robot base are supported")
         self.target = self.hub_xyz + self.outward * (NUT_SEAT + NUT_LENGTH + .08)
         self.flange_target = self.target + self.outward * TOOL_LENGTH
         self.arm = Arm(ROBOT_URDF)
-        self.angles = self.arm.solve(self.base_xyz, self.flange_target, side=1)
+        self.rotation = np.array([[1.,0.,0.],[0.,0.,-1.],[0.,1.,0.]])
+        self.goal_angles = self.arm.solve(self.base_xyz, self.flange_target, side=1)
         self.arm_drives = [self.stage.GetPrimAtPath(f"{ROBOT_PATH}/Joints/joint_{i}")
                            .GetAttribute("drive:angular:physics:targetPosition") for i in range(1, 7)]
         self.require(all(bool(d) for d in self.arm_drives), "Missing arm drive")
-        self.nuts = [SingleXFormPrim(root + "/Nut", reset_xform_properties=False) for root in SPINDLES]
+        self.nuts = [SingleXFormPrim(path, reset_xform_properties=False) for path in self.nut_paths]
+        self.nut_status = [dict(loaded=False, aligned=False, engaged_model=False,
+                                seated=False, locked=False, released=False) for _ in SPINDLES]
         self.speeds = []
         for i, root in enumerate(SPINDLES):
             bearing = self.stage.GetPrimAtPath(root + "/Bearing")
             self.require(bool(bearing) and bearing.HasAPI(UsdPhysics.DriveAPI, "angular"),
                          f"Missing spindle drive {root}")
             self.speeds.append(UsdPhysics.DriveAPI.Get(bearing, "angular").CreateTargetVelocityAttr(0.))
-            hold = UsdPhysics.FixedJoint.Get(self.stage, root + "/SocketRetention")
+            hold = UsdPhysics.FixedJoint.Get(self.stage, self.hold_paths[i])
             loaded = (bool(hold) and hold.GetJointEnabledAttr().Get() and
                       list(map(str, hold.GetBody0Rel().GetTargets())) == [root + "/Rotor"] and
-                      list(map(str, hold.GetBody1Rel().GetTargets())) == [root + "/Nut"])
+                      list(map(str, hold.GetBody1Rel().GetTargets())) == [self.nut_paths[i]])
             self.nut_status[i]["loaded"] = bool(loaded)
         self.require(all(n["loaded"] for n in self.nut_status), "Initial five nuts are not retained")
-        # 기존 고정 FL 씬의 스터드 끝점. 기울어진 실시간 허브에는 적용 불가.
+        # 고정 좌측 씬의 스터드 끝점. 기울어진 실시간 허브에는 적용 불가.
         bounds = UsdGeom.BBoxCache(0, [UsdGeom.Tokens.default_])
         tips = []
         for i in range(len(SPINDLES)):
-            stud = self.stage.GetPrimAtPath(f"{HUB_PATH}/Stud_{i}")
+            stud = self.stage.GetPrimAtPath(f"{self.hub_path}/Stud_{i}")
             self.require(bool(stud), f"Missing stud {i}")
             box = bounds.ComputeWorldBound(stud).ComputeAlignedRange()
             self.require(not box.IsEmpty(), f"Empty stud bound {i}")
@@ -421,6 +526,7 @@ class TaskController:
                         "hub_xyz_m": self.hub_xyz.tolist(), "target_tcp_m": self.target.tolist(),
                         "wheel_hub_lateral_offset_mm": float(np.linalg.norm(self.planar(self.wheel_xyz-self.hub_xyz))*1000),
                         "required_turns": self.turns_required}
+        self.verify_loaded()  # 장전 관계와 실제 너트 위치를 함께 검증
 
     def planar(self, vector):
         vector = np.asarray(vector)
@@ -432,7 +538,7 @@ class TaskController:
 
     def solve_pose(self, target, rotation, seed):
         # Arm.solve()은 고정 방향만 지원한다. 같은 FK/Jacobian을 이용해 목표 자세를 확장.
-        q = np.array(seed, dtype=float, copy=True)
+        q = np.clip(np.array(seed, dtype=float, copy=True), self.arm.lower, self.arm.upper)
         for _ in range(150):
             frames = self.arm.fk(self.base_xyz, q)
             p, r, _ = frames[-1]
@@ -470,15 +576,8 @@ class TaskController:
         return c, z, a
 
     def center_align(self):
-        # 기존 접근 궤적: 베이스 회전 후 팔 접기. 안전거리에서 중심 정렬.
-        turned = np.zeros_like(self.angles)
-        turned[0] = self.angles[0]
-        for start, goal in ((np.zeros_like(turned), turned), (turned, self.angles)):
-            for frame in range(720):
-                fraction = min((frame + 1) * self.dt / 3, 1)
-                blend = fraction**2 * (3 - 2*fraction)
-                self.command_arm(start + (goal-start)*blend)
-                self.step(frame)
+        # 실제 이전 명령 자세에서 공통 경유 자세를 거쳐 다음 휠 준비 자세로 이동.
+        self.move_via_upright(self.goal_angles)
         for _ in range(30):
             c,z,_ = self.update_tcp_metrics()
             if c <= CENTER_TOL and z <= STANDOFF_TOL:
@@ -633,26 +732,26 @@ class TaskController:
 
     def lock(self):
         from pxr import Gf, UsdPhysics
-        # 고정 FL 시험에 한해 World 고정. 차량 이동을 위한 Hub 결합은 미구현.
+        # 고정 차량 시험에 한해 World 고정. 차량 이동을 위한 Hub 결합은 미구현.
         # LOCK과 RELEASE 사이에는 physics step을 진행하지 않는다.
         for i,(root,nut) in enumerate(zip(SPINDLES,self.nuts)):
             xyz,quat = nut.get_world_pose()
-            lock = UsdPhysics.FixedJoint.Define(self.stage,root+"/SeatedJoint")
-            lock.CreateBody1Rel().SetTargets([root+"/Nut"])
+            lock = UsdPhysics.FixedJoint.Define(self.stage, f"/World/FastenedJoints/{self.target_wheel}/Nut_{i}")
+            lock.CreateBody1Rel().SetTargets([self.nut_paths[i]])
             lock.CreateLocalPos0Attr(Gf.Vec3f(*xyz.tolist()))
             lock.CreateLocalRot0Attr(Gf.Quatf(float(quat[0]),Gf.Vec3f(*quat[1:].tolist())))
             lock.CreateExcludeFromArticulationAttr(True)
             lock.CreateJointEnabledAttr(True)
             self.nut_status[i]["locked"] = bool(lock.GetJointEnabledAttr().Get() and
                 not lock.GetBody0Rel().GetTargets() and
-                list(map(str,lock.GetBody1Rel().GetTargets())) == [root+"/Nut"])
+                list(map(str,lock.GetBody1Rel().GetTargets())) == [self.nut_paths[i]])
         self.metrics = {"mode":"world_fixed_joint", "hub_attachment":False}
         self.require(all(n["locked"] for n in self.nut_status), "SeatedJoint creation failed")
 
     def release(self):
         from pxr import UsdPhysics
         for i,root in enumerate(SPINDLES):
-            hold = UsdPhysics.FixedJoint.Get(self.stage,root+"/SocketRetention")
+            hold = UsdPhysics.FixedJoint.Get(self.stage,self.hold_paths[i])
             hold.CreateJointEnabledAttr(False)
             released = not hold.GetJointEnabledAttr().Get()
             self.nut_status[i]["released"] = bool(released)
@@ -670,6 +769,166 @@ class TaskController:
         self.metrics = {"nut_drift_mm":(movement*1000).tolist(),"tcp_clearance_mm":retreat*1000}
         self.require(movement.max()<SEAT_TOL and retreat>RETRACT_CLEARANCE,
                      "Retraction or nut retention check failed")
+        self.angles = retract.copy()  # 다음 장전/체결 이동의 시작점
+
+    # ── STEP 13: 고정식 박스에서 신규 너트 장전 (공급 동작 모사) ─────────
+    def move_joints(self, goal, seconds=3.):
+        """현재 명령 관절각에서 목표까지 smoothstep, 충분한 안정화 포함."""
+        start = self.angles.copy()
+        goal = np.asarray(goal, dtype=float)
+        # smoothstep 최대 속도 = 1.5 * 이동각 / 시간. URDF 속도 한계 여유 적용.
+        seconds = max(seconds, float(np.max(1.5*np.abs(goal-start)/(.7*self.arm.speed))))
+        frames = max(1, int(np.ceil(seconds/self.dt)))
+        for frame in range(frames):
+            t = (frame+1)/frames
+            self.command_arm(start+(goal-start)*(t*t*(3-2*t)))
+            self.step(frame)
+        self.angles = goal.copy()
+        self.settle(120)
+
+    def move_via_upright(self, goal):
+        """기존 수직 준비 자세를 중간 경유점으로 재사용. 충돌 계획은 별도 검증 필요."""
+        upright = np.zeros(6)
+        upright[0] = self.angles[0]
+        if np.linalg.norm(self.angles-upright) > 1e-8:
+            self.move_joints(upright)
+        upright[0] = goal[0]
+        if np.linalg.norm(self.angles-upright) > 1e-8:
+            self.move_joints(upright)
+        self.move_joints(goal)
+
+    def reload_log(self, number, text):
+        print(f"[{self.target_wheel}][STEP 13-{number}] {text}", flush=True)
+
+    def reload_pose(self, tcp_xyz, rotation, seed):
+        """장전 TCP 위치 → 플랜지 위치. 공구 +Z는 박스 상면 방향."""
+        flange = np.asarray(tcp_xyz)-rotation[:,2]*TOOL_LENGTH
+        return self.solve_pose(flange, rotation, seed)
+
+    def plan_reload(self, dock, rotation):
+        # 회전각 자유인 원형 포트: 4개 yaw 후보와 seed에서 연속 도달 자세 탐색.
+        above = dock+np.array([0.,0.,RELOAD_APPROACH])
+        choices = []
+        for yaw in (0.,90.,180.,270.):
+            desired = Rotation.from_euler("z",yaw,degrees=True).as_matrix() @ rotation
+            for seed in (np.zeros(6), self.angles, *np.random.default_rng(41).uniform(-2.4,2.4,(6,6))):
+                try:
+                    pre = self.reload_pose(above,desired,seed)
+                    at = self.reload_pose(dock,desired,pre)
+                    back = self.reload_pose(above,desired,at)
+                    score = np.linalg.norm(pre) + 2*np.linalg.norm(at-pre) + np.linalg.norm(back-pre)
+                    choices.append((score,desired,pre,at,back))
+                except RuntimeError:
+                    continue
+        self.require(bool(choices), "Reload box IK unreachable")
+        return min(choices,key=lambda item:item[0])[1:]
+
+    def check_reload_pose(self, goal, rotation):
+        xyz,quat = self.tcp.get_world_pose()
+        error = np.asarray(xyz)-goal
+        actual = Rotation.from_quat(quat,scalar_first=True).as_matrix()
+        axis = float(np.degrees(np.arccos(np.clip(actual[:,2]@rotation[:,2],-1,1))))
+        lateral = float(np.linalg.norm(error[:2]))
+        height = float(abs(error[2]))
+        self.metrics.update(reload_xy_error_mm=lateral*1000, reload_z_error_mm=height*1000,
+                            reload_axis_error_deg=axis)
+        return lateral<=RELOAD_POS_TOL and height<=RELOAD_POS_TOL and axis<=RELOAD_AXIS_TOL
+
+    def spawn_nuts(self):
+        """실제 Rotor 월드 자세에서 신규 강체 생성. 기존 체결 너트는 변경하지 않는다."""
+        from isaacsim.core.prims import SingleXFormPrim
+        from pxr import Gf, UsdGeom, UsdPhysics
+        from sim_util import body, constrain, mass_properties
+        self.batch_id += 1
+        batch = f"/World/ReloadedNuts/Batch_{self.batch_id:03d}"
+        UsdGeom.Xform.Define(self.stage,batch)
+        paths, holds = [], []
+        for i,root in enumerate(SPINDLES):
+            rotor = self.stage.GetPrimAtPath(root+"/Rotor")
+            xyz,quat = SingleXFormPrim(root+"/Rotor",reset_xform_properties=False).get_world_pose()
+            rot = Rotation.from_quat(quat,scalar_first=True)
+            origin = np.asarray(xyz)+rot.apply([0,0,NUT_ROTOR_OFFSET])
+            q = Gf.Quatd(float(quat[0]),Gf.Vec3d(*map(float,quat[1:])))
+            path = batch+f"/Nut_{i}"
+            self.require(not self.stage.GetPrimAtPath(path), f"Duplicate nut: {path}")
+            nut = body(self.stage,path,origin,q,.045)
+            mass_properties(nut,(0,0,-.012),(3e-6,3e-6,3e-6))
+            visual = self.stage.DefinePrim(path+"/Visual","Xform")
+            visual.GetReferences().AddInternalReference(root+"/Nut/Visual")
+            joint_path = batch+f"/Retention_{i}"
+            hold = constrain(UsdPhysics.FixedJoint.Define(self.stage,joint_path),rotor,nut,(0,0,NUT_ROTOR_OFFSET))
+            hold.CreateExcludeFromArticulationAttr(True)
+            hold.CreateJointEnabledAttr(True)
+            paths.append(path); holds.append(joint_path)
+        self.nut_paths, self.hold_paths = paths, holds
+        self.nuts = [SingleXFormPrim(path,reset_xform_properties=False) for path in paths]
+        self.nut_status = [dict(loaded=False,aligned=False,engaged_model=False,seated=False,locked=False,released=False) for _ in paths]
+        self.settle(60)
+        self.verify_loaded()
+
+    def verify_loaded(self):
+        from pxr import UsdPhysics
+        from isaacsim.core.prims import SingleXFormPrim
+        errors = []
+        for i,root in enumerate(SPINDLES):
+            hold = UsdPhysics.FixedJoint.Get(self.stage,self.hold_paths[i])
+            xyz,q = SingleXFormPrim(root+"/Rotor",reset_xform_properties=False).get_world_pose()
+            expected = np.asarray(xyz)+Rotation.from_quat(q,scalar_first=True).apply([0,0,NUT_ROTOR_OFFSET])
+            error = float(np.linalg.norm(self.nuts[i].get_world_pose()[0]-expected))
+            errors.append(error*1000)
+            self.nut_status[i]["loaded"] = bool(hold and hold.GetJointEnabledAttr().Get()
+                and list(map(str,hold.GetBody0Rel().GetTargets()))==[root+"/Rotor"]
+                and list(map(str,hold.GetBody1Rel().GetTargets()))==[self.nut_paths[i]]
+                and error<=ENTRY_TOL)
+        self.metrics.update(loaded_count=sum(n["loaded"] for n in self.nut_status),load_errors_mm=errors)
+        self.require(all(n["loaded"] for n in self.nut_status), "Reload retention/position verification failed")
+
+    def verify_finished_nuts(self):
+        from isaacsim.core.prims import SingleXFormPrim
+        for wheel_id,(paths,seated) in self.finished_nuts.items():
+            positions = np.array([SingleXFormPrim(p,reset_xform_properties=False).get_world_pose()[0] for p in paths])
+            drift = float(np.max(np.linalg.norm(positions-seated,axis=1)))
+            self.require(drift<SEAT_TOL,f"Previously seated {wheel_id} nuts moved: {drift*1000:.3f} mm")
+
+    def reload(self):
+        from isaacsim.core.prims import SingleXFormPrim
+        from pxr import UsdPhysics
+        self.stop_spindles()
+        self.require(all(not n["loaded"] for n in self.nut_status), "Reload requires five empty sockets")
+        self.require(all(not UsdPhysics.FixedJoint.Get(self.stage,p).GetJointEnabledAttr().Get()
+                         for p in self.hold_paths), "Old retention still enabled")
+        self.metrics = {"mode":"박스 장전 모사 (공급기 미모델링)","physical_feed_verified":False}
+        port = SingleXFormPrim(RELOAD_PORT,reset_xform_properties=False)
+        dock,quat = port.get_world_pose()
+        dock = np.asarray(dock,dtype=float)
+        rotation = Rotation.from_quat(quat,scalar_first=True).as_matrix()
+        desired,pre,_,_ = self.plan_reload(dock,rotation)
+        self.reload_log(1,"박스 상단 접근")
+        self.move_via_upright(pre)
+        above = dock+np.array([0.,0.,RELOAD_APPROACH])
+        self.require(self.check_reload_pose(above,desired), "Reload approach pose error")
+        self.reload_log(2,"원형 장전 구역 중심·축 정렬 및 하강")
+        # Cartesian 직선 경유점 IK. 손목 branch는 이전 관절각에서 이어서 계산.
+        for fraction in np.linspace(0.,1.,9)[1:]:
+            q = self.reload_pose(above+(dock-above)*fraction,desired,self.angles)
+            self.move_joints(q,.25)
+        self.reload_log(3,"장전 위치 및 자세 유지 확인")
+        for frame in range(max(1,int(RELOAD_HOLD_SECONDS/self.dt))):
+            self.require(self.check_reload_pose(dock,desired), "Reload docking position/axis out of tolerance")
+            self.step(frame)
+        self.metrics["dock_errors"] = {k:self.metrics[k] for k in ("reload_xy_error_mm","reload_z_error_mm","reload_axis_error_deg")}
+        self.reload_log(4,"신규 너트 5개 생성 및 Fixed Joint 장착")
+        self.spawn_nuts()
+        self.reload_log(5,"장전 상태 확인 및 공구 후퇴")
+        for fraction in np.linspace(0.,1.,9)[1:]:
+            q = self.reload_pose(dock+(above-dock)*fraction,desired,self.angles)
+            self.move_joints(q,.25)
+        self.require(self.check_reload_pose(above,desired), "Reload withdrawal pose error")
+        self.verify_loaded()
+        self.verify_finished_nuts()
+        self.reload_required = False
+        self.metrics["batch_id"] = self.batch_id
+        self.rotation = desired
 
     def capture(self, name, eye, look_at):
         if self.captures is None:
@@ -677,7 +936,7 @@ class TaskController:
         from isaacsim.core.utils.viewports import set_camera_view
         from omni.kit.viewport.utility import capture_viewport_to_file, get_active_viewport
         self.captures.mkdir(parents=True, exist_ok=True)
-        set_camera_view(eye=eye, target=look_at)
+        set_camera_view(eye=list(eye), target=list(look_at))
         viewport = get_active_viewport()
         viewport.set_texture_resolution((1280, 720))
         for _ in range(40):
@@ -1041,6 +1300,8 @@ def check_thread_contact(app):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--json-log", action="store_true", help="상세 상태 JSON도 함께 출력")
+    parser.add_argument("--wheel-order", nargs="+", choices=("RL","FL"), default=["RL","FL"],
+                        help="체결 대상 및 순서 (기본 RL FL)")
     parser.add_argument("--headless", action="store_true", help="Check motion and exit")
     parser.add_argument("--captures", type=Path, help="Save loaded and seated close-ups")
     modes = parser.add_mutually_exclusive_group()
@@ -1048,6 +1309,8 @@ def main():
     modes.add_argument("--build-head", action="store_true", help="5축 체결 헤드 USD 생성")
     modes.add_argument("--check-thread-contact", action="store_true", help="나사면 접촉 시험")
     args = parser.parse_args()
+    if len(set(args.wheel_order)) != len(args.wheel_order):
+        parser.error("Duplicate wheel in --wheel-order")
     headless = args.headless or args.build_robot is not None or args.build_head or args.check_thread_contact
     app = SimulationApp({"headless": headless, "renderer": "RayTracedLighting",
                          "multi_gpu": False, "max_gpu_count": 1})
@@ -1060,7 +1323,7 @@ def main():
             return 0
         if args.check_thread_contact:
             return 0 if check_thread_contact(app) else 1
-        return run(app, args.headless, args.captures, json_log=args.json_log)
+        return run(app, args.headless, args.captures, json_log=args.json_log, wheel_order=args.wheel_order)
     finally:
         # USD 생성은 동기 Export로 끝난다. 생성 모드는 렌더러와 캡처 종료를 기다릴 필요가 없다.
         app.close(skip_cleanup=args.build_robot is not None or args.build_head)

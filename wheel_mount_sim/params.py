@@ -115,10 +115,10 @@ FACE_CONTACT_OFFSET = p("hub_face_contact_offset", .0002, "m", "derived",
 STUD_CONTACT_OFFSET = p("stud_contact_offset", .0003, "m", "derived",
                         "> 3 x travel per step at 20 mm/s (0.083 mm) and stud+pad offsets (0.345 mm) < stud-hole clearance 0.7 mm; "
                         "0.8 mm created false axial contacts at the hole edges (sim dbg27)")
-PILOT_CONTACT_OFFSET = p("pilot_contact_offset", .0002, "m", "derived",
-                         "must catch the bore wall when the hanging wheel tilts on release (0.87 deg x 12 mm = 0.18 mm per "
-                         "few steps): 0.02 mm tunnelled (dbg47). Safe now that the pilot is a polygon prism: the false "
-                         "edge contacts at 0.8 mm came from the native cylinder (dbg39/45)")
+PILOT_CONTACT_OFFSET = p("pilot_contact_offset", .0008, "m", "derived",
+                         ">= 2.5 x travel per step of the cell insertion bench (76 mm/s at 240 Hz = 0.32 mm); 0.2 mm let the "
+                         "pilot jam at 8.9 mm on that bench. 0.02 mm tunnelled on release (dbg47). False edge contacts at "
+                         "0.8 mm came from the native cylinder (dbg39/45), not from this polygon prism")
 PAD_CONTACT_OFFSET = p("pad_contact_offset", .000045, "m", "model", "cell value on the wheel pad: below the 0.08 mm pilot clearance")
 
 
