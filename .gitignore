@@ -1,5 +1,5 @@
-# 로컬 AMR 테스트 (Isaac 맵 + Nav2/RViz) — 커밋하지 않음
-amr_test/
+# 로컬 AMR 작업 (amr_part, 옛 이름 amr_test) (Isaac 맵 + Nav2/RViz) — 커밋하지 않음
+amr_part/
 
 # 개인 진행 기록 (choongman) — 커밋하지 않음
 choongman/
