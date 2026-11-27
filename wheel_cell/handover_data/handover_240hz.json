@@ -1,0 +1,10095 @@
+{
+ "what": "wheel on its hub after the mount robot let go and withdrew, gravity only, settled",
+ "frames": {
+  "car": "CN7 body frame (car at the origin): x forward, y left, z up, metres in the file shown as mm",
+  "hub": "hub body frame: z = wheel axis outboard, hub face at z = OFFSET; x = direction of stud 0 (stud k at 72k deg)"
+ },
+ "model": {
+  "wheel_mass_kg": 17.1,
+  "rim_mass_kg": 9.1,
+  "tire_mass_kg": 8.0,
+  "offset_mm": 46.0,
+  "stud_projection_mm": 30.0,
+  "web_thickness_mm": 14.0,
+  "physics_hz": 240,
+  "seconds": 20.0
+ },
+ "runs": [
+  {
+   "release_depth_mm": 6.0,
+   "seed": 42,
+   "stations": {
+    "FL": {
+     "hub": {
+      "centre_car_mm": [
+       1359.9892,
+       792.5001,
+       939.9846
+      ],
+      "axis_car": [
+       0.0,
+       1.0,
+       -0.0
+      ],
+      "moved_from_design_mm": [
+       -0.0108,
+       0.0001,
+       -0.0154
+      ],
+      "stud0_direction_car": [
+       0.5961,
+       -0.0,
+       -0.8029
+      ],
+      "pilot_diameter_mm": 66.9202
+     },
+     "wheel": {
+      "centre_car_mm": [
+       1359.628,
+       799.6502,
+       938.3123
+      ],
+      "axis_car": [
+       0.0076,
+       0.9993,
+       0.0356
+      ],
+      "orientation_car_wxyz": [
+       0.6437,
+       -0.6188,
+       0.3152,
+       0.3217
+      ],
+      "axial_gap_at_centre_mm": 7.15,
+      "radial_offset_mm": [
+       1.1274,
+       1.2869
+      ],
+      "tilt_deg": 2.086,
+      "tilt_axis_tip_shift_car": [
+       0.0076,
+       -0.0007,
+       0.0356
+      ],
+      "bolt_phase_error_deg": 0.116,
+      "tire_ring_offset_mm": [
+       0.2874,
+       0.2189,
+       -0.0275
+      ]
+     },
+     "studs": [
+      {
+       "index": 0,
+       "stud_tip_car_mm": [
+        1394.0674,
+        868.5001,
+        894.1093
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        57.1477,
+        -0.0164,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1394.0495,
+        860.9872,
+        894.5053
+       ],
+       "face_gap_mm": 8.496,
+       "stud_out_of_web_mm": 7.513,
+       "hole_to_stud_radial_mm": 0.396
+      },
+      {
+       "index": 1,
+       "stud_tip_car_mm": [
+        1326.8577,
+        868.5001,
+        893.413
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6439,
+        54.3626,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1326.8698,
+        861.5191,
+        893.9809
+       ],
+       "face_gap_mm": 9.028,
+       "stud_out_of_web_mm": 6.981,
+       "hole_to_stud_radial_mm": 0.568
+      },
+      {
+       "index": 2,
+       "stud_tip_car_mm": [
+        1305.4707,
+        868.5002,
+        957.08
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2241,
+        33.5835,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1305.5937,
+        859.4132,
+        957.6721
+       ],
+       "face_gap_mm": 6.922,
+       "stud_out_of_web_mm": 9.087,
+       "hole_to_stud_radial_mm": 0.605
+      },
+      {
+       "index": 3,
+       "stud_tip_car_mm": [
+        1359.3828,
+        868.5002,
+        997.1441
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.256,
+        -33.5852,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1359.6241,
+        857.5799,
+        997.5598
+       ],
+       "face_gap_mm": 5.089,
+       "stud_out_of_web_mm": 10.92,
+       "hole_to_stud_radial_mm": 0.481
+      },
+      {
+       "index": 4,
+       "stud_tip_car_mm": [
+        1414.1025,
+        868.5002,
+        958.2151
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6186,
+        -54.3157,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1414.2927,
+        858.5527,
+        958.5206
+       ],
+       "face_gap_mm": 6.062,
+       "stud_out_of_web_mm": 9.947,
+       "hole_to_stud_radial_mm": 0.36
+      }
+     ],
+     "settling": {
+      "gap_mm_over_time": [
+       [
+        0.0,
+        6.026,
+        0.046
+       ],
+       [
+        1.0,
+        6.96,
+        1.944
+       ],
+       [
+        2.0,
+        6.957,
+        1.943
+       ],
+       [
+        3.0,
+        6.971,
+        1.95
+       ],
+       [
+        4.0,
+        6.997,
+        1.945
+       ],
+       [
+        5.0,
+        7.043,
+        1.982
+       ],
+       [
+        6.0,
+        7.067,
+        2.022
+       ],
+       [
+        7.0,
+        7.07,
+        2.027
+       ],
+       [
+        8.0,
+        7.08,
+        2.042
+       ],
+       [
+        9.0,
+        7.082,
+        2.045
+       ],
+       [
+        10.0,
+        7.083,
+        2.047
+       ],
+       [
+        11.0,
+        7.095,
+        2.053
+       ],
+       [
+        12.0,
+        7.095,
+        2.053
+       ],
+       [
+        13.0,
+        7.096,
+        2.054
+       ],
+       [
+        14.0,
+        7.096,
+        2.055
+       ],
+       [
+        15.0,
+        7.096,
+        2.055
+       ],
+       [
+        16.0,
+        7.097,
+        2.056
+       ],
+       [
+        17.0,
+        7.097,
+        2.057
+       ],
+       [
+        18.0,
+        7.097,
+        2.057
+       ],
+       [
+        19.0,
+        7.125,
+        2.055
+       ],
+       [
+        20.0,
+        7.15,
+        2.086
+       ]
+      ],
+      "gap_change_last_1s_mm": 0.0253,
+      "tilt_change_last_1s_deg": 0.0314
+     },
+     "hub_parts_touching": [
+      "Pilot",
+      "PilotTip",
+      "Stud_0",
+      "Stud_1",
+      "Stud_2",
+      "Stud_3",
+      "Stud_4"
+     ],
+     "on_studs": true
+    },
+    "FR": {
+     "hub": {
+      "centre_car_mm": [
+       1359.9856,
+       -792.5001,
+       939.9845
+      ],
+      "axis_car": [
+       0.0,
+       -1.0,
+       0.0
+      ],
+      "moved_from_design_mm": [
+       -0.0144,
+       -0.0001,
+       -0.0155
+      ],
+      "stud0_direction_car": [
+       0.9501,
+       0.0,
+       0.3121
+      ],
+      "pilot_diameter_mm": 66.9333
+     },
+     "wheel": {
+      "centre_car_mm": [
+       1359.7846,
+       -799.9944,
+       938.3684
+      ],
+      "axis_car": [
+       0.0044,
+       -0.9994,
+       0.0344
+      ],
+      "orientation_car_wxyz": [
+       0.7097,
+       0.6861,
+       -0.1094,
+       0.1164
+      ],
+      "axial_gap_at_centre_mm": 7.494,
+      "radial_offset_mm": [
+       -0.6953,
+       -1.4726
+      ],
+      "tilt_deg": 1.99,
+      "tilt_axis_tip_shift_car": [
+       0.0044,
+       0.0006,
+       0.0344
+      ],
+      "bolt_phase_error_deg": 0.183,
+      "tire_ring_offset_mm": [
+       -0.1155,
+       -0.3426,
+       -0.0182
+      ]
+     },
+     "studs": [
+      {
+       "index": 0,
+       "stud_tip_car_mm": [
+        1414.279,
+        -868.5001,
+        957.8309
+       ],
+       "stud_axis_car": [
+        0.0,
+        -1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        57.1513,
+        0.0122,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1414.2796,
+        -859.1006,
+        958.4405
+       ],
+       "face_gap_mm": 6.609,
+       "stud_out_of_web_mm": 9.4,
+       "hole_to_stud_radial_mm": 0.61
+      },
+      {
+       "index": 1,
+       "stud_tip_car_mm": [
+        1359.803,
+        -868.5001,
+        997.1834
+       ],
+       "stud_axis_car": [
+        0.0,
+        -1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6761,
+        54.3995,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1359.6637,
+        -857.9915,
+        997.5499
+       ],
+       "face_gap_mm": 5.5,
+       "stud_out_of_web_mm": 10.509,
+       "hole_to_stud_radial_mm": 0.392
+      },
+      {
+       "index": 2,
+       "stud_tip_car_mm": [
+        1305.5339,
+        -868.5002,
+        957.4962
+       ],
+       "stud_axis_car": [
+        0.0,
+        -1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2677,
+        33.6296,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1305.5773,
+        -859.6004,
+        957.7286
+       ],
+       "face_gap_mm": 7.109,
+       "stud_out_of_web_mm": 8.9,
+       "hole_to_stud_radial_mm": 0.236
+      },
+      {
+       "index": 3,
+       "stud_tip_car_mm": [
+        1326.5203,
+        -868.5002,
+        893.5909
+       ],
+       "stud_axis_car": [
+        0.0,
+        -1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2718,
+        -33.6335,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1326.7659,
+        -861.7038,
+        894.0082
+       ],
+       "face_gap_mm": 9.212,
+       "stud_out_of_web_mm": 6.796,
+       "hole_to_stud_radial_mm": 0.484
+      },
+      {
+       "index": 4,
+       "stud_tip_car_mm": [
+        1393.7439,
+        -868.5001,
+        893.8439
+       ],
+       "stud_axis_car": [
+        0.0,
+        -1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6737,
+        -54.3712,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1393.9476,
+        -861.3949,
+        894.4481
+       ],
+       "face_gap_mm": 8.903,
+       "stud_out_of_web_mm": 7.105,
+       "hole_to_stud_radial_mm": 0.638
+      }
+     ],
+     "settling": {
+      "gap_mm_over_time": [
+       [
+        0.0,
+        6.026,
+        0.056
+       ],
+       [
+        1.0,
+        6.845,
+        1.64
+       ],
+       [
+        2.0,
+        6.846,
+        1.64
+       ],
+       [
+        3.0,
+        6.846,
+        1.64
+       ],
+       [
+        4.0,
+        6.846,
+        1.641
+       ],
+       [
+        5.0,
+        6.847,
+        1.641
+       ],
+       [
+        6.0,
+        6.846,
+        1.641
+       ],
+       [
+        7.0,
+        6.846,
+        1.641
+       ],
+       [
+        8.0,
+        6.846,
+        1.641
+       ],
+       [
+        9.0,
+        6.846,
+        1.641
+       ],
+       [
+        10.0,
+        6.846,
+        1.641
+       ],
+       [
+        11.0,
+        6.846,
+        1.64
+       ],
+       [
+        12.0,
+        6.847,
+        1.641
+       ],
+       [
+        13.0,
+        6.846,
+        1.641
+       ],
+       [
+        14.0,
+        6.891,
+        1.657
+       ],
+       [
+        15.0,
+        7.09,
+        1.762
+       ],
+       [
+        16.0,
+        7.424,
+        1.958
+       ],
+       [
+        17.0,
+        7.425,
+        1.959
+       ],
+       [
+        18.0,
+        7.492,
+        1.986
+       ],
+       [
+        19.0,
+        7.494,
+        1.988
+       ],
+       [
+        20.0,
+        7.494,
+        1.99
+       ]
+      ],
+      "gap_change_last_1s_mm": 0.0005,
+      "tilt_change_last_1s_deg": 0.0015
+     },
+     "hub_parts_touching": [
+      "Pilot",
+      "PilotTip",
+      "Stud_0",
+      "Stud_1",
+      "Stud_2",
+      "Stud_3",
+      "Stud_4"
+     ],
+     "on_studs": true
+    },
+    "RL": {
+     "hub": {
+      "centre_car_mm": [
+       -1359.985,
+       798.0006,
+       939.9841
+      ],
+      "axis_car": [
+       -0.0,
+       1.0,
+       -0.0
+      ],
+      "moved_from_design_mm": [
+       0.015,
+       0.0006,
+       -0.0159
+      ],
+      "stud0_direction_car": [
+       0.5735,
+       -0.0,
+       -0.8192
+      ],
+      "pilot_diameter_mm": 66.9103
+     },
+     "wheel": {
+      "centre_car_mm": [
+       -1359.9786,
+       806.0385,
+       937.8356
+      ],
+      "axis_car": [
+       -0.0001,
+       0.9989,
+       0.0464
+      ],
+      "orientation_car_wxyz": [
+       0.6415,
+       -0.6125,
+       0.3189,
+       0.3341
+      ],
+      "axial_gap_at_centre_mm": 8.038,
+      "radial_offset_mm": [
+       1.7638,
+       1.2268
+      ],
+      "tilt_deg": 2.657,
+      "tilt_axis_tip_shift_car": [
+       -0.0001,
+       -0.0011,
+       0.0464
+      ],
+      "bolt_phase_error_deg": -0.016,
+      "tire_ring_offset_mm": [
+       0.2672,
+       0.197,
+       -0.0344
+      ]
+     },
+     "studs": [
+      {
+       "index": 0,
+       "stud_tip_car_mm": [
+        -1327.2194,
+        874.0003,
+        893.1777
+       ],
+       "stud_axis_car": [
+        -0.0,
+        1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        57.1348,
+        -0.0016,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1327.22,
+        868.1468,
+        893.8407
+       ],
+       "face_gap_mm": 10.162,
+       "stud_out_of_web_mm": 5.853,
+       "hole_to_stud_radial_mm": 0.663
+      },
+      {
+       "index": 1,
+       "stud_tip_car_mm": [
+        -1394.3764,
+        874.0002,
+        894.3752
+       ],
+       "stud_axis_car": [
+        -0.0,
+        1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6421,
+        54.3291,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1394.3931,
+        868.0868,
+        895.0364
+       ],
+       "face_gap_mm": 10.102,
+       "stud_out_of_web_mm": 5.913,
+       "hole_to_stud_radial_mm": 0.661
+      },
+      {
+       "index": 2,
+       "stud_tip_car_mm": [
+        -1413.9816,
+        874.0006,
+        958.5608
+       ],
+       "stud_axis_car": [
+        -0.0,
+        1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.1837,
+        33.5826,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1414.0122,
+        865.1069,
+        959.2227
+       ],
+       "face_gap_mm": 7.121,
+       "stud_out_of_web_mm": 8.894,
+       "hole_to_stud_radial_mm": 0.663
+      },
+      {
+       "index": 3,
+       "stud_tip_car_mm": [
+        -1358.9307,
+        874.001,
+        997.1047
+       ],
+       "stud_axis_car": [
+        -0.0,
+        1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.191,
+        -33.6203,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1358.9642,
+        863.3254,
+        997.6963
+       ],
+       "face_gap_mm": 5.339,
+       "stud_out_of_web_mm": 10.676,
+       "hole_to_stud_radial_mm": 0.592
+      },
+      {
+       "index": 4,
+       "stud_tip_car_mm": [
+        -1305.3233,
+        874.0008,
+        956.6896
+       ],
+       "stud_axis_car": [
+        -0.0,
+        1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.66,
+        -54.361,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1305.3237,
+        865.2041,
+        957.288
+       ],
+       "face_gap_mm": 7.218,
+       "stud_out_of_web_mm": 8.797,
+       "hole_to_stud_radial_mm": 0.598
+      }
+     ],
+     "settling": {
+      "gap_mm_over_time": [
+       [
+        0.0,
+        6.03,
+        0.053
+       ],
+       [
+        1.0,
+        6.863,
+        2.013
+       ],
+       [
+        2.0,
+        6.863,
+        2.013
+       ],
+       [
+        3.0,
+        6.863,
+        2.013
+       ],
+       [
+        4.0,
+        6.863,
+        2.013
+       ],
+       [
+        5.0,
+        6.862,
+        2.013
+       ],
+       [
+        6.0,
+        6.863,
+        2.013
+       ],
+       [
+        7.0,
+        6.864,
+        2.012
+       ],
+       [
+        8.0,
+        7.031,
+        2.132
+       ],
+       [
+        9.0,
+        7.06,
+        2.165
+       ],
+       [
+        10.0,
+        7.073,
+        2.178
+       ],
+       [
+        11.0,
+        7.127,
+        2.181
+       ],
+       [
+        12.0,
+        7.134,
+        2.189
+       ],
+       [
+        13.0,
+        7.156,
+        2.182
+       ],
+       [
+        14.0,
+        7.156,
+        2.182
+       ],
+       [
+        15.0,
+        7.156,
+        2.182
+       ],
+       [
+        16.0,
+        7.207,
+        2.193
+       ],
+       [
+        17.0,
+        7.25,
+        2.225
+       ],
+       [
+        18.0,
+        7.89,
+        2.698
+       ],
+       [
+        19.0,
+        7.967,
+        2.694
+       ],
+       [
+        20.0,
+        8.038,
+        2.657
+       ]
+      ],
+      "gap_change_last_1s_mm": 0.0705,
+      "tilt_change_last_1s_deg": -0.0369
+     },
+     "hub_parts_touching": [
+      "Pilot",
+      "PilotTip",
+      "Stud_0",
+      "Stud_1",
+      "Stud_2",
+      "Stud_3",
+      "Stud_4"
+     ],
+     "on_studs": true
+    },
+    "RR": {
+     "hub": {
+      "centre_car_mm": [
+       -1359.9871,
+       -798.0017,
+       939.9829
+      ],
+      "axis_car": [
+       -0.0,
+       -1.0,
+       -0.0
+      ],
+      "moved_from_design_mm": [
+       0.0129,
+       -0.0017,
+       -0.0171
+      ],
+      "stud0_direction_car": [
+       0.9527,
+       -0.0,
+       0.304
+      ],
+      "pilot_diameter_mm": 66.9128
+     },
+     "wheel": {
+      "centre_car_mm": [
+       -1359.6766,
+       -814.8145,
+       935.3691
+      ],
+      "axis_car": [
+       -0.0055,
+       -0.9958,
+       0.0913
+      ],
+      "orientation_car_wxyz": [
+       0.7302,
+       0.6657,
+       -0.1058,
+       0.1119
+      ],
+      "axial_gap_at_centre_mm": 16.813,
+      "radial_offset_mm": [
+       -1.1066,
+       -4.4895
+      ],
+      "tilt_deg": 5.248,
+      "tilt_axis_tip_shift_car": [
+       -0.0055,
+       0.0042,
+       0.0913
+      ],
+      "bolt_phase_error_deg": -0.032,
+      "tire_ring_offset_mm": [
+       -0.1124,
+       -0.3514,
+       -0.0499
+      ]
+     },
+     "studs": [
+      {
+       "index": 0,
+       "stud_tip_car_mm": [
+        -1305.5139,
+        -874.0022,
+        957.3704
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        57.1816,
+        0.007,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1305.5644,
+        -873.2734,
+        958.1846
+       ],
+       "face_gap_mm": 15.33,
+       "stud_out_of_web_mm": 0.729,
+       "hole_to_stud_radial_mm": 0.816
+      },
+      {
+       "index": 1,
+       "stud_tip_car_mm": [
+        -1359.6468,
+        -874.0032,
+        997.1181
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6935,
+        54.3296,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1359.715,
+        -869.3478,
+        997.7569
+       ],
+       "face_gap_mm": 11.403,
+       "stud_out_of_web_mm": 4.655,
+       "hole_to_stud_radial_mm": 0.642
+      },
+      {
+       "index": 2,
+       "stud_tip_car_mm": [
+        -1414.2368,
+        -874.0022,
+        957.9261
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2271,
+        33.5873,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1414.2671,
+        -872.6296,
+        958.6804
+       ],
+       "face_gap_mm": 14.686,
+       "stud_out_of_web_mm": 1.373,
+       "hole_to_stud_radial_mm": 0.755
+      },
+      {
+       "index": 3,
+       "stud_tip_car_mm": [
+        -1393.828,
+        -874.0005,
+        893.9099
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2445,
+        -33.6034,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1393.8315,
+        -878.5834,
+        894.9575
+       ],
+       "face_gap_mm": 20.642,
+       "stud_out_of_web_mm": -4.583,
+       "hole_to_stud_radial_mm": 1.048
+      },
+      {
+       "index": 4,
+       "stud_tip_car_mm": [
+        -1326.6212,
+        -874.0005,
+        893.5337
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6673,
+        -54.3921,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1326.6495,
+        -878.9813,
+        894.6511
+       ],
+       "face_gap_mm": 21.039,
+       "stud_out_of_web_mm": -4.981,
+       "hole_to_stud_radial_mm": 1.118
+      }
+     ],
+     "settling": {
+      "gap_mm_over_time": [
+       [
+        0.0,
+        6.03,
+        0.063
+       ],
+       [
+        1.0,
+        6.649,
+        1.874
+       ],
+       [
+        2.0,
+        6.649,
+        1.874
+       ],
+       [
+        3.0,
+        6.662,
+        1.871
+       ],
+       [
+        4.0,
+        6.86,
+        2.001
+       ],
+       [
+        5.0,
+        6.926,
+        2.039
+       ],
+       [
+        6.0,
+        7.118,
+        2.197
+       ],
+       [
+        7.0,
+        7.255,
+        2.213
+       ],
+       [
+        8.0,
+        7.32,
+        2.234
+       ],
+       [
+        9.0,
+        7.327,
+        2.242
+       ],
+       [
+        10.0,
+        7.42,
+        2.321
+       ],
+       [
+        11.0,
+        7.425,
+        2.315
+       ],
+       [
+        12.0,
+        7.425,
+        2.315
+       ],
+       [
+        13.0,
+        7.498,
+        2.365
+       ],
+       [
+        14.0,
+        13.593,
+        3.975
+       ],
+       [
+        15.0,
+        16.814,
+        5.249
+       ],
+       [
+        16.0,
+        16.815,
+        5.249
+       ],
+       [
+        17.0,
+        16.813,
+        5.249
+       ],
+       [
+        18.0,
+        16.815,
+        5.25
+       ],
+       [
+        19.0,
+        16.817,
+        5.252
+       ],
+       [
+        20.0,
+        16.813,
+        5.248
+       ]
+      ],
+      "gap_change_last_1s_mm": -0.0041,
+      "tilt_change_last_1s_deg": -0.0035
+     },
+     "hub_parts_touching": [
+      "Stud_0",
+      "Stud_0Tip",
+      "Stud_1",
+      "Stud_2",
+      "Stud_2Tip",
+      "Stud_3",
+      "Stud_3Tip",
+      "Stud_4",
+      "Stud_4Tip"
+     ],
+     "on_studs": false
+    }
+   }
+  },
+  {
+   "release_depth_mm": 6.0,
+   "seed": 7,
+   "stations": {
+    "FL": {
+     "hub": {
+      "centre_car_mm": [
+       1359.9849,
+       792.4997,
+       939.9846
+      ],
+      "axis_car": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "moved_from_design_mm": [
+       -0.0151,
+       -0.0003,
+       -0.0154
+      ],
+      "stud0_direction_car": [
+       0.5871,
+       0.0,
+       -0.8095
+      ],
+      "pilot_diameter_mm": 66.9323
+     },
+     "wheel": {
+      "centre_car_mm": [
+       1360.0184,
+       799.4723,
+       938.5463
+      ],
+      "axis_car": [
+       -0.0008,
+       0.9995,
+       0.0305
+      ],
+      "orientation_car_wxyz": [
+       0.639,
+       -0.6201,
+       0.3166,
+       0.3269
+      ],
+      "axial_gap_at_centre_mm": 6.973,
+      "radial_offset_mm": [
+       1.1839,
+       0.8173
+      ],
+      "tilt_deg": 1.747,
+      "tilt_axis_tip_shift_car": [
+       -0.0008,
+       -0.0005,
+       0.0305
+      ],
+      "bolt_phase_error_deg": 0.086,
+      "tire_ring_offset_mm": [
+       0.2919,
+       0.2114,
+       -0.0172
+      ]
+     },
+     "studs": [
+      {
+       "index": 0,
+       "stud_tip_car_mm": [
+        1393.5608,
+        868.4997,
+        893.7505
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        57.1395,
+        -0.034,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1393.4474,
+        860.8814,
+        894.0767
+       ],
+       "face_gap_mm": 8.388,
+       "stud_out_of_web_mm": 7.618,
+       "hole_to_stud_radial_mm": 0.345
+      },
+      {
+       "index": 1,
+       "stud_tip_car_mm": [
+        1326.3445,
+        868.4997,
+        893.7608
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6665,
+        54.371,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1326.2638,
+        860.8253,
+        894.2454
+       ],
+       "face_gap_mm": 8.332,
+       "stud_out_of_web_mm": 7.674,
+       "hole_to_stud_radial_mm": 0.491
+      },
+      {
+       "index": 2,
+       "stud_tip_car_mm": [
+        1305.628,
+        868.4997,
+        957.6785
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2377,
+        33.6128,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1305.665,
+        858.8609,
+        958.1633
+       ],
+       "face_gap_mm": 6.368,
+       "stud_out_of_web_mm": 9.639,
+       "hole_to_stud_radial_mm": 0.486
+      },
+      {
+       "index": 3,
+       "stud_tip_car_mm": [
+        1360.0278,
+        868.4997,
+        997.1535
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2526,
+        -33.6004,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1360.1178,
+        857.703,
+        997.498
+       ],
+       "face_gap_mm": 5.21,
+       "stud_out_of_web_mm": 10.797,
+       "hole_to_stud_radial_mm": 0.356
+      },
+      {
+       "index": 4,
+       "stud_tip_car_mm": [
+        1414.3782,
+        868.4997,
+        957.6329
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6499,
+        -54.3928,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1414.3703,
+        858.9517,
+        957.8903
+       ],
+       "face_gap_mm": 6.459,
+       "stud_out_of_web_mm": 9.548,
+       "hole_to_stud_radial_mm": 0.258
+      }
+     ],
+     "settling": {
+      "gap_mm_over_time": [
+       [
+        0.0,
+        6.026,
+        0.046
+       ],
+       [
+        1.0,
+        6.973,
+        1.747
+       ],
+       [
+        2.0,
+        6.973,
+        1.747
+       ],
+       [
+        3.0,
+        6.973,
+        1.747
+       ],
+       [
+        4.0,
+        6.973,
+        1.747
+       ],
+       [
+        5.0,
+        6.973,
+        1.747
+       ],
+       [
+        6.0,
+        6.973,
+        1.747
+       ],
+       [
+        7.0,
+        6.973,
+        1.747
+       ],
+       [
+        8.0,
+        6.973,
+        1.747
+       ],
+       [
+        9.0,
+        6.973,
+        1.747
+       ],
+       [
+        10.0,
+        6.973,
+        1.747
+       ],
+       [
+        11.0,
+        6.973,
+        1.747
+       ],
+       [
+        12.0,
+        6.972,
+        1.747
+       ],
+       [
+        13.0,
+        6.972,
+        1.747
+       ],
+       [
+        14.0,
+        6.972,
+        1.747
+       ],
+       [
+        15.0,
+        6.973,
+        1.747
+       ],
+       [
+        16.0,
+        6.973,
+        1.747
+       ],
+       [
+        17.0,
+        6.972,
+        1.747
+       ],
+       [
+        18.0,
+        6.973,
+        1.747
+       ],
+       [
+        19.0,
+        6.973,
+        1.747
+       ],
+       [
+        20.0,
+        6.973,
+        1.747
+       ]
+      ],
+      "gap_change_last_1s_mm": -0.0002,
+      "tilt_change_last_1s_deg": 0.0001
+     },
+     "hub_parts_touching": [
+      "Pilot",
+      "PilotTip",
+      "Stud_0",
+      "Stud_1",
+      "Stud_2",
+      "Stud_3",
+      "Stud_4"
+     ],
+     "on_studs": true
+    },
+    "FR": {
+     "hub": {
+      "centre_car_mm": [
+       1359.9899,
+       -792.5003,
+       939.9846
+      ],
+      "axis_car": [
+       -0.0,
+       -1.0,
+       -0.0
+      ],
+      "moved_from_design_mm": [
+       -0.0101,
+       -0.0003,
+       -0.0154
+      ],
+      "stud0_direction_car": [
+       0.95,
+       -0.0,
+       0.3122
+      ],
+      "pilot_diameter_mm": 66.9109
+     },
+     "wheel": {
+      "centre_car_mm": [
+       1360.0146,
+       -800.1572,
+       937.8537
+      ],
+      "axis_car": [
+       -0.0003,
+       -0.999,
+       0.0456
+      ],
+      "orientation_car_wxyz": [
+       0.714,
+       0.6821,
+       -0.1094,
+       0.1143
+      ],
+      "axial_gap_at_centre_mm": 7.657,
+      "radial_offset_mm": [
+       -0.6418,
+       -2.0321
+      ],
+      "tilt_deg": 2.616,
+      "tilt_axis_tip_shift_car": [
+       -0.0003,
+       0.001,
+       0.0456
+      ],
+      "bolt_phase_error_deg": -0.002,
+      "tire_ring_offset_mm": [
+       -0.118,
+       -0.3164,
+       -0.0299
+      ]
+     },
+     "studs": [
+      {
+       "index": 0,
+       "stud_tip_car_mm": [
+        1414.3338,
+        -868.5005,
+        957.8352
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        57.2008,
+        -0.0077,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1414.2879,
+        -859.2939,
+        958.4299
+       ],
+       "face_gap_mm": 6.808,
+       "stud_out_of_web_mm": 9.207,
+       "hole_to_stud_radial_mm": 0.596
+      },
+      {
+       "index": 1,
+       "stud_tip_car_mm": [
+        1359.8173,
+        -868.5004,
+        997.1561
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6851,
+        54.3678,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1359.7929,
+        -857.4869,
+        997.6817
+       ],
+       "face_gap_mm": 5.001,
+       "stud_out_of_web_mm": 11.013,
+       "hole_to_stud_radial_mm": 0.526
+      },
+      {
+       "index": 2,
+       "stud_tip_car_mm": [
+        1305.5623,
+        -868.5001,
+        957.5071
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2364,
+        33.6389,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1305.5829,
+        -859.2839,
+        958.0369
+       ],
+       "face_gap_mm": 6.798,
+       "stud_out_of_web_mm": 9.216,
+       "hole_to_stud_radial_mm": 0.53
+      },
+      {
+       "index": 3,
+       "stud_tip_car_mm": [
+        1326.5468,
+        -868.5001,
+        893.6288
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2434,
+        -33.5979,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1326.5742,
+        -862.2014,
+        894.2833
+       ],
+       "face_gap_mm": 9.716,
+       "stud_out_of_web_mm": 6.299,
+       "hole_to_stud_radial_mm": 0.655
+      },
+      {
+       "index": 4,
+       "stud_tip_car_mm": [
+        1393.7481,
+        -868.5003,
+        893.8668
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6732,
+        -54.3519,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1393.7576,
+        -862.2077,
+        894.5262
+       ],
+       "face_gap_mm": 9.722,
+       "stud_out_of_web_mm": 6.293,
+       "hole_to_stud_radial_mm": 0.659
+      }
+     ],
+     "settling": {
+      "gap_mm_over_time": [
+       [
+        0.0,
+        6.026,
+        0.055
+       ],
+       [
+        1.0,
+        7.087,
+        2.154
+       ],
+       [
+        2.0,
+        7.09,
+        2.156
+       ],
+       [
+        3.0,
+        7.095,
+        2.157
+       ],
+       [
+        4.0,
+        7.126,
+        2.133
+       ],
+       [
+        5.0,
+        7.26,
+        2.227
+       ],
+       [
+        6.0,
+        7.272,
+        2.248
+       ],
+       [
+        7.0,
+        7.327,
+        2.334
+       ],
+       [
+        8.0,
+        7.331,
+        2.34
+       ],
+       [
+        9.0,
+        7.332,
+        2.341
+       ],
+       [
+        10.0,
+        7.417,
+        2.361
+       ],
+       [
+        11.0,
+        7.417,
+        2.361
+       ],
+       [
+        12.0,
+        7.418,
+        2.362
+       ],
+       [
+        13.0,
+        7.419,
+        2.362
+       ],
+       [
+        14.0,
+        7.439,
+        2.353
+       ],
+       [
+        15.0,
+        7.505,
+        2.401
+       ],
+       [
+        16.0,
+        7.504,
+        2.4
+       ],
+       [
+        17.0,
+        7.504,
+        2.4
+       ],
+       [
+        18.0,
+        7.504,
+        2.399
+       ],
+       [
+        19.0,
+        7.504,
+        2.399
+       ],
+       [
+        20.0,
+        7.657,
+        2.616
+       ]
+      ],
+      "gap_change_last_1s_mm": 0.1532,
+      "tilt_change_last_1s_deg": 0.2166
+     },
+     "hub_parts_touching": [
+      "Pilot",
+      "PilotTip",
+      "Stud_0",
+      "Stud_1",
+      "Stud_2",
+      "Stud_3",
+      "Stud_4"
+     ],
+     "on_studs": true
+    },
+    "RL": {
+     "hub": {
+      "centre_car_mm": [
+       -1360.0152,
+       798.0005,
+       939.9847
+      ],
+      "axis_car": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "moved_from_design_mm": [
+       -0.0152,
+       0.0005,
+       -0.0153
+      ],
+      "stud0_direction_car": [
+       0.5901,
+       0.0,
+       -0.8073
+      ],
+      "pilot_diameter_mm": 66.9397
+     },
+     "wheel": {
+      "centre_car_mm": [
+       -1360.249,
+       805.8774,
+       938.2012
+      ],
+      "axis_car": [
+       0.005,
+       0.9993,
+       0.0382
+      ],
+      "orientation_car_wxyz": [
+       0.6435,
+       -0.6178,
+       0.315,
+       0.3241
+      ],
+      "axial_gap_at_centre_mm": 7.877,
+      "radial_offset_mm": [
+       1.3018,
+       1.2413
+      ],
+      "tilt_deg": 2.208,
+      "tilt_axis_tip_shift_car": [
+       0.005,
+       -0.0007,
+       0.0382
+      ],
+      "bolt_phase_error_deg": -0.111,
+      "tire_ring_offset_mm": [
+       0.2902,
+       0.215,
+       -0.0201
+      ]
+     },
+     "studs": [
+      {
+       "index": 0,
+       "stud_tip_car_mm": [
+        -1326.2839,
+        874.0005,
+        893.8819
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        57.125,
+        -0.0236,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1326.1441,
+        867.423,
+        894.4391
+       ],
+       "face_gap_mm": 9.433,
+       "stud_out_of_web_mm": 6.577,
+       "hole_to_stud_radial_mm": 0.575
+      },
+      {
+       "index": 1,
+       "stud_tip_car_mm": [
+        -1393.5071,
+        874.0005,
+        893.6725
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6223,
+        54.369,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1393.3264,
+        867.7723,
+        894.1439
+       ],
+       "face_gap_mm": 9.782,
+       "stud_out_of_web_mm": 6.228,
+       "hole_to_stud_radial_mm": 0.505
+      },
+      {
+       "index": 2,
+       "stud_tip_car_mm": [
+        -1414.4299,
+        874.0005,
+        957.4918
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2462,
+        33.597,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1414.3801,
+        865.4414,
+        957.9011
+       ],
+       "face_gap_mm": 7.451,
+       "stud_out_of_web_mm": 8.559,
+       "hole_to_stud_radial_mm": 0.412
+      },
+      {
+       "index": 3,
+       "stud_tip_car_mm": [
+        -1360.202,
+        874.0004,
+        997.1572
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2653,
+        -33.5894,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1360.2097,
+        863.6516,
+        997.6004
+       ],
+       "face_gap_mm": 5.662,
+       "stud_out_of_web_mm": 10.349,
+       "hole_to_stud_radial_mm": 0.443
+      },
+      {
+       "index": 4,
+       "stud_tip_car_mm": [
+        -1305.7061,
+        874.0004,
+        957.7964
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6711,
+        -54.3549,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1305.6769,
+        864.8763,
+        958.3788
+       ],
+       "face_gap_mm": 6.886,
+       "stud_out_of_web_mm": 9.124,
+       "hole_to_stud_radial_mm": 0.583
+      }
+     ],
+     "settling": {
+      "gap_mm_over_time": [
+       [
+        0.0,
+        6.031,
+        0.054
+       ],
+       [
+        1.0,
+        6.864,
+        1.535
+       ],
+       [
+        2.0,
+        6.894,
+        1.553
+       ],
+       [
+        3.0,
+        6.901,
+        1.555
+       ],
+       [
+        4.0,
+        6.902,
+        1.556
+       ],
+       [
+        5.0,
+        6.906,
+        1.56
+       ],
+       [
+        6.0,
+        6.91,
+        1.576
+       ],
+       [
+        7.0,
+        7.818,
+        2.168
+       ],
+       [
+        8.0,
+        7.838,
+        2.179
+       ],
+       [
+        9.0,
+        7.838,
+        2.179
+       ],
+       [
+        10.0,
+        7.838,
+        2.179
+       ],
+       [
+        11.0,
+        7.838,
+        2.179
+       ],
+       [
+        12.0,
+        7.838,
+        2.179
+       ],
+       [
+        13.0,
+        7.838,
+        2.179
+       ],
+       [
+        14.0,
+        7.838,
+        2.179
+       ],
+       [
+        15.0,
+        7.838,
+        2.179
+       ],
+       [
+        16.0,
+        7.838,
+        2.179
+       ],
+       [
+        17.0,
+        7.838,
+        2.179
+       ],
+       [
+        18.0,
+        7.838,
+        2.179
+       ],
+       [
+        19.0,
+        7.838,
+        2.179
+       ],
+       [
+        20.0,
+        7.877,
+        2.208
+       ]
+      ],
+      "gap_change_last_1s_mm": 0.039,
+      "tilt_change_last_1s_deg": 0.029
+     },
+     "hub_parts_touching": [
+      "Pilot",
+      "PilotTip",
+      "Stud_0",
+      "Stud_1",
+      "Stud_2",
+      "Stud_3",
+      "Stud_4"
+     ],
+     "on_studs": true
+    },
+    "RR": {
+     "hub": {
+      "centre_car_mm": [
+       -1360.0154,
+       -797.9997,
+       939.9847
+      ],
+      "axis_car": [
+       -0.0,
+       -1.0,
+       0.0
+      ],
+      "moved_from_design_mm": [
+       -0.0154,
+       0.0003,
+       -0.0153
+      ],
+      "stud0_direction_car": [
+       0.9508,
+       0.0,
+       0.3097
+      ],
+      "pilot_diameter_mm": 66.9293
+     },
+     "wheel": {
+      "centre_car_mm": [
+       -1360.0475,
+       -804.9791,
+       938.5187
+      ],
+      "axis_car": [
+       0.0006,
+       -0.9995,
+       0.031
+      ],
+      "orientation_car_wxyz": [
+       0.7089,
+       0.6873,
+       -0.1098,
+       0.1137
+      ],
+      "axial_gap_at_centre_mm": 6.979,
+      "radial_offset_mm": [
+       -0.4845,
+       -1.384
+      ],
+      "tilt_deg": 1.777,
+      "tilt_axis_tip_shift_car": [
+       0.0006,
+       0.0005,
+       0.031
+      ],
+      "bolt_phase_error_deg": 0.146,
+      "tire_ring_offset_mm": [
+       -0.1148,
+       -0.3415,
+       -0.0161
+      ]
+     },
+     "studs": [
+      {
+       "index": 0,
+       "stud_tip_car_mm": [
+        -1305.6889,
+        -873.9997,
+        957.684
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        57.1369,
+        0.0058,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1305.7169,
+        -864.3626,
+        958.214
+       ],
+       "face_gap_mm": 6.37,
+       "stud_out_of_web_mm": 9.637,
+       "hole_to_stud_radial_mm": 0.531
+      },
+      {
+       "index": 1,
+       "stud_tip_car_mm": [
+        -1360.044,
+        -873.9997,
+        997.1339
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6704,
+        54.3487,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1360.2037,
+        -863.1788,
+        997.5008
+       ],
+       "face_gap_mm": 5.186,
+       "stud_out_of_web_mm": 10.821,
+       "hole_to_stud_radial_mm": 0.4
+      },
+      {
+       "index": 2,
+       "stud_tip_car_mm": [
+        -1414.4233,
+        -873.9997,
+        957.5884
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.282,
+        33.587,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1414.422,
+        -864.4431,
+        957.8467
+       ],
+       "face_gap_mm": 6.45,
+       "stud_out_of_web_mm": 9.557,
+       "hole_to_stud_radial_mm": 0.258
+      },
+      {
+       "index": 3,
+       "stud_tip_car_mm": [
+        -1393.5815,
+        -873.9998,
+        893.7352
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2383,
+        -33.5815,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1393.4438,
+        -866.4082,
+        894.0522
+       ],
+       "face_gap_mm": 8.415,
+       "stud_out_of_web_mm": 7.592,
+       "hole_to_stud_radial_mm": 0.346
+      },
+      {
+       "index": 4,
+       "stud_tip_car_mm": [
+        -1326.372,
+        -873.9998,
+        893.8075
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6898,
+        -54.3257,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1326.2604,
+        -866.3585,
+        894.2793
+       ],
+       "face_gap_mm": 8.365,
+       "stud_out_of_web_mm": 7.641,
+       "hole_to_stud_radial_mm": 0.485
+      }
+     ],
+     "settling": {
+      "gap_mm_over_time": [
+       [
+        0.0,
+        6.03,
+        0.064
+       ],
+       [
+        1.0,
+        6.979,
+        1.777
+       ],
+       [
+        2.0,
+        6.979,
+        1.777
+       ],
+       [
+        3.0,
+        6.979,
+        1.777
+       ],
+       [
+        4.0,
+        6.979,
+        1.777
+       ],
+       [
+        5.0,
+        6.979,
+        1.777
+       ],
+       [
+        6.0,
+        6.98,
+        1.777
+       ],
+       [
+        7.0,
+        6.979,
+        1.777
+       ],
+       [
+        8.0,
+        6.979,
+        1.777
+       ],
+       [
+        9.0,
+        6.979,
+        1.777
+       ],
+       [
+        10.0,
+        6.979,
+        1.777
+       ],
+       [
+        11.0,
+        6.979,
+        1.777
+       ],
+       [
+        12.0,
+        6.979,
+        1.777
+       ],
+       [
+        13.0,
+        6.979,
+        1.777
+       ],
+       [
+        14.0,
+        6.979,
+        1.777
+       ],
+       [
+        15.0,
+        6.979,
+        1.777
+       ],
+       [
+        16.0,
+        6.979,
+        1.777
+       ],
+       [
+        17.0,
+        6.979,
+        1.777
+       ],
+       [
+        18.0,
+        6.979,
+        1.777
+       ],
+       [
+        19.0,
+        6.979,
+        1.777
+       ],
+       [
+        20.0,
+        6.979,
+        1.777
+       ]
+      ],
+      "gap_change_last_1s_mm": 0.0001,
+      "tilt_change_last_1s_deg": -0.0
+     },
+     "hub_parts_touching": [
+      "Pilot",
+      "PilotTip",
+      "Stud_0",
+      "Stud_1",
+      "Stud_2",
+      "Stud_3",
+      "Stud_4"
+     ],
+     "on_studs": true
+    }
+   }
+  },
+  {
+   "release_depth_mm": 6.0,
+   "seed": 123,
+   "stations": {
+    "FL": {
+     "hub": {
+      "centre_car_mm": [
+       1359.9923,
+       792.4994,
+       939.9846
+      ],
+      "axis_car": [
+       -0.0,
+       1.0,
+       0.0
+      ],
+      "moved_from_design_mm": [
+       -0.0077,
+       -0.0006,
+       -0.0154
+      ],
+      "stud0_direction_car": [
+       0.5812,
+       0.0,
+       -0.8138
+      ],
+      "pilot_diameter_mm": 66.917
+     },
+     "wheel": {
+      "centre_car_mm": [
+       1359.7339,
+       800.1606,
+       938.0448
+      ],
+      "axis_car": [
+       0.0054,
+       0.9991,
+       0.0415
+      ],
+      "orientation_car_wxyz": [
+       0.6428,
+       -0.6149,
+       0.318,
+       0.328
+      ],
+      "axial_gap_at_centre_mm": 7.661,
+      "radial_offset_mm": [
+       1.4284,
+       1.3376
+      ],
+      "tilt_deg": 2.4,
+      "tilt_axis_tip_shift_car": [
+       0.0054,
+       -0.0009,
+       0.0415
+      ],
+      "bolt_phase_error_deg": -0.114,
+      "tire_ring_offset_mm": [
+       0.2892,
+       0.2157,
+       -0.0209
+      ]
+     },
+     "studs": [
+      {
+       "index": 0,
+       "stud_tip_car_mm": [
+        1393.1924,
+        868.4994,
+        893.4727
+       ],
+       "stud_axis_car": [
+        -0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        57.1455,
+        0.016,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1393.3492,
+        861.8585,
+        894.1186
+       ],
+       "face_gap_mm": 9.371,
+       "stud_out_of_web_mm": 6.641,
+       "hole_to_stud_radial_mm": 0.665
+      },
+      {
+       "index": 1,
+       "stud_tip_car_mm": [
+        1326.0224,
+        868.4994,
+        894.0046
+       ],
+       "stud_axis_car": [
+        -0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6732,
+        54.367,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1326.1677,
+        862.2012,
+        894.566
+       ],
+       "face_gap_mm": 9.714,
+       "stud_out_of_web_mm": 6.298,
+       "hole_to_stud_radial_mm": 0.58
+      },
+      {
+       "index": 2,
+       "stud_tip_car_mm": [
+        1305.7923,
+        868.4994,
+        958.0734
+       ],
+       "stud_axis_car": [
+        -0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2211,
+        33.5924,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1305.8191,
+        859.6512,
+        958.5434
+       ],
+       "face_gap_mm": 7.164,
+       "stud_out_of_web_mm": 8.848,
+       "hole_to_stud_radial_mm": 0.471
+      },
+      {
+       "index": 3,
+       "stud_tip_car_mm": [
+        1360.4709,
+        868.4994,
+        997.1673
+       ],
+       "stud_axis_car": [
+        -0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2547,
+        -33.6243,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1360.4245,
+        857.7325,
+        997.6361
+       ],
+       "face_gap_mm": 5.245,
+       "stud_out_of_web_mm": 10.767,
+       "hole_to_stud_radial_mm": 0.471
+      },
+      {
+       "index": 4,
+       "stud_tip_car_mm": [
+        1414.4906,
+        868.4994,
+        957.1719
+       ],
+       "stud_axis_car": [
+        -0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6884,
+        -54.3378,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1414.5211,
+        859.0967,
+        957.8194
+       ],
+       "face_gap_mm": 6.61,
+       "stud_out_of_web_mm": 9.403,
+       "hole_to_stud_radial_mm": 0.648
+      }
+     ],
+     "settling": {
+      "gap_mm_over_time": [
+       [
+        0.0,
+        6.026,
+        0.045
+       ],
+       [
+        1.0,
+        6.766,
+        1.861
+       ],
+       [
+        2.0,
+        6.79,
+        1.87
+       ],
+       [
+        3.0,
+        6.793,
+        1.874
+       ],
+       [
+        4.0,
+        6.794,
+        1.877
+       ],
+       [
+        5.0,
+        6.795,
+        1.879
+       ],
+       [
+        6.0,
+        6.801,
+        1.886
+       ],
+       [
+        7.0,
+        6.883,
+        1.958
+       ],
+       [
+        8.0,
+        6.945,
+        1.981
+       ],
+       [
+        9.0,
+        7.041,
+        1.993
+       ],
+       [
+        10.0,
+        7.042,
+        1.995
+       ],
+       [
+        11.0,
+        7.095,
+        2.027
+       ],
+       [
+        12.0,
+        7.095,
+        2.027
+       ],
+       [
+        13.0,
+        7.159,
+        2.046
+       ],
+       [
+        14.0,
+        7.227,
+        2.097
+       ],
+       [
+        15.0,
+        7.399,
+        2.209
+       ],
+       [
+        16.0,
+        7.423,
+        2.24
+       ],
+       [
+        17.0,
+        7.462,
+        2.261
+       ],
+       [
+        18.0,
+        7.487,
+        2.271
+       ],
+       [
+        19.0,
+        7.565,
+        2.336
+       ],
+       [
+        20.0,
+        7.661,
+        2.4
+       ]
+      ],
+      "gap_change_last_1s_mm": 0.0965,
+      "tilt_change_last_1s_deg": 0.0637
+     },
+     "hub_parts_touching": [
+      "Pilot",
+      "PilotTip",
+      "Stud_0",
+      "Stud_1",
+      "Stud_2",
+      "Stud_3",
+      "Stud_4"
+     ],
+     "on_studs": true
+    },
+    "FR": {
+     "hub": {
+      "centre_car_mm": [
+       1359.9907,
+       -792.5005,
+       939.9846
+      ],
+      "axis_car": [
+       0.0,
+       -1.0,
+       -0.0
+      ],
+      "moved_from_design_mm": [
+       -0.0093,
+       -0.0005,
+       -0.0154
+      ],
+      "stud0_direction_car": [
+       0.9503,
+       0.0,
+       0.3112
+      ],
+      "pilot_diameter_mm": 66.9374
+     },
+     "wheel": {
+      "centre_car_mm": [
+       1359.9981,
+       -809.1237,
+       935.4035
+      ],
+      "axis_car": [
+       -0.0016,
+       -0.9959,
+       0.0902
+      ],
+      "orientation_car_wxyz": [
+       0.7292,
+       0.666,
+       -0.1069,
+       0.1158
+      ],
+      "axial_gap_at_centre_mm": 16.623,
+      "radial_offset_mm": [
+       -1.4186,
+       -4.3559
+      ],
+      "tilt_deg": 5.174,
+      "tilt_axis_tip_shift_car": [
+       -0.0016,
+       0.0041,
+       0.0902
+      ],
+      "bolt_phase_error_deg": -0.059,
+      "tire_ring_offset_mm": [
+       -0.1136,
+       -0.3436,
+       -0.0481
+      ]
+     },
+     "studs": [
+      {
+       "index": 0,
+       "stud_tip_car_mm": [
+        1414.2741,
+        -868.5004,
+        957.7634
+       ],
+       "stud_axis_car": [
+        0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        57.1206,
+        0.0039,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1414.2121,
+        -867.3636,
+        958.5353
+       ],
+       "face_gap_mm": 14.92,
+       "stud_out_of_web_mm": 1.137,
+       "hole_to_stud_radial_mm": 0.774
+      },
+      {
+       "index": 1,
+       "stud_tip_car_mm": [
+        1359.8413,
+        -868.5005,
+        997.1122
+       ],
+       "stud_axis_car": [
+        0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6352,
+        54.3378,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1359.7678,
+        -863.7262,
+        997.7304
+       ],
+       "face_gap_mm": 11.283,
+       "stud_out_of_web_mm": 4.774,
+       "hole_to_stud_radial_mm": 0.623
+      },
+      {
+       "index": 2,
+       "stud_tip_car_mm": [
+        1305.5953,
+        -868.5006,
+        957.5127
+       ],
+       "stud_axis_car": [
+        0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2403,
+        33.585,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1305.5068,
+        -867.2101,
+        958.2681
+       ],
+       "face_gap_mm": 14.767,
+       "stud_out_of_web_mm": 1.291,
+       "hole_to_stud_radial_mm": 0.761
+      },
+      {
+       "index": 3,
+       "stud_tip_car_mm": [
+        1326.4979,
+        -868.5005,
+        893.7264
+       ],
+       "stud_axis_car": [
+        0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2248,
+        -33.5388,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1326.4159,
+        -873.0007,
+        894.6839
+       ],
+       "face_gap_mm": 20.557,
+       "stud_out_of_web_mm": -4.5,
+       "hole_to_stud_radial_mm": 0.961
+      },
+      {
+       "index": 4,
+       "stud_tip_car_mm": [
+        1393.6795,
+        -868.5004,
+        893.8392
+       ],
+       "stud_axis_car": [
+        0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6562,
+        -54.3376,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1393.5995,
+        -873.0956,
+        894.8491
+       ],
+       "face_gap_mm": 20.652,
+       "stud_out_of_web_mm": -4.595,
+       "hole_to_stud_radial_mm": 1.013
+      }
+     ],
+     "settling": {
+      "gap_mm_over_time": [
+       [
+        0.0,
+        6.026,
+        0.056
+       ],
+       [
+        1.0,
+        6.91,
+        1.611
+       ],
+       [
+        2.0,
+        6.935,
+        1.606
+       ],
+       [
+        3.0,
+        6.939,
+        1.609
+       ],
+       [
+        4.0,
+        6.939,
+        1.61
+       ],
+       [
+        5.0,
+        6.939,
+        1.61
+       ],
+       [
+        6.0,
+        6.939,
+        1.611
+       ],
+       [
+        7.0,
+        6.939,
+        1.61
+       ],
+       [
+        8.0,
+        7.023,
+        1.649
+       ],
+       [
+        9.0,
+        7.068,
+        1.716
+       ],
+       [
+        10.0,
+        7.145,
+        1.744
+       ],
+       [
+        11.0,
+        7.225,
+        1.759
+       ],
+       [
+        12.0,
+        7.324,
+        1.848
+       ],
+       [
+        13.0,
+        7.456,
+        1.947
+       ],
+       [
+        14.0,
+        7.568,
+        1.977
+       ],
+       [
+        15.0,
+        7.614,
+        2.034
+       ],
+       [
+        16.0,
+        16.623,
+        5.173
+       ],
+       [
+        17.0,
+        16.623,
+        5.174
+       ],
+       [
+        18.0,
+        16.623,
+        5.174
+       ],
+       [
+        19.0,
+        16.623,
+        5.174
+       ],
+       [
+        20.0,
+        16.623,
+        5.174
+       ]
+      ],
+      "gap_change_last_1s_mm": 0.0005,
+      "tilt_change_last_1s_deg": 0.0003
+     },
+     "hub_parts_touching": [
+      "Stud_0",
+      "Stud_0Tip",
+      "Stud_1",
+      "Stud_2",
+      "Stud_2Tip",
+      "Stud_3",
+      "Stud_3Tip",
+      "Stud_4",
+      "Stud_4Tip"
+     ],
+     "on_studs": false
+    },
+    "RL": {
+     "hub": {
+      "centre_car_mm": [
+       -1359.9921,
+       797.9996,
+       939.9847
+      ],
+      "axis_car": [
+       -0.0,
+       1.0,
+       0.0
+      ],
+      "moved_from_design_mm": [
+       0.0079,
+       -0.0004,
+       -0.0153
+      ],
+      "stud0_direction_car": [
+       0.5878,
+       0.0,
+       -0.809
+      ],
+      "pilot_diameter_mm": 66.9188
+     },
+     "wheel": {
+      "centre_car_mm": [
+       -1360.08,
+       805.063,
+       938.3634
+      ],
+      "axis_car": [
+       0.0018,
+       0.9994,
+       0.0344
+      ],
+      "orientation_car_wxyz": [
+       0.6409,
+       -0.6187,
+       0.3163,
+       0.3263
+      ],
+      "axial_gap_at_centre_mm": 7.063,
+      "radial_offset_mm": [
+       1.2601,
+       1.024
+      ],
+      "tilt_deg": 1.973,
+      "tilt_axis_tip_shift_car": [
+       0.0018,
+       -0.0006,
+       0.0344
+      ],
+      "bolt_phase_error_deg": 0.039,
+      "tire_ring_offset_mm": [
+       0.2937,
+       0.2098,
+       -0.0169
+      ]
+     },
+     "studs": [
+      {
+       "index": 0,
+       "stud_tip_car_mm": [
+        -1326.3924,
+        873.9996,
+        893.729
+       ],
+       "stud_axis_car": [
+        -0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        57.1711,
+        0.0041,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1326.4267,
+        866.5586,
+        894.1835
+       ],
+       "face_gap_mm": 8.567,
+       "stud_out_of_web_mm": 7.441,
+       "hole_to_stud_radial_mm": 0.456
+      },
+      {
+       "index": 1,
+       "stud_tip_car_mm": [
+        -1393.574,
+        873.9996,
+        893.7647
+       ],
+       "stud_axis_car": [
+        -0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6554,
+        54.3353,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1393.6104,
+        866.6755,
+        894.2529
+       ],
+       "face_gap_mm": 8.684,
+       "stud_out_of_web_mm": 7.324,
+       "hole_to_stud_radial_mm": 0.49
+      },
+      {
+       "index": 2,
+       "stud_tip_car_mm": [
+        -1414.362,
+        873.9995,
+        957.6629
+       ],
+       "stud_axis_car": [
+        -0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2588,
+        33.5965,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1414.3091,
+        864.5148,
+        958.1322
+       ],
+       "face_gap_mm": 6.524,
+       "stud_out_of_web_mm": 9.485,
+       "hole_to_stud_radial_mm": 0.472
+      },
+      {
+       "index": 3,
+       "stud_tip_car_mm": [
+        -1359.9913,
+        873.9995,
+        997.1139
+       ],
+       "stud_axis_car": [
+        -0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2189,
+        -33.5791,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1359.918,
+        863.0626,
+        997.5423
+       ],
+       "face_gap_mm": 5.071,
+       "stud_out_of_web_mm": 10.937,
+       "hole_to_stud_radial_mm": 0.435
+      },
+      {
+       "index": 4,
+       "stud_tip_car_mm": [
+        -1305.6388,
+        873.9996,
+        957.63
+       ],
+       "stud_axis_car": [
+        -0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6713,
+        -54.3449,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1305.6036,
+        864.3257,
+        958.0199
+       ],
+       "face_gap_mm": 6.334,
+       "stud_out_of_web_mm": 9.674,
+       "hole_to_stud_radial_mm": 0.391
+      }
+     ],
+     "settling": {
+      "gap_mm_over_time": [
+       [
+        0.0,
+        6.03,
+        0.053
+       ],
+       [
+        1.0,
+        6.935,
+        1.948
+       ],
+       [
+        2.0,
+        6.935,
+        1.948
+       ],
+       [
+        3.0,
+        6.935,
+        1.948
+       ],
+       [
+        4.0,
+        6.937,
+        1.946
+       ],
+       [
+        5.0,
+        6.939,
+        1.943
+       ],
+       [
+        6.0,
+        7.002,
+        1.934
+       ],
+       [
+        7.0,
+        7.036,
+        1.941
+       ],
+       [
+        8.0,
+        7.037,
+        1.94
+       ],
+       [
+        9.0,
+        7.037,
+        1.941
+       ],
+       [
+        10.0,
+        7.053,
+        1.965
+       ],
+       [
+        11.0,
+        7.064,
+        1.973
+       ],
+       [
+        12.0,
+        7.063,
+        1.973
+       ],
+       [
+        13.0,
+        7.064,
+        1.973
+       ],
+       [
+        14.0,
+        7.064,
+        1.973
+       ],
+       [
+        15.0,
+        7.064,
+        1.973
+       ],
+       [
+        16.0,
+        7.064,
+        1.973
+       ],
+       [
+        17.0,
+        7.064,
+        1.973
+       ],
+       [
+        18.0,
+        7.063,
+        1.973
+       ],
+       [
+        19.0,
+        7.064,
+        1.973
+       ],
+       [
+        20.0,
+        7.063,
+        1.973
+       ]
+      ],
+      "gap_change_last_1s_mm": -0.0001,
+      "tilt_change_last_1s_deg": -0.0001
+     },
+     "hub_parts_touching": [
+      "Pilot",
+      "PilotTip",
+      "Stud_0",
+      "Stud_1",
+      "Stud_2",
+      "Stud_3",
+      "Stud_4"
+     ],
+     "on_studs": true
+    },
+    "RR": {
+     "hub": {
+      "centre_car_mm": [
+       -1359.9898,
+       -798.0003,
+       939.9846
+      ],
+      "axis_car": [
+       0.0,
+       -1.0,
+       0.0
+      ],
+      "moved_from_design_mm": [
+       0.0102,
+       -0.0003,
+       -0.0154
+      ],
+      "stud0_direction_car": [
+       0.9495,
+       0.0,
+       0.3138
+      ],
+      "pilot_diameter_mm": 66.9392
+     },
+     "wheel": {
+      "centre_car_mm": [
+       -1360.1421,
+       -805.0621,
+       938.636
+      ],
+      "axis_car": [
+       0.0033,
+       -0.9996,
+       0.0286
+      ],
+      "orientation_car_wxyz": [
+       0.7078,
+       0.6882,
+       -0.1098,
+       0.1153
+      ],
+      "axial_gap_at_centre_mm": 7.062,
+      "radial_offset_mm": [
+       -0.5678,
+       -1.2327
+      ],
+      "tilt_deg": 1.647,
+      "tilt_axis_tip_shift_car": [
+       0.0033,
+       0.0004,
+       0.0286
+      ],
+      "bolt_phase_error_deg": 0.031,
+      "tire_ring_offset_mm": [
+       -0.113,
+       -0.3426,
+       -0.0159
+      ]
+     },
+     "studs": [
+      {
+       "index": 0,
+       "stud_tip_car_mm": [
+        -1305.7513,
+        -874.0003,
+        957.9239
+       ],
+       "stud_axis_car": [
+        0.0,
+        -1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        57.1282,
+        0.0153,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1305.6941,
+        -864.3454,
+        958.3088
+       ],
+       "face_gap_mm": 6.351,
+       "stud_out_of_web_mm": 9.655,
+       "hole_to_stud_radial_mm": 0.389
+      },
+      {
+       "index": 1,
+       "stud_tip_car_mm": [
+        -1360.2744,
+        -874.0003,
+        997.117
+       ],
+       "stud_axis_car": [
+        0.0,
+        -1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6558,
+        54.3366,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1360.2725,
+        -863.4065,
+        997.4751
+       ],
+       "face_gap_mm": 5.412,
+       "stud_out_of_web_mm": 10.594,
+       "hole_to_stud_radial_mm": 0.358
+      },
+      {
+       "index": 2,
+       "stud_tip_car_mm": [
+        -1414.3849,
+        -874.0003,
+        957.3962
+       ],
+       "stud_axis_car": [
+        0.0,
+        -1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.1851,
+        33.5996,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1414.3975,
+        -864.7212,
+        957.6954
+       ],
+       "face_gap_mm": 6.727,
+       "stud_out_of_web_mm": 9.279,
+       "hole_to_stud_radial_mm": 0.299
+      },
+      {
+       "index": 3,
+       "stud_tip_car_mm": [
+        -1393.3473,
+        -874.0003,
+        893.5968
+       ],
+       "stud_axis_car": [
+        0.0,
+        -1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2278,
+        -33.5788,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1393.2702,
+        -866.4727,
+        893.944
+       ],
+       "face_gap_mm": 8.478,
+       "stud_out_of_web_mm": 7.528,
+       "hole_to_stud_radial_mm": 0.356
+      },
+      {
+       "index": 4,
+       "stud_tip_car_mm": [
+        -1326.1747,
+        -874.0003,
+        893.923
+       ],
+       "stud_axis_car": [
+        0.0,
+        -1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.655,
+        -54.3455,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1326.0879,
+        -866.2405,
+        894.3231
+       ],
+       "face_gap_mm": 8.246,
+       "stud_out_of_web_mm": 7.76,
+       "hole_to_stud_radial_mm": 0.409
+      }
+     ],
+     "settling": {
+      "gap_mm_over_time": [
+       [
+        0.0,
+        6.03,
+        0.065
+       ],
+       [
+        1.0,
+        6.84,
+        1.55
+       ],
+       [
+        2.0,
+        6.862,
+        1.595
+       ],
+       [
+        3.0,
+        6.987,
+        1.61
+       ],
+       [
+        4.0,
+        6.988,
+        1.611
+       ],
+       [
+        5.0,
+        6.997,
+        1.612
+       ],
+       [
+        6.0,
+        7.058,
+        1.65
+       ],
+       [
+        7.0,
+        7.062,
+        1.646
+       ],
+       [
+        8.0,
+        7.062,
+        1.645
+       ],
+       [
+        9.0,
+        7.062,
+        1.645
+       ],
+       [
+        10.0,
+        7.062,
+        1.646
+       ],
+       [
+        11.0,
+        7.062,
+        1.646
+       ],
+       [
+        12.0,
+        7.062,
+        1.647
+       ],
+       [
+        13.0,
+        7.062,
+        1.647
+       ],
+       [
+        14.0,
+        7.062,
+        1.646
+       ],
+       [
+        15.0,
+        7.062,
+        1.647
+       ],
+       [
+        16.0,
+        7.062,
+        1.647
+       ],
+       [
+        17.0,
+        7.062,
+        1.647
+       ],
+       [
+        18.0,
+        7.062,
+        1.647
+       ],
+       [
+        19.0,
+        7.062,
+        1.647
+       ],
+       [
+        20.0,
+        7.062,
+        1.647
+       ]
+      ],
+      "gap_change_last_1s_mm": -0.0003,
+      "tilt_change_last_1s_deg": 0.0003
+     },
+     "hub_parts_touching": [
+      "Pilot",
+      "PilotTip",
+      "Stud_0",
+      "Stud_1",
+      "Stud_2",
+      "Stud_3",
+      "Stud_4"
+     ],
+     "on_studs": true
+    }
+   }
+  },
+  {
+   "release_depth_mm": 6.0,
+   "seed": 2024,
+   "stations": {
+    "FL": {
+     "hub": {
+      "centre_car_mm": [
+       1359.993,
+       792.4993,
+       939.9846
+      ],
+      "axis_car": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "moved_from_design_mm": [
+       -0.007,
+       -0.0007,
+       -0.0154
+      ],
+      "stud0_direction_car": [
+       0.5881,
+       0.0,
+       -0.8088
+      ],
+      "pilot_diameter_mm": 66.9296
+     },
+     "wheel": {
+      "centre_car_mm": [
+       1359.9721,
+       799.3307,
+       938.5623
+      ],
+      "axis_car": [
+       0.0005,
+       0.9995,
+       0.0301
+      ],
+      "orientation_car_wxyz": [
+       0.6397,
+       -0.6206,
+       0.316,
+       0.3253
+      ],
+      "axial_gap_at_centre_mm": 6.831,
+      "radial_offset_mm": [
+       1.138,
+       0.8533
+      ],
+      "tilt_deg": 1.724,
+      "tilt_axis_tip_shift_car": [
+       0.0005,
+       -0.0005,
+       0.0301
+      ],
+      "bolt_phase_error_deg": -0.044,
+      "tire_ring_offset_mm": [
+       0.2918,
+       0.2116,
+       -0.0159
+      ]
+     },
+     "studs": [
+      {
+       "index": 0,
+       "stud_tip_car_mm": [
+        1393.6379,
+        868.4993,
+        893.7308
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        57.196,
+        -0.0084,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1393.6389,
+        860.6767,
+        894.1852
+       ],
+       "face_gap_mm": 8.184,
+       "stud_out_of_web_mm": 7.823,
+       "hole_to_stud_radial_mm": 0.454
+      },
+      {
+       "index": 1,
+       "stud_tip_car_mm": [
+        1326.3923,
+        868.4993,
+        893.7212
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6554,
+        54.3837,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1326.4551,
+        860.7119,
+        894.1204
+       ],
+       "face_gap_mm": 8.219,
+       "stud_out_of_web_mm": 7.787,
+       "hole_to_stud_radial_mm": 0.404
+      },
+      {
+       "index": 2,
+       "stud_tip_car_mm": [
+        1305.6283,
+        868.4993,
+        957.6173
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2338,
+        33.5986,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1305.6316,
+        858.8007,
+        957.9671
+       ],
+       "face_gap_mm": 6.308,
+       "stud_out_of_web_mm": 9.699,
+       "hole_to_stud_radial_mm": 0.35
+      },
+      {
+       "index": 3,
+       "stud_tip_car_mm": [
+        1359.937,
+        868.4993,
+        997.1153
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2388,
+        -33.5544,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1359.9458,
+        857.5844,
+        997.4913
+       ],
+       "face_gap_mm": 5.091,
+       "stud_out_of_web_mm": 10.915,
+       "hole_to_stud_radial_mm": 0.376
+      },
+      {
+       "index": 4,
+       "stud_tip_car_mm": [
+        1414.3471,
+        868.4993,
+        957.6351
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6914,
+        -54.3408,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1414.3373,
+        858.7438,
+        958.0719
+       ],
+       "face_gap_mm": 6.251,
+       "stud_out_of_web_mm": 9.755,
+       "hole_to_stud_radial_mm": 0.437
+      }
+     ],
+     "settling": {
+      "gap_mm_over_time": [
+       [
+        0.0,
+        6.026,
+        0.046
+       ],
+       [
+        1.0,
+        6.797,
+        1.667
+       ],
+       [
+        2.0,
+        6.797,
+        1.667
+       ],
+       [
+        3.0,
+        6.797,
+        1.667
+       ],
+       [
+        4.0,
+        6.797,
+        1.667
+       ],
+       [
+        5.0,
+        6.797,
+        1.668
+       ],
+       [
+        6.0,
+        6.797,
+        1.668
+       ],
+       [
+        7.0,
+        6.797,
+        1.666
+       ],
+       [
+        8.0,
+        6.797,
+        1.667
+       ],
+       [
+        9.0,
+        6.831,
+        1.724
+       ],
+       [
+        10.0,
+        6.831,
+        1.724
+       ],
+       [
+        11.0,
+        6.831,
+        1.724
+       ],
+       [
+        12.0,
+        6.832,
+        1.724
+       ],
+       [
+        13.0,
+        6.832,
+        1.724
+       ],
+       [
+        14.0,
+        6.831,
+        1.724
+       ],
+       [
+        15.0,
+        6.832,
+        1.724
+       ],
+       [
+        16.0,
+        6.831,
+        1.724
+       ],
+       [
+        17.0,
+        6.831,
+        1.724
+       ],
+       [
+        18.0,
+        6.831,
+        1.724
+       ],
+       [
+        19.0,
+        6.832,
+        1.724
+       ],
+       [
+        20.0,
+        6.831,
+        1.724
+       ]
+      ],
+      "gap_change_last_1s_mm": -0.0002,
+      "tilt_change_last_1s_deg": -0.0
+     },
+     "hub_parts_touching": [
+      "Pilot",
+      "PilotTip",
+      "Stud_0",
+      "Stud_1",
+      "Stud_2",
+      "Stud_3",
+      "Stud_4"
+     ],
+     "on_studs": true
+    },
+    "FR": {
+     "hub": {
+      "centre_car_mm": [
+       1359.9854,
+       -792.4995,
+       939.9846
+      ],
+      "axis_car": [
+       0.0,
+       -1.0,
+       0.0
+      ],
+      "moved_from_design_mm": [
+       -0.0146,
+       0.0005,
+       -0.0154
+      ],
+      "stud0_direction_car": [
+       0.9508,
+       0.0,
+       0.3099
+      ],
+      "pilot_diameter_mm": 66.9253
+     },
+     "wheel": {
+      "centre_car_mm": [
+       1359.9511,
+       -799.2347,
+       938.5539
+      ],
+      "axis_car": [
+       0.0007,
+       -0.9995,
+       0.0302
+      ],
+      "orientation_car_wxyz": [
+       0.7086,
+       0.6876,
+       -0.1101,
+       0.114
+      ],
+      "axial_gap_at_centre_mm": 6.735,
+      "radial_offset_mm": [
+       -0.4759,
+       -1.3497
+      ],
+      "tilt_deg": 1.729,
+      "tilt_axis_tip_shift_car": [
+       0.0007,
+       0.0005,
+       0.0302
+      ],
+      "bolt_phase_error_deg": 0.176,
+      "tire_ring_offset_mm": [
+       -0.1122,
+       -0.3423,
+       -0.0172
+      ]
+     },
+     "studs": [
+      {
+       "index": 0,
+       "stud_tip_car_mm": [
+        1414.3156,
+        -868.4995,
+        957.6672
+       ],
+       "stud_axis_car": [
+        0.0,
+        -1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        57.1353,
+        -0.0249,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1414.2719,
+        -858.63,
+        958.2407
+       ],
+       "face_gap_mm": 6.137,
+       "stud_out_of_web_mm": 9.87,
+       "hole_to_stud_radial_mm": 0.575
+      },
+      {
+       "index": 1,
+       "stud_tip_car_mm": [
+        1359.933,
+        -868.4995,
+        997.1823
+       ],
+       "stud_axis_car": [
+        0.0,
+        -1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6757,
+        54.398,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1359.7556,
+        -857.4832,
+        997.4877
+       ],
+       "face_gap_mm": 4.99,
+       "stud_out_of_web_mm": 11.016,
+       "hole_to_stud_radial_mm": 0.353
+      },
+      {
+       "index": 2,
+       "stud_tip_car_mm": [
+        1305.6476,
+        -868.4995,
+        957.6017
+       ],
+       "stud_axis_car": [
+        0.0,
+        -1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2032,
+        33.589,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1305.5671,
+        -858.7191,
+        957.7919
+       ],
+       "face_gap_mm": 6.226,
+       "stud_out_of_web_mm": 9.78,
+       "hole_to_stud_radial_mm": 0.207
+      },
+      {
+       "index": 3,
+       "stud_tip_car_mm": [
+        1326.4535,
+        -868.4996,
+        893.7221
+       ],
+       "stud_axis_car": [
+        0.0,
+        -1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2177,
+        -33.5935,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1326.5932,
+        -860.6298,
+        894.0116
+       ],
+       "face_gap_mm": 8.137,
+       "stud_out_of_web_mm": 7.87,
+       "hole_to_stud_radial_mm": 0.321
+      },
+      {
+       "index": 4,
+       "stud_tip_car_mm": [
+        1393.5951,
+        -868.4996,
+        893.7825
+       ],
+       "stud_axis_car": [
+        0.0,
+        -1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6372,
+        -54.3432,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1393.7764,
+        -860.5747,
+        894.289
+       ],
+       "face_gap_mm": 8.081,
+       "stud_out_of_web_mm": 7.925,
+       "hole_to_stud_radial_mm": 0.538
+      }
+     ],
+     "settling": {
+      "gap_mm_over_time": [
+       [
+        0.0,
+        6.036,
+        0.061
+       ],
+       [
+        1.0,
+        6.735,
+        1.729
+       ],
+       [
+        2.0,
+        6.735,
+        1.729
+       ],
+       [
+        3.0,
+        6.735,
+        1.729
+       ],
+       [
+        4.0,
+        6.735,
+        1.729
+       ],
+       [
+        5.0,
+        6.735,
+        1.729
+       ],
+       [
+        6.0,
+        6.735,
+        1.729
+       ],
+       [
+        7.0,
+        6.735,
+        1.729
+       ],
+       [
+        8.0,
+        6.735,
+        1.729
+       ],
+       [
+        9.0,
+        6.735,
+        1.729
+       ],
+       [
+        10.0,
+        6.735,
+        1.729
+       ],
+       [
+        11.0,
+        6.735,
+        1.729
+       ],
+       [
+        12.0,
+        6.735,
+        1.729
+       ],
+       [
+        13.0,
+        6.735,
+        1.729
+       ],
+       [
+        14.0,
+        6.735,
+        1.729
+       ],
+       [
+        15.0,
+        6.735,
+        1.729
+       ],
+       [
+        16.0,
+        6.735,
+        1.729
+       ],
+       [
+        17.0,
+        6.735,
+        1.729
+       ],
+       [
+        18.0,
+        6.735,
+        1.729
+       ],
+       [
+        19.0,
+        6.735,
+        1.729
+       ],
+       [
+        20.0,
+        6.735,
+        1.729
+       ]
+      ],
+      "gap_change_last_1s_mm": 0.0002,
+      "tilt_change_last_1s_deg": 0.0001
+     },
+     "hub_parts_touching": [
+      "Pilot",
+      "PilotTip",
+      "Stud_0",
+      "Stud_1",
+      "Stud_2",
+      "Stud_3",
+      "Stud_4"
+     ],
+     "on_studs": true
+    },
+    "RL": {
+     "hub": {
+      "centre_car_mm": [
+       -1360.014,
+       798.0002,
+       939.9846
+      ],
+      "axis_car": [
+       -0.0,
+       1.0,
+       0.0
+      ],
+      "moved_from_design_mm": [
+       -0.014,
+       0.0002,
+       -0.0154
+      ],
+      "stud0_direction_car": [
+       0.592,
+       0.0,
+       -0.8059
+      ],
+      "pilot_diameter_mm": 66.9131
+     },
+     "wheel": {
+      "centre_car_mm": [
+       -1360.2242,
+       806.0807,
+       937.8718
+      ],
+      "axis_car": [
+       0.0045,
+       0.999,
+       0.0453
+      ],
+      "orientation_car_wxyz": [
+       0.6458,
+       -0.6157,
+       0.3134,
+       0.325
+      ],
+      "axial_gap_at_centre_mm": 8.08,
+      "radial_offset_mm": [
+       1.5784,
+       1.4203
+      ],
+      "tilt_deg": 2.61,
+      "tilt_axis_tip_shift_car": [
+       0.0045,
+       -0.001,
+       0.0453
+      ],
+      "bolt_phase_error_deg": -0.046,
+      "tire_ring_offset_mm": [
+       0.2896,
+       0.2148,
+       -0.0257
+      ]
+     },
+     "studs": [
+      {
+       "index": 0,
+       "stud_tip_car_mm": [
+        -1326.1372,
+        874.0003,
+        893.9249
+       ],
+       "stud_axis_car": [
+        -0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        57.1764,
+        -0.036,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1326.1055,
+        867.9538,
+        894.5848
+       ],
+       "face_gap_mm": 9.968,
+       "stud_out_of_web_mm": 6.046,
+       "hole_to_stud_radial_mm": 0.661
+      },
+      {
+       "index": 1,
+       "stud_tip_car_mm": [
+        -1393.3757,
+        874.0002,
+        893.564
+       ],
+       "stud_axis_car": [
+        -0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6626,
+        54.3682,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1393.2877,
+        868.2717,
+        894.2231
+       ],
+       "face_gap_mm": 10.286,
+       "stud_out_of_web_mm": 5.728,
+       "hole_to_stud_radial_mm": 0.665
+      },
+      {
+       "index": 2,
+       "stud_tip_car_mm": [
+        -1414.4476,
+        874.0002,
+        957.3265
+       ],
+       "stud_axis_car": [
+        -0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2007,
+        33.6042,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1414.4055,
+        865.4757,
+        957.9404
+       ],
+       "face_gap_mm": 7.49,
+       "stud_out_of_web_mm": 8.524,
+       "hole_to_stud_radial_mm": 0.615
+      },
+      {
+       "index": 3,
+       "stud_tip_car_mm": [
+        -1360.31,
+        874.0002,
+        997.1581
+       ],
+       "stud_axis_car": [
+        -0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2538,
+        -33.6076,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1360.2749,
+        863.4297,
+        997.6815
+       ],
+       "face_gap_mm": 5.444,
+       "stud_out_of_web_mm": 10.57,
+       "hole_to_stud_radial_mm": 0.525
+      },
+      {
+       "index": 4,
+       "stud_tip_car_mm": [
+        -1305.7744,
+        874.0003,
+        957.9537
+       ],
+       "stud_axis_car": [
+        -0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6273,
+        -54.3517,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1305.7025,
+        864.9613,
+        958.5257
+       ],
+       "face_gap_mm": 6.976,
+       "stud_out_of_web_mm": 9.039,
+       "hole_to_stud_radial_mm": 0.576
+      }
+     ],
+     "settling": {
+      "gap_mm_over_time": [
+       [
+        0.0,
+        6.03,
+        0.053
+       ],
+       [
+        1.0,
+        6.955,
+        2.051
+       ],
+       [
+        2.0,
+        7.08,
+        2.128
+       ],
+       [
+        3.0,
+        7.127,
+        2.136
+       ],
+       [
+        4.0,
+        7.153,
+        2.176
+       ],
+       [
+        5.0,
+        7.153,
+        2.177
+       ],
+       [
+        6.0,
+        7.154,
+        2.178
+       ],
+       [
+        7.0,
+        7.17,
+        2.189
+       ],
+       [
+        8.0,
+        7.203,
+        2.22
+       ],
+       [
+        9.0,
+        7.215,
+        2.192
+       ],
+       [
+        10.0,
+        7.286,
+        2.212
+       ],
+       [
+        11.0,
+        7.795,
+        2.594
+       ],
+       [
+        12.0,
+        7.905,
+        2.606
+       ],
+       [
+        13.0,
+        7.905,
+        2.606
+       ],
+       [
+        14.0,
+        7.905,
+        2.606
+       ],
+       [
+        15.0,
+        7.904,
+        2.606
+       ],
+       [
+        16.0,
+        7.934,
+        2.608
+       ],
+       [
+        17.0,
+        7.942,
+        2.613
+       ],
+       [
+        18.0,
+        7.988,
+        2.608
+       ],
+       [
+        19.0,
+        8.071,
+        2.604
+       ],
+       [
+        20.0,
+        8.08,
+        2.61
+       ]
+      ],
+      "gap_change_last_1s_mm": 0.0092,
+      "tilt_change_last_1s_deg": 0.006
+     },
+     "hub_parts_touching": [
+      "Pilot",
+      "PilotTip",
+      "Stud_0",
+      "Stud_1",
+      "Stud_2",
+      "Stud_3",
+      "Stud_4"
+     ],
+     "on_studs": true
+    },
+    "RR": {
+     "hub": {
+      "centre_car_mm": [
+       -1360.0144,
+       -797.9991,
+       939.9846
+      ],
+      "axis_car": [
+       0.0,
+       -1.0,
+       -0.0
+      ],
+      "moved_from_design_mm": [
+       -0.0144,
+       0.0009,
+       -0.0154
+      ],
+      "stud0_direction_car": [
+       0.9502,
+       0.0,
+       0.3117
+      ],
+      "pilot_diameter_mm": 66.9353
+     },
+     "wheel": {
+      "centre_car_mm": [
+       -1360.1912,
+       -804.7535,
+       938.6753
+      ],
+      "axis_car": [
+       0.0039,
+       -0.9996,
+       0.0276
+      ],
+      "orientation_car_wxyz": [
+       0.7075,
+       0.6886,
+       -0.1094,
+       0.1152
+      ],
+      "axial_gap_at_centre_mm": 6.754,
+      "radial_offset_mm": [
+       -0.5761,
+       -1.1889
+      ],
+      "tilt_deg": 1.6,
+      "tilt_axis_tip_shift_car": [
+       0.0039,
+       0.0004,
+       0.0276
+      ],
+      "bolt_phase_error_deg": 0.108,
+      "tire_ring_offset_mm": [
+       -0.0894,
+       -0.3355,
+       -0.0163
+      ]
+     },
+     "studs": [
+      {
+       "index": 0,
+       "stud_tip_car_mm": [
+        -1305.6986,
+        -873.9991,
+        957.8074
+       ],
+       "stud_axis_car": [
+        0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        57.1652,
+        0.0042,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1305.6936,
+        -864.0241,
+        958.2489
+       ],
+       "face_gap_mm": 6.03,
+       "stud_out_of_web_mm": 9.975,
+       "hole_to_stud_radial_mm": 0.442
+      },
+      {
+       "index": 1,
+       "stud_tip_car_mm": [
+        -1360.1527,
+        -873.9992,
+        997.1531
+       ],
+       "stud_axis_car": [
+        0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6886,
+        54.3634,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1360.2399,
+        -863.1515,
+        997.4614
+       ],
+       "face_gap_mm": 5.158,
+       "stud_out_of_web_mm": 10.848,
+       "hole_to_stud_radial_mm": 0.32
+      },
+      {
+       "index": 2,
+       "stud_tip_car_mm": [
+        -1414.4379,
+        -873.9992,
+        957.4717
+       ],
+       "stud_axis_car": [
+        0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2611,
+        33.5801,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1414.3972,
+        -864.4605,
+        957.7255
+       ],
+       "face_gap_mm": 6.467,
+       "stud_out_of_web_mm": 9.539,
+       "hole_to_stud_radial_mm": 0.257
+      },
+      {
+       "index": 3,
+       "stud_tip_car_mm": [
+        -1393.465,
+        -873.9991,
+        893.6564
+       ],
+       "stud_axis_car": [
+        0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2248,
+        -33.5933,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1393.322,
+        -866.1421,
+        893.955
+       ],
+       "face_gap_mm": 8.148,
+       "stud_out_of_web_mm": 7.857,
+       "hole_to_stud_radial_mm": 0.331
+      },
+      {
+       "index": 4,
+       "stud_tip_car_mm": [
+        -1326.3144,
+        -873.9991,
+        893.8494
+       ],
+       "stud_axis_car": [
+        0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6402,
+        -54.3412,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1326.1395,
+        -865.8724,
+        894.2785
+       ],
+       "face_gap_mm": 7.879,
+       "stud_out_of_web_mm": 8.127,
+       "hole_to_stud_radial_mm": 0.463
+      }
+     ],
+     "settling": {
+      "gap_mm_over_time": [
+       [
+        0.0,
+        6.03,
+        0.064
+       ],
+       [
+        1.0,
+        6.698,
+        1.532
+       ],
+       [
+        2.0,
+        6.699,
+        1.534
+       ],
+       [
+        3.0,
+        6.701,
+        1.538
+       ],
+       [
+        4.0,
+        6.702,
+        1.538
+       ],
+       [
+        5.0,
+        6.703,
+        1.539
+       ],
+       [
+        6.0,
+        6.743,
+        1.579
+       ],
+       [
+        7.0,
+        6.753,
+        1.591
+       ],
+       [
+        8.0,
+        6.753,
+        1.591
+       ],
+       [
+        9.0,
+        6.753,
+        1.591
+       ],
+       [
+        10.0,
+        6.752,
+        1.591
+       ],
+       [
+        11.0,
+        6.753,
+        1.592
+       ],
+       [
+        12.0,
+        6.753,
+        1.592
+       ],
+       [
+        13.0,
+        6.752,
+        1.592
+       ],
+       [
+        14.0,
+        6.753,
+        1.592
+       ],
+       [
+        15.0,
+        6.753,
+        1.592
+       ],
+       [
+        16.0,
+        6.753,
+        1.592
+       ],
+       [
+        17.0,
+        6.753,
+        1.592
+       ],
+       [
+        18.0,
+        6.753,
+        1.592
+       ],
+       [
+        19.0,
+        6.753,
+        1.592
+       ],
+       [
+        20.0,
+        6.754,
+        1.6
+       ]
+      ],
+      "gap_change_last_1s_mm": 0.0017,
+      "tilt_change_last_1s_deg": 0.0077
+     },
+     "hub_parts_touching": [
+      "Pilot",
+      "PilotTip",
+      "Stud_0",
+      "Stud_1",
+      "Stud_2",
+      "Stud_3",
+      "Stud_4"
+     ],
+     "on_studs": true
+    }
+   }
+  },
+  {
+   "release_depth_mm": 0.3,
+   "seed": 42,
+   "stations": {
+    "FL": {
+     "hub": {
+      "centre_car_mm": [
+       1359.9856,
+       792.5006,
+       939.9847
+      ],
+      "axis_car": [
+       -0.0,
+       1.0,
+       -0.0
+      ],
+      "moved_from_design_mm": [
+       -0.0144,
+       0.0006,
+       -0.0153
+      ],
+      "stud0_direction_car": [
+       0.5929,
+       -0.0,
+       -0.8053
+      ],
+      "pilot_diameter_mm": 66.9202
+     },
+     "wheel": {
+      "centre_car_mm": [
+       1359.9358,
+       794.8445,
+       939.2703
+      ],
+      "axis_car": [
+       0.001,
+       0.9999,
+       0.0143
+      ],
+      "orientation_car_wxyz": [
+       0.6358,
+       -0.6264,
+       0.3169,
+       0.3208
+      ],
+      "axial_gap_at_centre_mm": 2.344,
+      "radial_offset_mm": [
+       0.5458,
+       0.4637
+      ],
+      "tilt_deg": 0.824,
+      "tilt_axis_tip_shift_car": [
+       0.001,
+       -0.0001,
+       0.0143
+      ],
+      "bolt_phase_error_deg": -0.037,
+      "tire_ring_offset_mm": [
+       0.2895,
+       0.2161,
+       -0.0079
+      ]
+     },
+     "studs": [
+      {
+       "index": 0,
+       "stud_tip_car_mm": [
+        1393.8795,
+        868.5006,
+        893.9731
+       ],
+       "stud_axis_car": [
+        -0.0,
+        1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        57.1477,
+        -0.0164,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1393.9068,
+        855.4634,
+        894.1323
+       ],
+       "face_gap_mm": 2.964,
+       "stud_out_of_web_mm": 13.037,
+       "hole_to_stud_radial_mm": 0.161
+      },
+      {
+       "index": 1,
+       "stud_tip_car_mm": [
+        1326.6676,
+        868.5006,
+        893.5463
+       ],
+       "stud_axis_car": [
+        -0.0,
+        1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6439,
+        54.3626,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1326.7246,
+        855.5385,
+        893.67
+       ],
+       "face_gap_mm": 3.039,
+       "stud_out_of_web_mm": 12.962,
+       "hole_to_stud_radial_mm": 0.136
+      },
+      {
+       "index": 2,
+       "stud_tip_car_mm": [
+        1305.5361,
+        868.5006,
+        957.2986
+       ],
+       "stud_axis_car": [
+        -0.0,
+        1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2241,
+        33.5835,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1305.5235,
+        854.6459,
+        957.4148
+       ],
+       "face_gap_mm": 2.147,
+       "stud_out_of_web_mm": 13.855,
+       "hole_to_stud_radial_mm": 0.117
+      },
+      {
+       "index": 3,
+       "stud_tip_car_mm": [
+        1359.6085,
+        868.5007,
+        997.1462
+       ],
+       "stud_axis_car": [
+        -0.0,
+        1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.256,
+        -33.5852,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1359.6028,
+        854.0192,
+        997.2734
+       ],
+       "face_gap_mm": 1.52,
+       "stud_out_of_web_mm": 14.481,
+       "hole_to_stud_radial_mm": 0.127
+      },
+      {
+       "index": 4,
+       "stud_tip_car_mm": [
+        1414.1716,
+        868.5007,
+        957.998
+       ],
+       "stud_axis_car": [
+        -0.0,
+        1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6186,
+        -54.3157,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1414.2266,
+        854.5245,
+        958.1627
+       ],
+       "face_gap_mm": 2.025,
+       "stud_out_of_web_mm": 13.976,
+       "hole_to_stud_radial_mm": 0.174
+      }
+     ],
+     "settling": {
+      "gap_mm_over_time": [
+       [
+        0.0,
+        0.321,
+        0.037
+       ],
+       [
+        1.0,
+        1.214,
+        0.719
+       ],
+       [
+        2.0,
+        1.233,
+        0.72
+       ],
+       [
+        3.0,
+        1.412,
+        0.733
+       ],
+       [
+        4.0,
+        1.605,
+        0.751
+       ],
+       [
+        5.0,
+        1.652,
+        0.765
+       ],
+       [
+        6.0,
+        1.775,
+        0.792
+       ],
+       [
+        7.0,
+        2.079,
+        0.793
+       ],
+       [
+        8.0,
+        2.08,
+        0.792
+       ],
+       [
+        9.0,
+        2.245,
+        0.82
+       ],
+       [
+        10.0,
+        2.319,
+        0.82
+       ],
+       [
+        11.0,
+        2.322,
+        0.818
+       ],
+       [
+        12.0,
+        2.341,
+        0.819
+       ],
+       [
+        13.0,
+        2.34,
+        0.82
+       ],
+       [
+        14.0,
+        2.34,
+        0.82
+       ],
+       [
+        15.0,
+        2.34,
+        0.822
+       ],
+       [
+        16.0,
+        2.341,
+        0.819
+       ],
+       [
+        17.0,
+        2.341,
+        0.821
+       ],
+       [
+        18.0,
+        2.341,
+        0.82
+       ],
+       [
+        19.0,
+        2.341,
+        0.821
+       ],
+       [
+        20.0,
+        2.344,
+        0.824
+       ]
+      ],
+      "gap_change_last_1s_mm": 0.0027,
+      "tilt_change_last_1s_deg": 0.003
+     },
+     "hub_parts_touching": [
+      "Pilot",
+      "PilotTip",
+      "Stud_0",
+      "Stud_1",
+      "Stud_2",
+      "Stud_3",
+      "Stud_4"
+     ],
+     "on_studs": true
+    },
+    "FR": {
+     "hub": {
+      "centre_car_mm": [
+       1359.9873,
+       -792.5003,
+       939.9845
+      ],
+      "axis_car": [
+       -0.0,
+       -1.0,
+       -0.0
+      ],
+      "moved_from_design_mm": [
+       -0.0127,
+       -0.0003,
+       -0.0155
+      ],
+      "stud0_direction_car": [
+       0.9504,
+       -0.0,
+       0.3112
+      ],
+      "pilot_diameter_mm": 66.9333
+     },
+     "wheel": {
+      "centre_car_mm": [
+       1359.9229,
+       -794.044,
+       939.4023
+      ],
+      "axis_car": [
+       0.0014,
+       -0.9999,
+       0.0116
+      ],
+      "orientation_car_wxyz": [
+       0.7022,
+       0.6942,
+       -0.1108,
+       0.113
+      ],
+      "axial_gap_at_centre_mm": 1.544,
+      "radial_offset_mm": [
+       -0.2423,
+       -0.5332
+      ],
+      "tilt_deg": 0.668,
+      "tilt_axis_tip_shift_car": [
+       0.0014,
+       0.0001,
+       0.0116
+      ],
+      "bolt_phase_error_deg": 0.077,
+      "tire_ring_offset_mm": [
+       -0.1132,
+       -0.3426,
+       -0.0063
+      ]
+     },
+     "studs": [
+      {
+       "index": 0,
+       "stud_tip_car_mm": [
+        1414.2974,
+        -868.5003,
+        957.7799
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        57.1513,
+        0.0122,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1414.2925,
+        -853.7595,
+        957.9533
+       ],
+       "face_gap_mm": 1.26,
+       "stud_out_of_web_mm": 14.741,
+       "hole_to_stud_radial_mm": 0.173
+      },
+      {
+       "index": 1,
+       "stud_tip_car_mm": [
+        1359.8582,
+        -868.5003,
+        997.1835
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6761,
+        54.3995,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1359.7964,
+        -853.3782,
+        997.2432
+       ],
+       "face_gap_mm": 0.879,
+       "stud_out_of_web_mm": 15.122,
+       "hole_to_stud_radial_mm": 0.086
+      },
+      {
+       "index": 2,
+       "stud_tip_car_mm": [
+        1305.552,
+        -868.5003,
+        957.5472
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2677,
+        33.6296,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1305.5875,
+        -853.9114,
+        957.5596
+       ],
+       "face_gap_mm": 1.412,
+       "stud_out_of_web_mm": 14.589,
+       "hole_to_stud_radial_mm": 0.038
+      },
+      {
+       "index": 3,
+       "stud_tip_car_mm": [
+        1326.4784,
+        -868.5002,
+        893.6223
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2718,
+        -33.6335,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1326.5807,
+        -854.6223,
+        893.7438
+       ],
+       "face_gap_mm": 2.123,
+       "stud_out_of_web_mm": 13.878,
+       "hole_to_stud_radial_mm": 0.159
+      },
+      {
+       "index": 4,
+       "stud_tip_car_mm": [
+        1393.7022,
+        -868.5002,
+        893.8121
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6737,
+        -54.3712,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1393.7641,
+        -854.5284,
+        893.9871
+       ],
+       "face_gap_mm": 2.029,
+       "stud_out_of_web_mm": 13.972,
+       "hole_to_stud_radial_mm": 0.186
+      }
+     ],
+     "settling": {
+      "gap_mm_over_time": [
+       [
+        0.0,
+        0.322,
+        0.048
+       ],
+       [
+        1.0,
+        0.977,
+        0.629
+       ],
+       [
+        2.0,
+        0.984,
+        0.635
+       ],
+       [
+        3.0,
+        0.984,
+        0.635
+       ],
+       [
+        4.0,
+        0.984,
+        0.635
+       ],
+       [
+        5.0,
+        0.984,
+        0.635
+       ],
+       [
+        6.0,
+        0.985,
+        0.635
+       ],
+       [
+        7.0,
+        1.078,
+        0.618
+       ],
+       [
+        8.0,
+        1.11,
+        0.652
+       ],
+       [
+        9.0,
+        1.365,
+        0.624
+       ],
+       [
+        10.0,
+        1.384,
+        0.652
+       ],
+       [
+        11.0,
+        1.384,
+        0.654
+       ],
+       [
+        12.0,
+        1.453,
+        0.656
+       ],
+       [
+        13.0,
+        1.544,
+        0.667
+       ],
+       [
+        14.0,
+        1.543,
+        0.667
+       ],
+       [
+        15.0,
+        1.543,
+        0.667
+       ],
+       [
+        16.0,
+        1.543,
+        0.668
+       ],
+       [
+        17.0,
+        1.543,
+        0.668
+       ],
+       [
+        18.0,
+        1.543,
+        0.668
+       ],
+       [
+        19.0,
+        1.543,
+        0.667
+       ],
+       [
+        20.0,
+        1.544,
+        0.668
+       ]
+      ],
+      "gap_change_last_1s_mm": 0.0007,
+      "tilt_change_last_1s_deg": 0.0011
+     },
+     "hub_parts_touching": [
+      "Face",
+      "Pilot",
+      "PilotTip",
+      "Stud_0",
+      "Stud_1",
+      "Stud_2",
+      "Stud_3",
+      "Stud_4"
+     ],
+     "on_studs": true
+    },
+    "RL": {
+     "hub": {
+      "centre_car_mm": [
+       -1360.0091,
+       797.9999,
+       939.9846
+      ],
+      "axis_car": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "moved_from_design_mm": [
+       -0.0091,
+       -0.0001,
+       -0.0154
+      ],
+      "stud0_direction_car": [
+       0.5881,
+       0.0,
+       -0.8088
+      ],
+      "pilot_diameter_mm": 66.9103
+     },
+     "wheel": {
+      "centre_car_mm": [
+       -1359.9801,
+       799.5549,
+       939.2669
+      ],
+      "axis_car": [
+       -0.0005,
+       0.9999,
+       0.0143
+      ],
+      "orientation_car_wxyz": [
+       0.635,
+       -0.6262,
+       0.3175,
+       0.3224
+      ],
+      "axial_gap_at_centre_mm": 1.555,
+      "radial_offset_mm": [
+       0.5975,
+       0.3987
+      ],
+      "tilt_deg": 0.818,
+      "tilt_axis_tip_shift_car": [
+       -0.0005,
+       -0.0001,
+       0.0143
+      ],
+      "bolt_phase_error_deg": -0.176,
+      "tire_ring_offset_mm": [
+       0.2898,
+       0.2146,
+       -0.008
+      ]
+     },
+     "studs": [
+      {
+       "index": 0,
+       "stud_tip_car_mm": [
+        -1326.405,
+        873.9999,
+        893.7769
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        57.1348,
+        -0.0016,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1326.2591,
+        860.224,
+        894.0089
+       ],
+       "face_gap_mm": 2.226,
+       "stud_out_of_web_mm": 13.776,
+       "hole_to_stud_radial_mm": 0.274
+      },
+      {
+       "index": 1,
+       "stud_tip_car_mm": [
+        -1393.5727,
+        873.9999,
+        893.7636
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6421,
+        54.3291,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1393.4425,
+        860.1939,
+        893.7773
+       ],
+       "face_gap_mm": 2.195,
+       "stud_out_of_web_mm": 13.806,
+       "hole_to_stud_radial_mm": 0.131
+      },
+      {
+       "index": 2,
+       "stud_tip_car_mm": [
+        -1414.3316,
+        873.9999,
+        957.5854
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.1837,
+        33.5826,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1414.4232,
+        859.2724,
+        957.5945
+       ],
+       "face_gap_mm": 1.274,
+       "stud_out_of_web_mm": 14.728,
+       "hole_to_stud_radial_mm": 0.092
+      },
+      {
+       "index": 3,
+       "stud_tip_car_mm": [
+        -1359.9845,
+        873.9998,
+        997.1154
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.191,
+        -33.6203,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1360.2065,
+        858.7329,
+        997.2673
+       ],
+       "face_gap_mm": 0.734,
+       "stud_out_of_web_mm": 15.267,
+       "hole_to_stud_radial_mm": 0.269
+      },
+      {
+       "index": 4,
+       "stud_tip_car_mm": [
+        -1305.6573,
+        873.9998,
+        957.6732
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.66,
+        -54.361,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1305.7181,
+        859.321,
+        957.9692
+       ],
+       "face_gap_mm": 1.323,
+       "stud_out_of_web_mm": 14.679,
+       "hole_to_stud_radial_mm": 0.302
+      }
+     ],
+     "settling": {
+      "gap_mm_over_time": [
+       [
+        0.0,
+        0.325,
+        0.045
+       ],
+       [
+        1.0,
+        1.185,
+        0.773
+       ],
+       [
+        2.0,
+        1.196,
+        0.795
+       ],
+       [
+        3.0,
+        1.196,
+        0.795
+       ],
+       [
+        4.0,
+        1.196,
+        0.795
+       ],
+       [
+        5.0,
+        1.196,
+        0.795
+       ],
+       [
+        6.0,
+        1.189,
+        0.787
+       ],
+       [
+        7.0,
+        1.188,
+        0.78
+       ],
+       [
+        8.0,
+        1.19,
+        0.782
+       ],
+       [
+        9.0,
+        1.554,
+        0.818
+       ],
+       [
+        10.0,
+        1.555,
+        0.819
+       ],
+       [
+        11.0,
+        1.555,
+        0.818
+       ],
+       [
+        12.0,
+        1.555,
+        0.818
+       ],
+       [
+        13.0,
+        1.555,
+        0.818
+       ],
+       [
+        14.0,
+        1.555,
+        0.818
+       ],
+       [
+        15.0,
+        1.555,
+        0.818
+       ],
+       [
+        16.0,
+        1.555,
+        0.818
+       ],
+       [
+        17.0,
+        1.555,
+        0.818
+       ],
+       [
+        18.0,
+        1.555,
+        0.819
+       ],
+       [
+        19.0,
+        1.555,
+        0.818
+       ],
+       [
+        20.0,
+        1.555,
+        0.818
+       ]
+      ],
+      "gap_change_last_1s_mm": 0.0002,
+      "tilt_change_last_1s_deg": -0.0
+     },
+     "hub_parts_touching": [
+      "Face",
+      "Pilot",
+      "PilotTip",
+      "Stud_0",
+      "Stud_1",
+      "Stud_2",
+      "Stud_3",
+      "Stud_4"
+     ],
+     "on_studs": true
+    },
+    "RR": {
+     "hub": {
+      "centre_car_mm": [
+       -1360.0143,
+       -798.0002,
+       939.9846
+      ],
+      "axis_car": [
+       0.0,
+       -1.0,
+       0.0
+      ],
+      "moved_from_design_mm": [
+       -0.0143,
+       -0.0002,
+       -0.0154
+      ],
+      "stud0_direction_car": [
+       0.9506,
+       0.0,
+       0.3105
+      ],
+      "pilot_diameter_mm": 66.9128
+     },
+     "wheel": {
+      "centre_car_mm": [
+       -1360.0869,
+       -799.9136,
+       939.2559
+      ],
+      "axis_car": [
+       0.0016,
+       -0.9999,
+       0.0146
+      ],
+      "orientation_car_wxyz": [
+       0.7028,
+       0.6928,
+       -0.1129,
+       0.1157
+      ],
+      "axial_gap_at_centre_mm": 1.913,
+      "radial_offset_mm": [
+       -0.2953,
+       -0.6701
+      ],
+      "tilt_deg": 0.84,
+      "tilt_axis_tip_shift_car": [
+       0.0016,
+       0.0001,
+       0.0146
+      ],
+      "bolt_phase_error_deg": 0.516,
+      "tire_ring_offset_mm": [
+       -0.1169,
+       -0.341,
+       -0.0087
+      ]
+     },
+     "studs": [
+      {
+       "index": 0,
+       "stud_tip_car_mm": [
+        -1305.661,
+        -874.0002,
+        957.7456
+       ],
+       "stud_axis_car": [
+        0.0,
+        -1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        57.1816,
+        0.007,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1305.8278,
+        -859.5544,
+        958.3624
+       ],
+       "face_gap_mm": 1.556,
+       "stud_out_of_web_mm": 14.446,
+       "hole_to_stud_radial_mm": 0.639
+      },
+      {
+       "index": 1,
+       "stud_tip_car_mm": [
+        -1360.0641,
+        -874.0002,
+        997.1227
+       ],
+       "stud_axis_car": [
+        0.0,
+        -1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6935,
+        54.3296,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1360.5963,
+        -859.0756,
+        997.2707
+       ],
+       "face_gap_mm": 1.077,
+       "stud_out_of_web_mm": 14.925,
+       "hole_to_stud_radial_mm": 0.552
+      },
+      {
+       "index": 2,
+       "stud_tip_car_mm": [
+        -1414.3852,
+        -874.0002,
+        957.5588
+       ],
+       "stud_axis_car": [
+        0.0,
+        -1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2271,
+        33.5873,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1414.5273,
+        -859.7461,
+        957.2125
+       ],
+       "face_gap_mm": 1.747,
+       "stud_out_of_web_mm": 14.254,
+       "hole_to_stud_radial_mm": 0.374
+      },
+      {
+       "index": 3,
+       "stud_tip_car_mm": [
+        -1393.5397,
+        -874.0002,
+        893.6834
+       ],
+       "stud_axis_car": [
+        0.0,
+        -1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2445,
+        -33.6034,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1393.0901,
+        -860.6392,
+        893.5468
+       ],
+       "face_gap_mm": 2.64,
+       "stud_out_of_web_mm": 13.361,
+       "hole_to_stud_radial_mm": 0.47
+      },
+      {
+       "index": 4,
+       "stud_tip_car_mm": [
+        -1326.3319,
+        -874.0002,
+        893.7663
+       ],
+       "stud_axis_car": [
+        0.0,
+        -1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6673,
+        -54.3921,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1325.9101,
+        -860.5207,
+        894.2575
+       ],
+       "face_gap_mm": 2.522,
+       "stud_out_of_web_mm": 13.48,
+       "hole_to_stud_radial_mm": 0.647
+      }
+     ],
+     "settling": {
+      "gap_mm_over_time": [
+       [
+        0.0,
+        0.326,
+        0.055
+       ],
+       [
+        1.0,
+        1.095,
+        0.751
+       ],
+       [
+        2.0,
+        1.098,
+        0.757
+       ],
+       [
+        3.0,
+        1.246,
+        0.769
+       ],
+       [
+        4.0,
+        1.715,
+        0.818
+       ],
+       [
+        5.0,
+        1.855,
+        0.819
+       ],
+       [
+        6.0,
+        1.896,
+        0.833
+       ],
+       [
+        7.0,
+        1.895,
+        0.832
+       ],
+       [
+        8.0,
+        1.895,
+        0.833
+       ],
+       [
+        9.0,
+        1.895,
+        0.834
+       ],
+       [
+        10.0,
+        1.896,
+        0.834
+       ],
+       [
+        11.0,
+        1.896,
+        0.834
+       ],
+       [
+        12.0,
+        1.895,
+        0.833
+       ],
+       [
+        13.0,
+        1.895,
+        0.833
+       ],
+       [
+        14.0,
+        1.895,
+        0.833
+       ],
+       [
+        15.0,
+        1.897,
+        0.83
+       ],
+       [
+        16.0,
+        1.909,
+        0.836
+       ],
+       [
+        17.0,
+        1.914,
+        0.839
+       ],
+       [
+        18.0,
+        1.913,
+        0.84
+       ],
+       [
+        19.0,
+        1.914,
+        0.84
+       ],
+       [
+        20.0,
+        1.913,
+        0.84
+       ]
+      ],
+      "gap_change_last_1s_mm": -0.0001,
+      "tilt_change_last_1s_deg": 0.0
+     },
+     "hub_parts_touching": [
+      "Face",
+      "Pilot",
+      "PilotTip",
+      "Stud_0",
+      "Stud_1",
+      "Stud_2",
+      "Stud_3",
+      "Stud_4"
+     ],
+     "on_studs": true
+    }
+   }
+  },
+  {
+   "release_depth_mm": 0.3,
+   "seed": 7,
+   "stations": {
+    "FL": {
+     "hub": {
+      "centre_car_mm": [
+       1360.0068,
+       792.5004,
+       939.9845
+      ],
+      "axis_car": [
+       -0.0,
+       1.0,
+       -0.0
+      ],
+      "moved_from_design_mm": [
+       0.0068,
+       0.0004,
+       -0.0155
+      ],
+      "stud0_direction_car": [
+       0.5891,
+       -0.0,
+       -0.808
+      ],
+      "pilot_diameter_mm": 66.9323
+     },
+     "wheel": {
+      "centre_car_mm": [
+       1359.9699,
+       794.7612,
+       939.3511
+      ],
+      "axis_car": [
+       0.0008,
+       0.9999,
+       0.0127
+      ],
+      "orientation_car_wxyz": [
+       0.6341,
+       -0.6258,
+       0.3193,
+       0.3229
+      ],
+      "axial_gap_at_centre_mm": 2.261,
+      "radial_offset_mm": [
+       0.4901,
+       0.403
+      ],
+      "tilt_deg": 0.729,
+      "tilt_axis_tip_shift_car": [
+       0.0008,
+       -0.0001,
+       0.0127
+      ],
+      "bolt_phase_error_deg": 0.11,
+      "tire_ring_offset_mm": [
+       0.2933,
+       0.2107,
+       -0.007
+      ]
+     },
+     "studs": [
+      {
+       "index": 0,
+       "stud_tip_car_mm": [
+        1393.6965,
+        868.5003,
+        893.8332
+       ],
+       "stud_axis_car": [
+        -0.0,
+        1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        57.1395,
+        -0.034,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1393.5939,
+        855.3178,
+        893.8709
+       ],
+       "face_gap_mm": 2.819,
+       "stud_out_of_web_mm": 13.183,
+       "hole_to_stud_radial_mm": 0.109
+      },
+      {
+       "index": 1,
+       "stud_tip_car_mm": [
+        1326.4804,
+        868.5003,
+        893.6779
+       ],
+       "stud_axis_car": [
+        -0.0,
+        1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6665,
+        54.371,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1326.4101,
+        855.3694,
+        893.8921
+       ],
+       "face_gap_mm": 2.87,
+       "stud_out_of_web_mm": 13.131,
+       "hole_to_stud_radial_mm": 0.225
+      },
+      {
+       "index": 2,
+       "stud_tip_car_mm": [
+        1305.6065,
+        868.5004,
+        957.5444
+       ],
+       "stud_axis_car": [
+        -0.0,
+        1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2377,
+        33.6128,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1305.6687,
+        854.5738,
+        957.7891
+       ],
+       "face_gap_mm": 2.075,
+       "stud_out_of_web_mm": 13.927,
+       "hole_to_stud_radial_mm": 0.252
+      },
+      {
+       "index": 3,
+       "stud_tip_car_mm": [
+        1359.9089,
+        868.5005,
+        997.1532
+       ],
+       "stud_axis_car": [
+        -0.0,
+        1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2526,
+        -33.6004,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1360.0337,
+        854.0306,
+        997.2585
+       ],
+       "face_gap_mm": 1.531,
+       "stud_out_of_web_mm": 14.47,
+       "hole_to_stud_radial_mm": 0.163
+      },
+      {
+       "index": 4,
+       "stud_tip_car_mm": [
+        1414.3565,
+        868.5004,
+        957.7666
+       ],
+       "stud_axis_car": [
+        -0.0,
+        1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6499,
+        -54.3928,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1414.3744,
+        854.4904,
+        957.7548
+       ],
+       "face_gap_mm": 1.991,
+       "stud_out_of_web_mm": 14.01,
+       "hole_to_stud_radial_mm": 0.021
+      }
+     ],
+     "settling": {
+      "gap_mm_over_time": [
+       [
+        0.0,
+        0.321,
+        0.038
+       ],
+       [
+        1.0,
+        1.184,
+        0.654
+       ],
+       [
+        2.0,
+        1.215,
+        0.637
+       ],
+       [
+        3.0,
+        1.229,
+        0.648
+       ],
+       [
+        4.0,
+        1.68,
+        0.679
+       ],
+       [
+        5.0,
+        1.715,
+        0.684
+       ],
+       [
+        6.0,
+        1.858,
+        0.692
+       ],
+       [
+        7.0,
+        1.861,
+        0.695
+       ],
+       [
+        8.0,
+        1.861,
+        0.695
+       ],
+       [
+        9.0,
+        1.861,
+        0.694
+       ],
+       [
+        10.0,
+        1.861,
+        0.694
+       ],
+       [
+        11.0,
+        1.873,
+        0.697
+       ],
+       [
+        12.0,
+        1.879,
+        0.703
+       ],
+       [
+        13.0,
+        1.968,
+        0.707
+       ],
+       [
+        14.0,
+        2.149,
+        0.723
+       ],
+       [
+        15.0,
+        2.26,
+        0.729
+       ],
+       [
+        16.0,
+        2.26,
+        0.729
+       ],
+       [
+        17.0,
+        2.261,
+        0.729
+       ],
+       [
+        18.0,
+        2.261,
+        0.729
+       ],
+       [
+        19.0,
+        2.261,
+        0.729
+       ],
+       [
+        20.0,
+        2.261,
+        0.729
+       ]
+      ],
+      "gap_change_last_1s_mm": 0.0001,
+      "tilt_change_last_1s_deg": 0.0004
+     },
+     "hub_parts_touching": [
+      "Pilot",
+      "PilotTip",
+      "Stud_0",
+      "Stud_1",
+      "Stud_2",
+      "Stud_3",
+      "Stud_4"
+     ],
+     "on_studs": true
+    },
+    "FR": {
+     "hub": {
+      "centre_car_mm": [
+       1360.0047,
+       -792.5006,
+       939.9846
+      ],
+      "axis_car": [
+       -0.0,
+       -1.0,
+       -0.0
+      ],
+      "moved_from_design_mm": [
+       0.0047,
+       -0.0006,
+       -0.0154
+      ],
+      "stud0_direction_car": [
+       0.9502,
+       -0.0,
+       0.3117
+      ],
+      "pilot_diameter_mm": 66.9109
+     },
+     "wheel": {
+      "centre_car_mm": [
+       1359.9186,
+       -794.5343,
+       939.2421
+      ],
+      "axis_car": [
+       0.0018,
+       -0.9999,
+       0.0149
+      ],
+      "orientation_car_wxyz": [
+       0.7034,
+       0.6932,
+       -0.1097,
+       0.1126
+      ],
+      "axial_gap_at_centre_mm": 2.034,
+      "radial_offset_mm": [
+       -0.3132,
+       -0.6787
+      ],
+      "tilt_deg": 0.858,
+      "tilt_axis_tip_shift_car": [
+       0.0018,
+       0.0001,
+       0.0149
+      ],
+      "bolt_phase_error_deg": -0.071,
+      "tire_ring_offset_mm": [
+       -0.1137,
+       -0.343,
+       -0.0082
+      ]
+     },
+     "studs": [
+      {
+       "index": 0,
+       "stud_tip_car_mm": [
+        1414.358,
+        -868.5007,
+        957.807
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        57.2008,
+        -0.0077,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1414.3484,
+        -854.1678,
+        957.8798
+       ],
+       "face_gap_mm": 1.669,
+       "stud_out_of_web_mm": 14.333,
+       "hole_to_stud_radial_mm": 0.073
+      },
+      {
+       "index": 1,
+       "stud_tip_car_mm": [
+        1359.8618,
+        -868.5008,
+        997.156
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6851,
+        54.3678,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1359.9307,
+        -853.6785,
+        997.2772
+       ],
+       "face_gap_mm": 1.179,
+       "stud_out_of_web_mm": 14.822,
+       "hole_to_stud_radial_mm": 0.139
+      },
+      {
+       "index": 2,
+       "stud_tip_car_mm": [
+        1305.5864,
+        -868.5007,
+        957.5351
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2364,
+        33.6389,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1305.6429,
+        -854.3626,
+        957.704
+       ],
+       "face_gap_mm": 1.864,
+       "stud_out_of_web_mm": 14.138,
+       "hole_to_stud_radial_mm": 0.178
+      },
+      {
+       "index": 3,
+       "stud_tip_car_mm": [
+        1326.5379,
+        -868.5005,
+        893.646
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2434,
+        -33.5979,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1326.5089,
+        -855.2746,
+        893.8491
+       ],
+       "face_gap_mm": 2.776,
+       "stud_out_of_web_mm": 13.226,
+       "hole_to_stud_radial_mm": 0.205
+      },
+      {
+       "index": 4,
+       "stud_tip_car_mm": [
+        1393.7393,
+        -868.5005,
+        893.8492
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6732,
+        -54.3519,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1393.6925,
+        -855.1542,
+        893.9578
+       ],
+       "face_gap_mm": 2.655,
+       "stud_out_of_web_mm": 13.346,
+       "hole_to_stud_radial_mm": 0.118
+      }
+     ],
+     "settling": {
+      "gap_mm_over_time": [
+       [
+        0.0,
+        0.322,
+        0.047
+       ],
+       [
+        1.0,
+        1.278,
+        0.784
+       ],
+       [
+        2.0,
+        1.335,
+        0.825
+       ],
+       [
+        3.0,
+        1.384,
+        0.81
+       ],
+       [
+        4.0,
+        1.396,
+        0.796
+       ],
+       [
+        5.0,
+        1.396,
+        0.796
+       ],
+       [
+        6.0,
+        1.396,
+        0.796
+       ],
+       [
+        7.0,
+        1.396,
+        0.796
+       ],
+       [
+        8.0,
+        1.396,
+        0.796
+       ],
+       [
+        9.0,
+        1.395,
+        0.791
+       ],
+       [
+        10.0,
+        1.432,
+        0.751
+       ],
+       [
+        11.0,
+        1.859,
+        0.852
+       ],
+       [
+        12.0,
+        1.862,
+        0.856
+       ],
+       [
+        13.0,
+        1.931,
+        0.843
+       ],
+       [
+        14.0,
+        2.004,
+        0.856
+       ],
+       [
+        15.0,
+        2.005,
+        0.855
+       ],
+       [
+        16.0,
+        2.006,
+        0.857
+       ],
+       [
+        17.0,
+        2.006,
+        0.856
+       ],
+       [
+        18.0,
+        2.006,
+        0.856
+       ],
+       [
+        19.0,
+        2.006,
+        0.857
+       ],
+       [
+        20.0,
+        2.034,
+        0.858
+       ]
+      ],
+      "gap_change_last_1s_mm": 0.0274,
+      "tilt_change_last_1s_deg": 0.001
+     },
+     "hub_parts_touching": [
+      "Face",
+      "Pilot",
+      "PilotTip",
+      "Stud_0",
+      "Stud_1",
+      "Stud_2",
+      "Stud_3",
+      "Stud_4"
+     ],
+     "on_studs": true
+    },
+    "RL": {
+     "hub": {
+      "centre_car_mm": [
+       -1359.9883,
+       797.9994,
+       939.9847
+      ],
+      "axis_car": [
+       0.0,
+       1.0,
+       -0.0
+      ],
+      "moved_from_design_mm": [
+       0.0117,
+       -0.0006,
+       -0.0153
+      ],
+      "stud0_direction_car": [
+       0.5905,
+       -0.0,
+       -0.8071
+      ],
+      "pilot_diameter_mm": 66.9397
+     },
+     "wheel": {
+      "centre_car_mm": [
+       -1360.1385,
+       800.3993,
+       939.3761
+      ],
+      "axis_car": [
+       0.003,
+       0.9999,
+       0.0123
+      ],
+      "orientation_car_wxyz": [
+       0.6353,
+       -0.6266,
+       0.3181,
+       0.3201
+      ],
+      "axial_gap_at_centre_mm": 2.4,
+      "radial_offset_mm": [
+       0.4025,
+       0.4806
+      ],
+      "tilt_deg": 0.723,
+      "tilt_axis_tip_shift_car": [
+       0.003,
+       -0.0001,
+       0.0123
+      ],
+      "bolt_phase_error_deg": -0.156,
+      "tire_ring_offset_mm": [
+       0.2902,
+       0.2139,
+       -0.0082
+      ]
+     },
+     "studs": [
+      {
+       "index": 0,
+       "stud_tip_car_mm": [
+        -1326.2389,
+        873.9994,
+        893.8952
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        57.125,
+        -0.0236,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1326.088,
+        860.8565,
+        894.0814
+       ],
+       "face_gap_mm": 2.858,
+       "stud_out_of_web_mm": 13.143,
+       "hole_to_stud_radial_mm": 0.24
+      },
+      {
+       "index": 1,
+       "stud_tip_car_mm": [
+        -1393.462,
+        873.9994,
+        893.6593
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6223,
+        54.369,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1393.2704,
+        861.0639,
+        893.6792
+       ],
+       "face_gap_mm": 3.066,
+       "stud_out_of_web_mm": 12.936,
+       "hole_to_stud_radial_mm": 0.193
+      },
+      {
+       "index": 2,
+       "stud_tip_car_mm": [
+        -1414.41,
+        873.9995,
+        957.4703
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2462,
+        33.597,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1414.4158,
+        860.3462,
+        957.4446
+       ],
+       "face_gap_mm": 2.348,
+       "stud_out_of_web_mm": 13.653,
+       "hole_to_stud_radial_mm": 0.026
+      },
+      {
+       "index": 3,
+       "stud_tip_car_mm": [
+        -1360.1978,
+        873.9995,
+        997.1571
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2653,
+        -33.5894,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1360.302,
+        859.6953,
+        997.256
+       ],
+       "face_gap_mm": 1.697,
+       "stud_out_of_web_mm": 14.304,
+       "hole_to_stud_radial_mm": 0.144
+      },
+      {
+       "index": 4,
+       "stud_tip_car_mm": [
+        -1305.6864,
+        873.9994,
+        957.8178
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6711,
+        -54.3549,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1305.7125,
+        860.0107,
+        958.0954
+       ],
+       "face_gap_mm": 2.012,
+       "stud_out_of_web_mm": 13.989,
+       "hole_to_stud_radial_mm": 0.279
+      }
+     ],
+     "settling": {
+      "gap_mm_over_time": [
+       [
+        0.0,
+        0.326,
+        0.046
+       ],
+       [
+        1.0,
+        0.816,
+        0.577
+       ],
+       [
+        2.0,
+        0.81,
+        0.574
+       ],
+       [
+        3.0,
+        0.932,
+        0.589
+       ],
+       [
+        4.0,
+        0.932,
+        0.59
+       ],
+       [
+        5.0,
+        0.932,
+        0.59
+       ],
+       [
+        6.0,
+        0.932,
+        0.59
+       ],
+       [
+        7.0,
+        0.932,
+        0.59
+       ],
+       [
+        8.0,
+        0.933,
+        0.59
+       ],
+       [
+        9.0,
+        0.932,
+        0.59
+       ],
+       [
+        10.0,
+        0.933,
+        0.59
+       ],
+       [
+        11.0,
+        0.932,
+        0.59
+       ],
+       [
+        12.0,
+        0.997,
+        0.581
+       ],
+       [
+        13.0,
+        1.596,
+        0.627
+       ],
+       [
+        14.0,
+        1.711,
+        0.64
+       ],
+       [
+        15.0,
+        1.711,
+        0.641
+       ],
+       [
+        16.0,
+        1.866,
+        0.65
+       ],
+       [
+        17.0,
+        1.866,
+        0.651
+       ],
+       [
+        18.0,
+        1.836,
+        0.641
+       ],
+       [
+        19.0,
+        2.39,
+        0.713
+       ],
+       [
+        20.0,
+        2.4,
+        0.723
+       ]
+      ],
+      "gap_change_last_1s_mm": 0.0101,
+      "tilt_change_last_1s_deg": 0.0098
+     },
+     "hub_parts_touching": [
+      "Pilot",
+      "PilotTip",
+      "Stud_0",
+      "Stud_1",
+      "Stud_2",
+      "Stud_3",
+      "Stud_4"
+     ],
+     "on_studs": true
+    },
+    "RR": {
+     "hub": {
+      "centre_car_mm": [
+       -1359.9908,
+       -798.0009,
+       939.9784
+      ],
+      "axis_car": [
+       0.0,
+       -1.0,
+       -0.0
+      ],
+      "moved_from_design_mm": [
+       0.0092,
+       -0.0009,
+       -0.0216
+      ],
+      "stud0_direction_car": [
+       0.9344,
+       -0.0,
+       0.3562
+      ],
+      "pilot_diameter_mm": 66.9293
+     },
+     "wheel": {
+      "centre_car_mm": [
+       -1360.0949,
+       -801.2159,
+       939.2075
+      ],
+      "axis_car": [
+       0.0021,
+       -0.9999,
+       0.0156
+      ],
+      "orientation_car_wxyz": [
+       0.701,
+       0.6904,
+       -0.1249,
+       0.1283
+      ],
+      "axial_gap_at_centre_mm": 3.215,
+      "radial_offset_mm": [
+       -0.3718,
+       -0.6831
+      ],
+      "tilt_deg": 0.906,
+      "tilt_axis_tip_shift_car": [
+       0.0021,
+       0.0001,
+       0.0157
+      ],
+      "bolt_phase_error_deg": -0.246,
+      "tire_ring_offset_mm": [
+       -0.1295,
+       -0.3485,
+       -0.0071
+      ]
+     },
+     "studs": [
+      {
+       "index": 0,
+       "stud_tip_car_mm": [
+        -1306.6034,
+        -874.0019,
+        960.3319
+       ],
+       "stud_axis_car": [
+        0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        57.1369,
+        0.0058,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1306.4834,
+        -860.783,
+        960.2714
+       ],
+       "face_gap_mm": 2.783,
+       "stud_out_of_web_mm": 13.219,
+       "hole_to_stud_radial_mm": 0.135
+      },
+      {
+       "index": 1,
+       "stud_tip_car_mm": [
+        -1362.838,
+        -874.0037,
+        997.053
+       ],
+       "stud_axis_car": [
+        0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6704,
+        54.3487,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1362.5874,
+        -860.3219,
+        997.2281
+       ],
+       "face_gap_mm": 2.32,
+       "stud_out_of_web_mm": 13.682,
+       "hole_to_stud_radial_mm": 0.305
+      },
+      {
+       "index": 2,
+       "stud_tip_car_mm": [
+        -1415.2007,
+        -874.0017,
+        954.8736
+       ],
+       "stud_axis_car": [
+        0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.282,
+        33.587,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1415.0749,
+        -861.0859,
+        955.2978
+       ],
+       "face_gap_mm": 3.086,
+       "stud_out_of_web_mm": 12.916,
+       "hole_to_stud_radial_mm": 0.442
+      },
+      {
+       "index": 3,
+       "stud_tip_car_mm": [
+        -1391.235,
+        -873.9986,
+        892.1261
+       ],
+       "stud_axis_car": [
+        0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2383,
+        -33.5815,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1391.4099,
+        -862.0193,
+        892.4268
+       ],
+       "face_gap_mm": 4.022,
+       "stud_out_of_web_mm": 11.979,
+       "hole_to_stud_radial_mm": 0.347
+      },
+      {
+       "index": 4,
+       "stud_tip_car_mm": [
+        -1324.1109,
+        -873.9988,
+        895.513
+       ],
+       "stud_axis_car": [
+        0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6898,
+        -54.3257,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1324.2967,
+        -861.8321,
+        895.5006
+       ],
+       "face_gap_mm": 3.835,
+       "stud_out_of_web_mm": 12.167,
+       "hole_to_stud_radial_mm": 0.186
+      }
+     ],
+     "settling": {
+      "gap_mm_over_time": [
+       [
+        0.0,
+        0.321,
+        0.056
+       ],
+       [
+        1.0,
+        1.228,
+        0.682
+       ],
+       [
+        2.0,
+        1.32,
+        0.668
+       ],
+       [
+        3.0,
+        1.334,
+        0.674
+       ],
+       [
+        4.0,
+        1.338,
+        0.683
+       ],
+       [
+        5.0,
+        1.382,
+        0.691
+       ],
+       [
+        6.0,
+        2.211,
+        0.761
+       ],
+       [
+        7.0,
+        2.273,
+        0.758
+       ],
+       [
+        8.0,
+        2.632,
+        0.796
+       ],
+       [
+        9.0,
+        2.675,
+        0.795
+       ],
+       [
+        10.0,
+        2.697,
+        0.8
+       ],
+       [
+        11.0,
+        2.734,
+        0.803
+       ],
+       [
+        12.0,
+        2.804,
+        0.819
+       ],
+       [
+        13.0,
+        2.804,
+        0.819
+       ],
+       [
+        14.0,
+        2.803,
+        0.819
+       ],
+       [
+        15.0,
+        3.043,
+        0.836
+       ],
+       [
+        16.0,
+        3.094,
+        0.839
+       ],
+       [
+        17.0,
+        3.094,
+        0.769
+       ],
+       [
+        18.0,
+        3.154,
+        0.857
+       ],
+       [
+        19.0,
+        3.156,
+        0.847
+       ],
+       [
+        20.0,
+        3.215,
+        0.906
+       ]
+      ],
+      "gap_change_last_1s_mm": 0.059,
+      "tilt_change_last_1s_deg": 0.0584
+     },
+     "hub_parts_touching": [
+      "Pilot",
+      "PilotTip",
+      "Stud_0",
+      "Stud_1",
+      "Stud_2",
+      "Stud_3",
+      "Stud_4"
+     ],
+     "on_studs": true
+    }
+   }
+  },
+  {
+   "release_depth_mm": 0.3,
+   "seed": 123,
+   "stations": {
+    "FL": {
+     "hub": {
+      "centre_car_mm": [
+       1360.0074,
+       792.5006,
+       939.9847
+      ],
+      "axis_car": [
+       0.0,
+       1.0,
+       -0.0
+      ],
+      "moved_from_design_mm": [
+       0.0074,
+       0.0006,
+       -0.0153
+      ],
+      "stud0_direction_car": [
+       0.5887,
+       -0.0,
+       -0.8083
+      ],
+      "pilot_diameter_mm": 66.917
+     },
+     "wheel": {
+      "centre_car_mm": [
+       1359.9676,
+       794.6612,
+       939.2653
+      ],
+      "axis_car": [
+       0.0009,
+       0.9999,
+       0.0144
+      ],
+      "orientation_car_wxyz": [
+       0.6349,
+       -0.6256,
+       0.3185,
+       0.3226
+      ],
+      "axial_gap_at_centre_mm": 2.161,
+      "radial_offset_mm": [
+       0.558,
+       0.4557
+      ],
+      "tilt_deg": 0.828,
+      "tilt_axis_tip_shift_car": [
+       0.0009,
+       -0.0001,
+       0.0144
+      ],
+      "bolt_phase_error_deg": -0.022,
+      "tire_ring_offset_mm": [
+       0.2926,
+       0.2121,
+       -0.0082
+      ]
+     },
+     "studs": [
+      {
+       "index": 0,
+       "stud_tip_car_mm": [
+        1393.6375,
+        868.5006,
+        893.7825
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        57.1455,
+        0.016,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1393.6835,
+        855.2898,
+        893.9494
+       ],
+       "face_gap_mm": 2.791,
+       "stud_out_of_web_mm": 13.211,
+       "hole_to_stud_radial_mm": 0.173
+      },
+      {
+       "index": 1,
+       "stud_tip_car_mm": [
+        1326.4654,
+        868.5005,
+        893.6915
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6732,
+        54.367,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1326.4998,
+        855.3528,
+        893.85
+       ],
+       "face_gap_mm": 2.854,
+       "stud_out_of_web_mm": 13.148,
+       "hole_to_stud_radial_mm": 0.162
+      },
+      {
+       "index": 2,
+       "stud_tip_car_mm": [
+        1305.642,
+        868.5007,
+        957.57
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2211,
+        33.5924,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1305.6435,
+        854.4514,
+        957.7083
+       ],
+       "face_gap_mm": 1.952,
+       "stud_out_of_web_mm": 14.049,
+       "hole_to_stud_radial_mm": 0.138
+      },
+      {
+       "index": 3,
+       "stud_tip_car_mm": [
+        1359.9558,
+        868.5007,
+        997.1692
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2547,
+        -33.6243,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1359.9373,
+        853.8312,
+        997.2742
+       ],
+       "face_gap_mm": 1.332,
+       "stud_out_of_web_mm": 14.67,
+       "hole_to_stud_radial_mm": 0.107
+      },
+      {
+       "index": 4,
+       "stud_tip_car_mm": [
+        1414.3441,
+        868.5007,
+        957.6765
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6884,
+        -54.3378,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1414.3491,
+        854.3494,
+        957.8691
+       ],
+       "face_gap_mm": 1.85,
+       "stud_out_of_web_mm": 14.151,
+       "hole_to_stud_radial_mm": 0.193
+      }
+     ],
+     "settling": {
+      "gap_mm_over_time": [
+       [
+        0.0,
+        0.321,
+        0.037
+       ],
+       [
+        1.0,
+        1.251,
+        0.745
+       ],
+       [
+        2.0,
+        1.385,
+        0.736
+       ],
+       [
+        3.0,
+        1.427,
+        0.765
+       ],
+       [
+        4.0,
+        1.427,
+        0.765
+       ],
+       [
+        5.0,
+        1.428,
+        0.767
+       ],
+       [
+        6.0,
+        1.521,
+        0.767
+       ],
+       [
+        7.0,
+        1.601,
+        0.774
+       ],
+       [
+        8.0,
+        2.1,
+        0.819
+       ],
+       [
+        9.0,
+        2.146,
+        0.822
+       ],
+       [
+        10.0,
+        2.159,
+        0.826
+       ],
+       [
+        11.0,
+        2.16,
+        0.826
+       ],
+       [
+        12.0,
+        2.16,
+        0.826
+       ],
+       [
+        13.0,
+        2.16,
+        0.826
+       ],
+       [
+        14.0,
+        2.16,
+        0.826
+       ],
+       [
+        15.0,
+        2.16,
+        0.826
+       ],
+       [
+        16.0,
+        2.16,
+        0.826
+       ],
+       [
+        17.0,
+        2.161,
+        0.828
+       ],
+       [
+        18.0,
+        2.161,
+        0.828
+       ],
+       [
+        19.0,
+        2.161,
+        0.828
+       ],
+       [
+        20.0,
+        2.161,
+        0.828
+       ]
+      ],
+      "gap_change_last_1s_mm": -0.0005,
+      "tilt_change_last_1s_deg": -0.0003
+     },
+     "hub_parts_touching": [
+      "Pilot",
+      "PilotTip",
+      "Stud_0",
+      "Stud_1",
+      "Stud_2",
+      "Stud_3",
+      "Stud_4"
+     ],
+     "on_studs": true
+    },
+    "FR": {
+     "hub": {
+      "centre_car_mm": [
+       1360.0056,
+       -792.5004,
+       939.9846
+      ],
+      "axis_car": [
+       -0.0,
+       -1.0,
+       -0.0
+      ],
+      "moved_from_design_mm": [
+       0.0056,
+       -0.0004,
+       -0.0154
+      ],
+      "stud0_direction_car": [
+       0.9497,
+       -0.0,
+       0.3132
+      ],
+      "pilot_diameter_mm": 66.9374
+     },
+     "wheel": {
+      "centre_car_mm": [
+       1359.9399,
+       -794.337,
+       939.4066
+      ],
+      "axis_car": [
+       0.0014,
+       -0.9999,
+       0.0115
+      ],
+      "orientation_car_wxyz": [
+       0.7024,
+       0.6945,
+       -0.109,
+       0.1113
+      ],
+      "axial_gap_at_centre_mm": 1.837,
+      "radial_offset_mm": [
+       -0.2434,
+       -0.5283
+      ],
+      "tilt_deg": 0.666,
+      "tilt_axis_tip_shift_car": [
+       0.0014,
+       0.0001,
+       0.0115
+      ],
+      "bolt_phase_error_deg": -0.333,
+      "tire_ring_offset_mm": [
+       -0.1137,
+       -0.3426,
+       -0.0065
+      ]
+     },
+     "studs": [
+      {
+       "index": 0,
+       "stud_tip_car_mm": [
+        1414.2508,
+        -868.5005,
+        957.8792
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        57.1206,
+        0.0039,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1414.3994,
+        -854.0551,
+        957.6833
+       ],
+       "face_gap_mm": 1.556,
+       "stud_out_of_web_mm": 14.445,
+       "hole_to_stud_radial_mm": 0.246
+      },
+      {
+       "index": 1,
+       "stud_tip_car_mm": [
+        1359.7341,
+        -868.5005,
+        997.1117
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6352,
+        54.3378,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1360.1002,
+        -853.6735,
+        997.245
+       ],
+       "face_gap_mm": 1.174,
+       "stud_out_of_web_mm": 14.827,
+       "hole_to_stud_radial_mm": 0.39
+      },
+      {
+       "index": 2,
+       "stud_tip_car_mm": [
+        1305.5728,
+        -868.5005,
+        957.3965
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2403,
+        33.585,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1305.6938,
+        -854.2032,
+        957.8326
+       ],
+       "face_gap_mm": 1.704,
+       "stud_out_of_web_mm": 14.297,
+       "hole_to_stud_radial_mm": 0.453
+      },
+      {
+       "index": 3,
+       "stud_tip_car_mm": [
+        1326.6115,
+        -868.5004,
+        893.655
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2248,
+        -33.5388,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1326.368,
+        -854.9122,
+        893.9128
+       ],
+       "face_gap_mm": 2.413,
+       "stud_out_of_web_mm": 13.588,
+       "hole_to_stud_radial_mm": 0.355
+      },
+      {
+       "index": 4,
+       "stud_tip_car_mm": [
+        1393.7927,
+        -868.5004,
+        893.9112
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6562,
+        -54.3376,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1393.5517,
+        -854.8206,
+        893.8205
+       ],
+       "face_gap_mm": 2.321,
+       "stud_out_of_web_mm": 13.68,
+       "hole_to_stud_radial_mm": 0.257
+      }
+     ],
+     "settling": {
+      "gap_mm_over_time": [
+       [
+        0.0,
+        0.322,
+        0.048
+       ],
+       [
+        1.0,
+        0.857,
+        0.598
+       ],
+       [
+        2.0,
+        0.857,
+        0.598
+       ],
+       [
+        3.0,
+        0.857,
+        0.598
+       ],
+       [
+        4.0,
+        0.857,
+        0.598
+       ],
+       [
+        5.0,
+        0.908,
+        0.601
+       ],
+       [
+        6.0,
+        0.998,
+        0.602
+       ],
+       [
+        7.0,
+        1.137,
+        0.61
+       ],
+       [
+        8.0,
+        1.164,
+        0.613
+       ],
+       [
+        9.0,
+        1.164,
+        0.613
+       ],
+       [
+        10.0,
+        1.164,
+        0.614
+       ],
+       [
+        11.0,
+        1.183,
+        0.621
+       ],
+       [
+        12.0,
+        1.209,
+        0.627
+       ],
+       [
+        13.0,
+        1.218,
+        0.634
+       ],
+       [
+        14.0,
+        1.217,
+        0.634
+       ],
+       [
+        15.0,
+        1.217,
+        0.634
+       ],
+       [
+        16.0,
+        1.218,
+        0.634
+       ],
+       [
+        17.0,
+        1.224,
+        0.618
+       ],
+       [
+        18.0,
+        1.331,
+        0.632
+       ],
+       [
+        19.0,
+        1.716,
+        0.649
+       ],
+       [
+        20.0,
+        1.837,
+        0.666
+       ]
+      ],
+      "gap_change_last_1s_mm": 0.1202,
+      "tilt_change_last_1s_deg": 0.0167
+     },
+     "hub_parts_touching": [
+      "Pilot",
+      "PilotTip",
+      "Stud_0",
+      "Stud_1",
+      "Stud_2",
+      "Stud_3",
+      "Stud_4"
+     ],
+     "on_studs": true
+    },
+    "RL": {
+     "hub": {
+      "centre_car_mm": [
+       -1360.0031,
+       798.0038,
+       939.9693
+      ],
+      "axis_car": [
+       0.0,
+       1.0,
+       -0.0001
+      ],
+      "moved_from_design_mm": [
+       -0.0031,
+       0.0038,
+       -0.0307
+      ],
+      "stud0_direction_car": [
+       0.6032,
+       -0.0001,
+       -0.7976
+      ],
+      "pilot_diameter_mm": 66.9188
+     },
+     "wheel": {
+      "centre_car_mm": [
+       -1360.0026,
+       801.478,
+       939.0653
+      ],
+      "axis_car": [
+       -0.0004,
+       0.9998,
+       0.0184
+      ],
+      "orientation_car_wxyz": [
+       0.6375,
+       -0.626,
+       0.3145,
+       0.3206
+      ],
+      "axial_gap_at_centre_mm": 3.474,
+      "radial_offset_mm": [
+       0.721,
+       0.5446
+      ],
+      "tilt_deg": 1.062,
+      "tilt_axis_tip_shift_car": [
+       -0.0004,
+       -0.0002,
+       0.0185
+      ],
+      "bolt_phase_error_deg": 0.458,
+      "tire_ring_offset_mm": [
+       0.3784,
+       0.223,
+       -0.0134
+      ]
+     },
+     "studs": [
+      {
+       "index": 0,
+       "stud_tip_car_mm": [
+        -1325.5233,
+        873.9987,
+        894.3573
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        -0.0001
+       ],
+       "stud_tip_hub_mm": [
+        57.1711,
+        0.0041,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1325.9239,
+        862.3252,
+        894.3174
+       ],
+       "face_gap_mm": 4.329,
+       "stud_out_of_web_mm": 11.674,
+       "hole_to_stud_radial_mm": 0.403
+      },
+      {
+       "index": 1,
+       "stud_tip_car_mm": [
+        -1392.6933,
+        873.9987,
+        893.106
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        -0.0001
+       ],
+       "stud_tip_hub_mm": [
+        17.6554,
+        54.3353,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1393.1036,
+        862.3145,
+        893.5751
+       ],
+       "face_gap_mm": 4.318,
+       "stud_out_of_web_mm": 11.684,
+       "hole_to_stud_radial_mm": 0.622
+      },
+      {
+       "index": 2,
+       "stud_tip_car_mm": [
+        -1414.7015,
+        874.0057,
+        956.5943
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        -0.0001
+       ],
+       "stud_tip_hub_mm": [
+        -46.2588,
+        33.5965,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1414.569,
+        861.1337,
+        957.2265
+       ],
+       "face_gap_mm": 3.13,
+       "stud_out_of_web_mm": 12.872,
+       "hole_to_stud_radial_mm": 0.645
+      },
+      {
+       "index": 3,
+       "stud_tip_car_mm": [
+        -1361.0965,
+        874.0101,
+        997.0796
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        -0.0001
+       ],
+       "stud_tip_hub_mm": [
+        -46.2189,
+        -33.5791,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1360.6556,
+        860.4146,
+        997.3077
+       ],
+       "face_gap_mm": 2.407,
+       "stud_out_of_web_mm": 13.596,
+       "hole_to_stud_radial_mm": 0.496
+      },
+      {
+       "index": 4,
+       "stud_tip_car_mm": [
+        -1305.9975,
+        874.0058,
+        958.6441
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        -0.0001
+       ],
+       "stud_tip_hub_mm": [
+        17.6713,
+        -54.3449,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1305.8699,
+        861.151,
+        958.4277
+       ],
+       "face_gap_mm": 3.148,
+       "stud_out_of_web_mm": 12.855,
+       "hole_to_stud_radial_mm": 0.252
+      }
+     ],
+     "settling": {
+      "gap_mm_over_time": [
+       [
+        0.0,
+        0.326,
+        0.045
+       ],
+       [
+        1.0,
+        0.996,
+        0.678
+       ],
+       [
+        2.0,
+        1.088,
+        0.719
+       ],
+       [
+        3.0,
+        1.275,
+        0.7
+       ],
+       [
+        4.0,
+        1.363,
+        0.74
+       ],
+       [
+        5.0,
+        1.684,
+        0.765
+       ],
+       [
+        6.0,
+        1.696,
+        0.774
+       ],
+       [
+        7.0,
+        1.696,
+        0.774
+       ],
+       [
+        8.0,
+        1.696,
+        0.774
+       ],
+       [
+        9.0,
+        1.696,
+        0.774
+       ],
+       [
+        10.0,
+        1.79,
+        0.794
+       ],
+       [
+        11.0,
+        1.791,
+        0.791
+       ],
+       [
+        12.0,
+        1.824,
+        0.798
+       ],
+       [
+        13.0,
+        1.865,
+        0.794
+       ],
+       [
+        14.0,
+        1.88,
+        0.798
+       ],
+       [
+        15.0,
+        1.88,
+        0.788
+       ],
+       [
+        16.0,
+        1.88,
+        0.789
+       ],
+       [
+        17.0,
+        1.868,
+        0.77
+       ],
+       [
+        18.0,
+        1.902,
+        0.788
+       ],
+       [
+        19.0,
+        3.354,
+        1.042
+       ],
+       [
+        20.0,
+        3.474,
+        1.062
+       ]
+      ],
+      "gap_change_last_1s_mm": 0.1206,
+      "tilt_change_last_1s_deg": 0.0201
+     },
+     "hub_parts_touching": [
+      "Pilot",
+      "PilotTip",
+      "Stud_0",
+      "Stud_1",
+      "Stud_2",
+      "Stud_3",
+      "Stud_4"
+     ],
+     "on_studs": true
+    },
+    "RR": {
+     "hub": {
+      "centre_car_mm": [
+       -1359.9855,
+       -797.9999,
+       939.9845
+      ],
+      "axis_car": [
+       -0.0,
+       -1.0,
+       -0.0
+      ],
+      "moved_from_design_mm": [
+       0.0145,
+       0.0001,
+       -0.0155
+      ],
+      "stud0_direction_car": [
+       0.9505,
+       -0.0,
+       0.3106
+      ],
+      "pilot_diameter_mm": 66.9392
+     },
+     "wheel": {
+      "centre_car_mm": [
+       -1360.0018,
+       -798.8668,
+       939.5012
+      ],
+      "axis_car": [
+       0.0006,
+       -1.0,
+       0.0096
+      ],
+      "orientation_car_wxyz": [
+       0.7012,
+       0.6946,
+       -0.1131,
+       0.1146
+      ],
+      "axial_gap_at_centre_mm": 0.867,
+      "radial_offset_mm": [
+       -0.1656,
+       -0.4544
+      ],
+      "tilt_deg": 0.551,
+      "tilt_axis_tip_shift_car": [
+       0.0006,
+       0.0,
+       0.0096
+      ],
+      "bolt_phase_error_deg": 0.432,
+      "tire_ring_offset_mm": [
+       -0.1154,
+       -0.3491,
+       -0.0064
+      ]
+     },
+     "studs": [
+      {
+       "index": 0,
+       "stud_tip_car_mm": [
+        -1305.6874,
+        -874.0,
+        957.742
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        57.1282,
+        0.0153,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1305.7752,
+        -858.6546,
+        958.2366
+       ],
+       "face_gap_mm": 0.655,
+       "stud_out_of_web_mm": 15.345,
+       "hole_to_stud_radial_mm": 0.502
+      },
+      {
+       "index": 1,
+       "stud_tip_car_mm": [
+        -1360.0793,
+        -874.0002,
+        997.1171
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6558,
+        54.3366,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1360.4899,
+        -858.3159,
+        997.2219
+       ],
+       "face_gap_mm": 0.316,
+       "stud_out_of_web_mm": 15.684,
+       "hole_to_stud_radial_mm": 0.424
+      },
+      {
+       "index": 2,
+       "stud_tip_car_mm": [
+        -1414.3222,
+        -874.0,
+        957.5773
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.1851,
+        33.5996,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1414.4763,
+        -858.7347,
+        957.2348
+       ],
+       "face_gap_mm": 0.735,
+       "stud_out_of_web_mm": 15.265,
+       "hole_to_stud_radial_mm": 0.376
+      },
+      {
+       "index": 3,
+       "stud_tip_car_mm": [
+        -1393.4978,
+        -873.9996,
+        893.7079
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2278,
+        -33.5788,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1393.127,
+        -859.3322,
+        893.5362
+       ],
+       "face_gap_mm": 1.333,
+       "stud_out_of_web_mm": 14.667,
+       "hole_to_stud_radial_mm": 0.409
+      },
+      {
+       "index": 4,
+       "stud_tip_car_mm": [
+        -1326.3245,
+        -873.9996,
+        893.8097
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.655,
+        -54.3455,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1325.946,
+        -859.2827,
+        894.1553
+       ],
+       "face_gap_mm": 1.284,
+       "stud_out_of_web_mm": 14.717,
+       "hole_to_stud_radial_mm": 0.512
+      }
+     ],
+     "settling": {
+      "gap_mm_over_time": [
+       [
+        0.0,
+        0.326,
+        0.056
+       ],
+       [
+        1.0,
+        0.867,
+        0.551
+       ],
+       [
+        2.0,
+        0.867,
+        0.551
+       ],
+       [
+        3.0,
+        0.867,
+        0.551
+       ],
+       [
+        4.0,
+        0.867,
+        0.551
+       ],
+       [
+        5.0,
+        0.867,
+        0.551
+       ],
+       [
+        6.0,
+        0.867,
+        0.551
+       ],
+       [
+        7.0,
+        0.867,
+        0.551
+       ],
+       [
+        8.0,
+        0.867,
+        0.551
+       ],
+       [
+        9.0,
+        0.867,
+        0.551
+       ],
+       [
+        10.0,
+        0.867,
+        0.551
+       ],
+       [
+        11.0,
+        0.867,
+        0.551
+       ],
+       [
+        12.0,
+        0.867,
+        0.551
+       ],
+       [
+        13.0,
+        0.867,
+        0.551
+       ],
+       [
+        14.0,
+        0.867,
+        0.551
+       ],
+       [
+        15.0,
+        0.867,
+        0.551
+       ],
+       [
+        16.0,
+        0.867,
+        0.551
+       ],
+       [
+        17.0,
+        0.867,
+        0.551
+       ],
+       [
+        18.0,
+        0.867,
+        0.551
+       ],
+       [
+        19.0,
+        0.867,
+        0.551
+       ],
+       [
+        20.0,
+        0.867,
+        0.551
+       ]
+      ],
+      "gap_change_last_1s_mm": -0.0003,
+      "tilt_change_last_1s_deg": 0.0
+     },
+     "hub_parts_touching": [
+      "Face",
+      "Pilot",
+      "PilotTip",
+      "Stud_0",
+      "Stud_1",
+      "Stud_2",
+      "Stud_3",
+      "Stud_4"
+     ],
+     "on_studs": true
+    }
+   }
+  },
+  {
+   "release_depth_mm": 0.3,
+   "seed": 2024,
+   "stations": {
+    "FL": {
+     "hub": {
+      "centre_car_mm": [
+       1360.0059,
+       792.4999,
+       939.9847
+      ],
+      "axis_car": [
+       -0.0,
+       1.0,
+       -0.0
+      ],
+      "moved_from_design_mm": [
+       0.0059,
+       -0.0001,
+       -0.0153
+      ],
+      "stud0_direction_car": [
+       0.5883,
+       -0.0,
+       -0.8087
+      ],
+      "pilot_diameter_mm": 66.9296
+     },
+     "wheel": {
+      "centre_car_mm": [
+       1360.0111,
+       794.0576,
+       939.3801
+      ],
+      "axis_car": [
+       -0.0001,
+       0.9999,
+       0.012
+      ],
+      "orientation_car_wxyz": [
+       0.633,
+       -0.6255,
+       0.3205,
+       0.3244
+      ],
+      "axial_gap_at_centre_mm": 1.558,
+      "radial_offset_mm": [
+       0.492,
+       0.3514
+      ],
+      "tilt_deg": 0.688,
+      "tilt_axis_tip_shift_car": [
+       -0.0001,
+       -0.0001,
+       0.012
+      ],
+      "bolt_phase_error_deg": 0.296,
+      "tire_ring_offset_mm": [
+       0.2932,
+       0.2133,
+       -0.0084
+      ]
+     },
+     "studs": [
+      {
+       "index": 0,
+       "stud_tip_car_mm": [
+        1393.6599,
+        868.4999,
+        893.7375
+       ],
+       "stud_axis_car": [
+        -0.0,
+        1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        57.196,
+        -0.0084,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1393.3824,
+        854.6153,
+        893.7156
+       ],
+       "face_gap_mm": 2.116,
+       "stud_out_of_web_mm": 13.885,
+       "hole_to_stud_radial_mm": 0.278
+      },
+      {
+       "index": 1,
+       "stud_tip_car_mm": [
+        1326.4143,
+        868.4999,
+        893.7146
+       ],
+       "stud_axis_car": [
+        -0.0,
+        1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6554,
+        54.3837,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1326.1993,
+        854.6022,
+        894.0233
+       ],
+       "face_gap_mm": 2.103,
+       "stud_out_of_web_mm": 13.898,
+       "hole_to_stud_radial_mm": 0.376
+      },
+      {
+       "index": 2,
+       "stud_tip_car_mm": [
+        1305.6376,
+        868.4999,
+        957.6065
+       ],
+       "stud_axis_car": [
+        -0.0,
+        1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2338,
+        33.5986,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1305.7313,
+        853.8305,
+        958.0088
+       ],
+       "face_gap_mm": 1.332,
+       "stud_out_of_web_mm": 14.669,
+       "hole_to_stud_radial_mm": 0.413
+      },
+      {
+       "index": 3,
+       "stud_tip_car_mm": [
+        1359.9385,
+        868.4999,
+        997.1153
+       ],
+       "stud_axis_car": [
+        -0.0,
+        1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2388,
+        -33.5544,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1360.2646,
+        853.3667,
+        997.2463
+       ],
+       "face_gap_mm": 0.868,
+       "stud_out_of_web_mm": 15.133,
+       "hole_to_stud_radial_mm": 0.351
+      },
+      {
+       "index": 4,
+       "stud_tip_car_mm": [
+        1414.3565,
+        868.4999,
+        957.6459
+       ],
+       "stud_axis_car": [
+        -0.0,
+        1.0,
+        -0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6914,
+        -54.3408,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1414.4359,
+        853.8517,
+        957.5109
+       ],
+       "face_gap_mm": 1.353,
+       "stud_out_of_web_mm": 14.648,
+       "hole_to_stud_radial_mm": 0.157
+      }
+     ],
+     "settling": {
+      "gap_mm_over_time": [
+       [
+        0.0,
+        0.321,
+        0.038
+       ],
+       [
+        1.0,
+        0.935,
+        0.643
+       ],
+       [
+        2.0,
+        0.935,
+        0.643
+       ],
+       [
+        3.0,
+        0.99,
+        0.638
+       ],
+       [
+        4.0,
+        0.991,
+        0.648
+       ],
+       [
+        5.0,
+        0.991,
+        0.649
+       ],
+       [
+        6.0,
+        1.328,
+        0.669
+       ],
+       [
+        7.0,
+        1.364,
+        0.673
+       ],
+       [
+        8.0,
+        1.364,
+        0.674
+       ],
+       [
+        9.0,
+        1.364,
+        0.675
+       ],
+       [
+        10.0,
+        1.364,
+        0.674
+       ],
+       [
+        11.0,
+        1.364,
+        0.674
+       ],
+       [
+        12.0,
+        1.364,
+        0.674
+       ],
+       [
+        13.0,
+        1.363,
+        0.674
+       ],
+       [
+        14.0,
+        1.363,
+        0.674
+       ],
+       [
+        15.0,
+        1.364,
+        0.674
+       ],
+       [
+        16.0,
+        1.364,
+        0.674
+       ],
+       [
+        17.0,
+        1.363,
+        0.673
+       ],
+       [
+        18.0,
+        1.363,
+        0.674
+       ],
+       [
+        19.0,
+        1.384,
+        0.677
+       ],
+       [
+        20.0,
+        1.558,
+        0.688
+       ]
+      ],
+      "gap_change_last_1s_mm": 0.1734,
+      "tilt_change_last_1s_deg": 0.0114
+     },
+     "hub_parts_touching": [
+      "Face",
+      "Pilot",
+      "PilotTip",
+      "Stud_0",
+      "Stud_1",
+      "Stud_2",
+      "Stud_3",
+      "Stud_4"
+     ],
+     "on_studs": true
+    },
+    "FR": {
+     "hub": {
+      "centre_car_mm": [
+       1359.9949,
+       -792.5015,
+       939.9778
+      ],
+      "axis_car": [
+       -0.0,
+       -1.0,
+       -0.0001
+      ],
+      "moved_from_design_mm": [
+       -0.0051,
+       -0.0015,
+       -0.0222
+      ],
+      "stud0_direction_car": [
+       0.9519,
+       -0.0,
+       0.3064
+      ],
+      "pilot_diameter_mm": 66.9253
+     },
+     "wheel": {
+      "centre_car_mm": [
+       1359.8797,
+       -798.6736,
+       938.6907
+      ],
+      "axis_car": [
+       0.0023,
+       -0.9996,
+       0.027
+      ],
+      "orientation_car_wxyz": [
+       0.7077,
+       0.6891,
+       -0.1079,
+       0.1124
+      ],
+      "axial_gap_at_centre_mm": 6.172,
+      "radial_offset_mm": [
+       -0.5039,
+       -1.1896
+      ],
+      "tilt_deg": 1.556,
+      "tilt_axis_tip_shift_car": [
+       0.0023,
+       0.0004,
+       0.0271
+      ],
+      "bolt_phase_error_deg": 0.075,
+      "tire_ring_offset_mm": [
+       -0.115,
+       -0.3559,
+       -0.0154
+      ]
+     },
+     "studs": [
+      {
+       "index": 0,
+       "stud_tip_car_mm": [
+        1414.3894,
+        -868.5026,
+        957.457
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        -0.0001
+       ],
+       "stud_tip_hub_mm": [
+        57.1353,
+        -0.0249,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1414.3926,
+        -858.0515,
+        957.8932
+       ],
+       "face_gap_mm": 5.554,
+       "stud_out_of_web_mm": 10.451,
+       "hole_to_stud_radial_mm": 0.436
+      },
+      {
+       "index": 1,
+       "stud_tip_car_mm": [
+        1360.1518,
+        -868.5048,
+        997.1709
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        -0.0001
+       ],
+       "stud_tip_hub_mm": [
+        17.6757,
+        54.398,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1360.0896,
+        -857.1079,
+        997.4402
+       ],
+       "face_gap_mm": 4.608,
+       "stud_out_of_web_mm": 11.397,
+       "hole_to_stud_radial_mm": 0.276
+      },
+      {
+       "index": 2,
+       "stud_tip_car_mm": [
+        1305.7219,
+        -868.5025,
+        957.7893
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        -0.0001
+       ],
+       "stud_tip_hub_mm": [
+        -46.2032,
+        33.589,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1305.6872,
+        -858.2976,
+        958.0367
+       ],
+       "face_gap_mm": 5.8,
+       "stud_out_of_web_mm": 10.205,
+       "hole_to_stud_radial_mm": 0.249
+      },
+      {
+       "index": 3,
+       "stud_tip_car_mm": [
+        1326.2939,
+        -868.4988,
+        893.834
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        -0.0001
+       ],
+       "stud_tip_hub_mm": [
+        -46.2177,
+        -33.5935,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1326.3677,
+        -859.9765,
+        894.137
+       ],
+       "face_gap_mm": 7.483,
+       "stud_out_of_web_mm": 8.522,
+       "hole_to_stud_radial_mm": 0.311
+      },
+      {
+       "index": 4,
+       "stud_tip_car_mm": [
+        1393.4353,
+        -868.4989,
+        893.6486
+       ],
+       "stud_axis_car": [
+        -0.0,
+        -1.0,
+        -0.0001
+       ],
+       "stud_tip_hub_mm": [
+        17.6372,
+        -54.3432,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        1393.5513,
+        -859.8244,
+        894.0483
+       ],
+       "face_gap_mm": 7.331,
+       "stud_out_of_web_mm": 8.675,
+       "hole_to_stud_radial_mm": 0.416
+      }
+     ],
+     "settling": {
+      "gap_mm_over_time": [
+       [
+        0.0,
+        0.322,
+        0.048
+       ],
+       [
+        1.0,
+        0.943,
+        0.67
+       ],
+       [
+        2.0,
+        1.024,
+        0.675
+       ],
+       [
+        3.0,
+        1.331,
+        0.698
+       ],
+       [
+        4.0,
+        1.398,
+        0.725
+       ],
+       [
+        5.0,
+        1.351,
+        0.73
+       ],
+       [
+        6.0,
+        1.911,
+        0.745
+       ],
+       [
+        7.0,
+        1.912,
+        0.747
+       ],
+       [
+        8.0,
+        1.912,
+        0.747
+       ],
+       [
+        9.0,
+        1.912,
+        0.747
+       ],
+       [
+        10.0,
+        1.913,
+        0.747
+       ],
+       [
+        11.0,
+        1.963,
+        0.765
+       ],
+       [
+        12.0,
+        1.962,
+        0.765
+       ],
+       [
+        13.0,
+        1.963,
+        0.765
+       ],
+       [
+        14.0,
+        5.89,
+        1.346
+       ],
+       [
+        15.0,
+        5.969,
+        1.47
+       ],
+       [
+        16.0,
+        6.054,
+        1.474
+       ],
+       [
+        17.0,
+        6.073,
+        1.512
+       ],
+       [
+        18.0,
+        6.121,
+        1.549
+       ],
+       [
+        19.0,
+        6.173,
+        1.556
+       ],
+       [
+        20.0,
+        6.172,
+        1.556
+       ]
+      ],
+      "gap_change_last_1s_mm": -0.0007,
+      "tilt_change_last_1s_deg": 0.0002
+     },
+     "hub_parts_touching": [
+      "Pilot",
+      "PilotTip",
+      "Stud_0",
+      "Stud_1",
+      "Stud_2",
+      "Stud_3",
+      "Stud_4"
+     ],
+     "on_studs": true
+    },
+    "RL": {
+     "hub": {
+      "centre_car_mm": [
+       -1360.0057,
+       797.9999,
+       939.9847
+      ],
+      "axis_car": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "moved_from_design_mm": [
+       -0.0057,
+       -0.0001,
+       -0.0153
+      ],
+      "stud0_direction_car": [
+       0.5879,
+       0.0,
+       -0.8089
+      ],
+      "pilot_diameter_mm": 66.9131
+     },
+     "wheel": {
+      "centre_car_mm": [
+       -1360.0305,
+       799.8013,
+       939.2672
+      ],
+      "axis_car": [
+       0.0005,
+       0.9999,
+       0.0143
+      ],
+      "orientation_car_wxyz": [
+       0.6344,
+       -0.6252,
+       0.3193,
+       0.3235
+      ],
+      "axial_gap_at_centre_mm": 1.801,
+      "radial_offset_mm": [
+       0.5658,
+       0.4418
+      ],
+      "tilt_deg": 0.821,
+      "tilt_axis_tip_shift_car": [
+       0.0005,
+       -0.0001,
+       0.0143
+      ],
+      "bolt_phase_error_deg": 0.075,
+      "tire_ring_offset_mm": [
+       0.2912,
+       0.2126,
+       -0.0071
+      ]
+     },
+     "studs": [
+      {
+       "index": 0,
+       "stud_tip_car_mm": [
+        -1326.3638,
+        873.9999,
+        893.7531
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        57.1764,
+        -0.036,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1326.464,
+        860.4398,
+        893.8536
+       ],
+       "face_gap_mm": 2.441,
+       "stud_out_of_web_mm": 13.56,
+       "hole_to_stud_radial_mm": 0.142
+      },
+      {
+       "index": 1,
+       "stud_tip_car_mm": [
+        -1393.6033,
+        873.9999,
+        893.7346
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6626,
+        54.3682,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1393.6478,
+        860.4745,
+        893.9377
+       ],
+       "face_gap_mm": 2.476,
+       "stud_out_of_web_mm": 13.525,
+       "hole_to_stud_radial_mm": 0.208
+      },
+      {
+       "index": 2,
+       "stud_tip_car_mm": [
+        -1414.3503,
+        873.9999,
+        957.6035
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2007,
+        33.6042,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1414.3293,
+        859.5705,
+        957.8527
+       ],
+       "face_gap_mm": 1.572,
+       "stud_out_of_web_mm": 14.429,
+       "hole_to_stud_radial_mm": 0.25
+      },
+      {
+       "index": 3,
+       "stud_tip_car_mm": [
+        -1360.0106,
+        873.9998,
+        997.1589
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        -46.2538,
+        -33.6076,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1359.9273,
+        858.977,
+        997.2703
+       ],
+       "face_gap_mm": 0.979,
+       "stud_out_of_web_mm": 15.023,
+       "hole_to_stud_radial_mm": 0.139
+      },
+      {
+       "index": 4,
+       "stud_tip_car_mm": [
+        -1305.6753,
+        873.9999,
+        957.6774
+       ],
+       "stud_axis_car": [
+        0.0,
+        1.0,
+        0.0
+       ],
+       "stud_tip_hub_mm": [
+        17.6273,
+        -54.3517,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1305.6236,
+        859.5142,
+        957.7167
+       ],
+       "face_gap_mm": 1.516,
+       "stud_out_of_web_mm": 14.486,
+       "hole_to_stud_radial_mm": 0.065
+      }
+     ],
+     "settling": {
+      "gap_mm_over_time": [
+       [
+        0.0,
+        0.325,
+        0.045
+       ],
+       [
+        1.0,
+        1.312,
+        0.777
+       ],
+       [
+        2.0,
+        1.312,
+        0.777
+       ],
+       [
+        3.0,
+        1.312,
+        0.777
+       ],
+       [
+        4.0,
+        1.313,
+        0.777
+       ],
+       [
+        5.0,
+        1.313,
+        0.777
+       ],
+       [
+        6.0,
+        1.312,
+        0.777
+       ],
+       [
+        7.0,
+        1.312,
+        0.777
+       ],
+       [
+        8.0,
+        1.312,
+        0.777
+       ],
+       [
+        9.0,
+        1.313,
+        0.777
+       ],
+       [
+        10.0,
+        1.337,
+        0.773
+       ],
+       [
+        11.0,
+        1.349,
+        0.765
+       ],
+       [
+        12.0,
+        1.539,
+        0.793
+       ],
+       [
+        13.0,
+        1.661,
+        0.804
+       ],
+       [
+        14.0,
+        1.784,
+        0.814
+       ],
+       [
+        15.0,
+        1.801,
+        0.821
+       ],
+       [
+        16.0,
+        1.801,
+        0.821
+       ],
+       [
+        17.0,
+        1.801,
+        0.821
+       ],
+       [
+        18.0,
+        1.801,
+        0.821
+       ],
+       [
+        19.0,
+        1.802,
+        0.821
+       ],
+       [
+        20.0,
+        1.801,
+        0.821
+       ]
+      ],
+      "gap_change_last_1s_mm": -0.0001,
+      "tilt_change_last_1s_deg": -0.0
+     },
+     "hub_parts_touching": [
+      "Face",
+      "Pilot",
+      "PilotTip",
+      "Stud_0",
+      "Stud_1",
+      "Stud_2",
+      "Stud_3",
+      "Stud_4"
+     ],
+     "on_studs": true
+    },
+    "RR": {
+     "hub": {
+      "centre_car_mm": [
+       -1360.0312,
+       -797.2006,
+       940.1008
+      ],
+      "axis_car": [
+       0.0072,
+       -1.0,
+       -0.0051
+      ],
+      "moved_from_design_mm": [
+       -0.0312,
+       0.7994,
+       0.1008
+      ],
+      "stud0_direction_car": [
+       -0.3544,
+       0.0022,
+       -0.9351
+      ],
+      "pilot_diameter_mm": 66.9353
+     },
+     "wheel": {
+      "centre_car_mm": [
+       -1360.0191,
+       -797.1497,
+       940.5987
+      ],
+      "axis_car": [
+       0.0055,
+       -1.0,
+       -0.0052
+      ],
+      "orientation_car_wxyz": [
+       0.4036,
+       0.4025,
+       0.5836,
+       -0.5783
+      ],
+      "axial_gap_at_centre_mm": -0.053,
+      "radial_offset_mm": [
+       -0.4698,
+       -0.1646
+      ],
+      "tilt_deg": 0.096,
+      "tilt_axis_tip_shift_car": [
+       -0.0017,
+       -0.0,
+       -0.0001
+      ],
+      "bolt_phase_error_deg": 0.256,
+      "tire_ring_offset_mm": [
+       0.5268,
+       0.2749,
+       -1.3874
+      ]
+     },
+     "studs": [
+      {
+       "index": 0,
+       "stud_tip_car_mm": [
+        -1379.7366,
+        -873.0719,
+        886.2574
+       ],
+       "stud_axis_car": [
+        0.0072,
+        -1.0,
+        -0.0051
+       ],
+       "stud_tip_hub_mm": [
+        57.1652,
+        0.0042,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1379.6995,
+        -856.9789,
+        886.7539
+       ],
+       "face_gap_mm": -0.095,
+       "stud_out_of_web_mm": 16.095,
+       "hole_to_stud_radial_mm": 0.442
+      },
+      {
+       "index": 1,
+       "stud_tip_car_mm": [
+        -1314.9175,
+        -872.6946,
+        903.9115
+       ],
+       "stud_axis_car": [
+        0.0072,
+        -1.0,
+        -0.0051
+       ],
+       "stud_tip_hub_mm": [
+        17.6886,
+        54.3634,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1314.9606,
+        -856.7142,
+        904.7112
+       ],
+       "face_gap_mm": 0.016,
+       "stud_out_of_web_mm": 15.984,
+       "hole_to_stud_radial_mm": 0.722
+      },
+      {
+       "index": 2,
+       "stud_tip_car_mm": [
+        -1311.6907,
+        -873.0127,
+        971.0753
+       ],
+       "stud_axis_car": [
+        0.0072,
+        -1.0,
+        -0.0051
+       ],
+       "stud_tip_hub_mm": [
+        -46.2611,
+        33.5801,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1312.0317,
+        -857.0489,
+        971.8303
+       ],
+       "face_gap_mm": 0.031,
+       "stud_out_of_web_mm": 15.969,
+       "hole_to_stud_radial_mm": 0.711
+      },
+      {
+       "index": 3,
+       "stud_tip_car_mm": [
+        -1374.5162,
+        -873.5862,
+        994.8427
+       ],
+       "stud_axis_car": [
+        0.0072,
+        -1.0,
+        -0.0051
+       ],
+       "stud_tip_hub_mm": [
+        -46.2248,
+        -33.5933,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1374.9606,
+        -857.5204,
+        995.3549
+       ],
+       "face_gap_mm": -0.071,
+       "stud_out_of_web_mm": 16.071,
+       "hole_to_stud_radial_mm": 0.542
+      },
+      {
+       "index": 4,
+       "stud_tip_car_mm": [
+        -1416.5482,
+        -873.6228,
+        942.4734
+       ],
+       "stud_axis_car": [
+        0.0072,
+        -1.0,
+        -0.0051
+       ],
+       "stud_tip_hub_mm": [
+        17.6402,
+        -54.3412,
+        76.0
+       ],
+       "hole_outer_centre_car_mm": [
+        -1416.7816,
+        -857.4772,
+        942.7748
+       ],
+       "face_gap_mm": -0.148,
+       "stud_out_of_web_mm": 16.148,
+       "hole_to_stud_radial_mm": 0.249
+      }
+     ],
+     "settling": {
+      "gap_mm_over_time": [
+       [
+        0.0,
+        0.326,
+        0.056
+       ],
+       [
+        1.0,
+        0.859,
+        0.61
+       ],
+       [
+        2.0,
+        0.859,
+        0.608
+       ],
+       [
+        3.0,
+        0.859,
+        0.608
+       ],
+       [
+        4.0,
+        0.859,
+        0.607
+       ],
+       [
+        5.0,
+        0.859,
+        0.607
+       ],
+       [
+        6.0,
+        0.859,
+        0.607
+       ],
+       [
+        7.0,
+        0.859,
+        0.608
+       ],
+       [
+        8.0,
+        0.859,
+        0.608
+       ],
+       [
+        9.0,
+        0.905,
+        0.558
+       ],
+       [
+        10.0,
+        1.206,
+        0.627
+       ],
+       [
+        11.0,
+        1.235,
+        0.648
+       ],
+       [
+        12.0,
+        1.536,
+        0.653
+       ],
+       [
+        13.0,
+        1.536,
+        0.653
+       ],
+       [
+        14.0,
+        1.536,
+        0.653
+       ],
+       [
+        15.0,
+        1.536,
+        0.653
+       ],
+       [
+        16.0,
+        0.888,
+        0.889
+       ],
+       [
+        17.0,
+        1.496,
+        0.651
+       ],
+       [
+        18.0,
+        -0.091,
+        0.111
+       ],
+       [
+        19.0,
+        -0.042,
+        0.084
+       ],
+       [
+        20.0,
+        -0.053,
+        0.096
+       ]
+      ],
+      "gap_change_last_1s_mm": -0.0113,
+      "tilt_change_last_1s_deg": 0.0119
+     },
+     "hub_parts_touching": [
+      "Face",
+      "Pilot",
+      "PilotTip",
+      "Stud_0",
+      "Stud_1",
+      "Stud_2",
+      "Stud_3",
+      "Stud_4"
+     ],
+     "on_studs": true
+    }
+   }
+  }
+ ]
+}
