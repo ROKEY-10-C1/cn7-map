@@ -5,7 +5,7 @@ from math import degrees
 from pxr import Gf, PhysxSchema, UsdGeom, UsdPhysics, UsdShade
 
 from physical_data import ROLLER_RATED_SPEED, ROLLER_TORQUE, tube_properties
-from process import FEED_START_X, LINE_Y, REJECT_GATE_HALF, REJECT_X
+from process import PICK_X, FEED_START_X, LINE_Y, REJECT_GATE_HALF, REJECT_X
 
 FACTORY="/World/Factory"
 START_AHEAD=.76
@@ -102,14 +102,20 @@ def setup_factory(stage, root, material, guide_material, branch_side):
                     speed=.30
                 else:
                     speed=.28 if "QA_Reject" in main or "ConveyorBend" in main else -.32
+                if main.startswith(("LeftFeed_roller","RightFeed_roller")):
+                    x=cache.GetLocalToWorldTransform(prim).ExtractTranslation()[0]
+                    # The live pick zone has its own rollers in this final section.
+                    if x<=PICK_X+.33:
+                        continue
                 joint_path=str(prim.GetPath())+"_Axle"
                 powered_roller(UsdGeom.Cylinder(prim),joint_path,speed,material,cache)
             else:
                 is_guide=("_rail" in main or name.startswith("Edge_") or main.endswith("_Gate"))
                 collider(prim,guide_material if is_guide else None)
-        elif main in ("LeftRail","RightRail","DockPlate","RejectCrate","PoweredDiverter",
+        elif main in ("DockPlate","RejectCrate","PoweredDiverter",
                       "TruckCargo","TruckCab","TruckFrame") or (
-                "Guard" in main and name.startswith(("Stile_","Header_"))):
+                "Guard" in main and name.startswith(("Stile_","Header_","LightCurtainPost"))) or (
+                main.startswith(("Column","EndWall","EndUpright"))):
             collider(prim)
     for side,label in ((1,"Left"),(-1,"Right")):
         for i,(x0,x1) in ((1,(FEED_START_X,4.71)),):  # feed belt only (index 1 keeps the reject-gate rule)

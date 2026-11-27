@@ -12,6 +12,7 @@ from physical_data import AMR_SPEED_X, AMR_SPEED_Y, AMR_TRACTION_COEFFICIENT, AM
 from physical_data import DOCK_CLAMP_CLOSED, DOCK_CLAMP_OPEN
 from sim_util import body, constrain, cube, drive, mass_properties, material, pose, reference, vec
 from live_params import ROOT
+from process import DOCK_X
 
 LOCATOR_STROKE = .06
 
@@ -23,7 +24,10 @@ class Carrier:
         self.path=str(deck.GetPath())
         self.lift_path=str(lift.GetPath())
         self.start=Gf.Vec3d(UsdGeom.Xformable(deck).GetOrderedXformOps()[0].Get())
-        self.waypoints=(Gf.Vec3d(self.start[0],0.,0.),Gf.Vec3d(0.))
+        self.waypoints=(Gf.Vec3d(self.start[0],0.,0.),Gf.Vec3d(DOCK_X,0.,0.))
+        self.index_target=None
+        self.index_arrived=False
+        self.clamp_release_time=0.
         self.segment=0
         self.previous=self.start
         self.total_mass=AMR_MASS+AMR_LIFT_MASS+BODY_MASS
@@ -104,6 +108,18 @@ class Carrier:
         target=drive(joint,"linear",0.,12000.,servo_damping(12000.,3.),400.)
         self.clamps.append((str(slide.GetPath()),side,target))
 
+    def request_index(self, x):
+        """Queue the next stop after the cell interlock grants permission."""
+        if not self.ready and not self.index_arrived:
+            return False
+        if self.index_target is None:
+            self.clamp_release_time=1.
+            for _,_,target in self.clamps:
+                target.Set(0.)
+        self.index_target=Gf.Vec3d(x,0.,0.)
+        self.index_arrived=False
+        return True
+
     def step(self,api,dt):
         state=api.get_rigidbody_transformation(self.path)
         if not state.get("ret_val"):
@@ -112,16 +128,21 @@ class Carrier:
         measured=(point-self.previous)/dt
         self.previous=point
         velocity=Gf.Vec3d(measured[0],measured[1],0.)
-        remaining=self.waypoints[self.segment]-point
+        self.clamp_release_time=max(0.,self.clamp_release_time-dt)
+        indexing=self.index_target is not None
+        goal=self.index_target if indexing and not self.clamp_release_time else self.waypoints[self.segment]
+        remaining=goal-point
         distance=Gf.Vec3d(remaining[0],remaining[1],0.).GetLength()
         if distance<.006 and velocity.GetLength()<.025:
-            if self.segment==0:
+            if indexing:
+                self.index_arrived=not self.clamp_release_time
+            elif self.segment==0:
                 self.segment=1
                 remaining=self.waypoints[1]-point
             elif not self.docked:
                 self.docked=True
         direction=Gf.Vec3d(remaining[0],remaining[1],0.)
-        if self.docked:
+        if self.docked and (not indexing or self.clamp_release_time or self.index_arrived):
             v_goal=direction*2.
         else:
             speed_limit=AMR_SPEED_Y if self.segment==0 else AMR_SPEED_X
@@ -142,7 +163,7 @@ class Carrier:
         bounded=max(-limit*.31,min(limit*.31,target_torque)) if self.grounded else 0.
         self.yaw_torque.Set(Gf.Vec3f(0.,0.,bounded))
         self.previous_yaw=yaw
-        if self.docked:
+        if self.docked and not indexing:
             close=DOCK_CLAMP_OPEN-DOCK_CLAMP_CLOSED
             self.clamp_target=min(close,self.clamp_target+.12*dt)
             for _,side,target in self.clamps:
@@ -168,7 +189,7 @@ class Carrier:
         rate=stage.GetTimeCodesPerSecond()
         begins=0.
         for axis,distance,speed in (("transY",-self.start[1],AMR_SPEED_Y),
-                                    ("transX",-self.start[0],AMR_SPEED_X)):
+                                    ("transX",DOCK_X-self.start[0],AMR_SPEED_X)):
             target=drive(joint,axis,0.,stiffness,damping,max_force)
             target.Set(0.,0.)
             target.Set(0.,rate*begins)

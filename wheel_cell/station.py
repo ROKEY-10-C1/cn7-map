@@ -10,7 +10,7 @@ from conveyor import START_AHEAD, TREAD_HALF, quaternion
 from fitment import ARCH_RADIUS, OFFSET, half_track
 from physical_data import RIM_MASS, annulus_inertia
 from physical_data import GUIDE_DYNAMIC_FRICTION, GUIDE_STATIC_FRICTION
-from process import BELT_Z, CN7_R16, HUB_Z, LINE_Y, STATIONS
+from process import PICK_X, BELT_Z, CN7_R16, HUB_Z, LINE_Y, STATIONS
 from cell_config import CONFIG
 from sim_util import body, convex_prism, hull, mass_properties, material, reference, rotate, transform
 from live_params import ROOT, TERMINAL_PHASES
@@ -73,6 +73,9 @@ class Station:
         measured=self.sensor.value(self.now)
         self.error=measured if measured is not None else self.error_true
         if self.phase not in TERMINAL_PHASES:
+            # The pick-zone timeout starts at its inlet, after the 1F–B1 transfer.
+            if self.phase=="arriving" and p[0]>self.zone.axle+START_AHEAD:
+                return
             self.phase=self.zone.step(dt)
 
 
@@ -96,7 +99,7 @@ def make_station(stage, car, name, seed, sections, mats, run_seed=0):
         hull(stage,hp+f"/Wheelhouse_{i}",outline,-.115,.11,False)
     wp=ROOT+"/"+name
     guide=material(stage,"GuideUHMW",GUIDE_STATIC_FRICTION,GUIDE_DYNAMIC_FRICTION,combine="min")
-    zone=PickZone(stage,wp,axle,side,mats[2],guide)
+    zone=PickZone(stage,wp,PICK_X if axle>0 else axle,side,mats[2],guide)
     # Rim body (mounting face colliders) and the tire's tread ring sprung to it; flat on the feed.
     delivery=(axle+START_AHEAD,side*LINE_Y,BELT_Z+.125)
     wheel_q=rotate((0,0,1),seed).GetQuat()

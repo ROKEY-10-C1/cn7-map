@@ -8,8 +8,9 @@ from math import ceil, pi
 
 import numpy as np
 
-from fitment import NUT_LENGTH, NUT_SEAT, PITCH, half_track
-from process import (MOUNT_HUB_X, BELT_Z, FASTEN_BASE_X, HUB_Z, LINE_Y, MOUNT_BASE_X, NUT_CYCLE, NUT_DRIVE,
+from fitment import NUT_LENGTH, NUT_SEAT, PITCH
+from layout import LAYOUT
+from process import (MOUNT_HUB_X, BELT_Z, FASTEN_BASE_X, FASTEN_HUB_X, LINE_Y, MOUNT_BASE_X, NUT_CYCLE, NUT_DRIVE,
                      NUT_ENGAGE, NUT_FINAL, GRIP_AT, MOUNT_CLEAR, PICK_X, ROBOT_BASE_Y)
 
 PARK = np.deg2rad([0, -30, -65, 0, -130, 0])
@@ -76,12 +77,12 @@ def solve_plan(arm, base_x, side, keys):
     return plan
 
 
-def mount_keys(side, seat, wheel, car_x):
+def mount_keys(side, seat, wheel):
     """Pick the flat wheel at the conveyor stop, stand it up and hang it on the hub at `seat`."""
     pick = np.array([PICK_X, side*LINE_Y, BELT_Z+wheel.width/2])
     toward_base = np.array([MOUNT_BASE_X-PICK_X, side*(ROBOT_BASE_Y-LINE_Y), 0.])
     toward_base /= np.linalg.norm(toward_base)
-    hub = np.array([MOUNT_HUB_X, side*half_track(car_x), HUB_Z])
+    hub = np.array([MOUNT_HUB_X, side*LAYOUT.work_hub_y, LAYOUT.work_hub_z])
     down, car = FACE_DOWN, toward_car(side)
     out = np.array([0., side, 0.])
     grip = lambda centre, rotation: (flange_for(centre, rotation, GRIP_CENTRE), rotation)
@@ -97,11 +98,11 @@ def mount_keys(side, seat, wheel, car_x):
             (seat+MOUNT_CLEAR, None)]
 
 
-def fasten_keys(side, tight, car_x, hub_x):
-    """Pick five nuts at the presenter, run them down on the hub (world x `hub_x`) at `tight`, park."""
+def fasten_keys(side, tight):
+    """Pick five nuts at the presenter, run them down at the fixed fastening datum at `tight`, park."""
     car = toward_car(side)
-    out = half_track(car_x)+NUT_SEAT+NUT_LENGTH+NUT_ADVANCE+HEAD_LENGTH
-    at = lambda y: ((hub_x, side*y, HUB_Z), car)
+    out = LAYOUT.work_hub_y+NUT_SEAT+NUT_LENGTH+NUT_ADVANCE+HEAD_LENGTH
+    at = lambda y: ((FASTEN_HUB_X, side*y, LAYOUT.work_hub_z), car)
     mx, my, mz = MAGAZINE
     pocket = ((mx, side*(my+HEAD_LENGTH), mz), car)
     clear = ((mx, side*(my+HEAD_LENGTH+.10), mz), car)

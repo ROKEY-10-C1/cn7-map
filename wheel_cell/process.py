@@ -1,8 +1,9 @@
 """Deterministic JIS schedule in metres, seconds and radians."""
 from dataclasses import dataclass
-from math import atan, ceil, cos, hypot, pi, sin
+from math import hypot
 
 from fitment import WHEELBASE
+from layout import LAYOUT
 
 FPS = 24
 HUB_Z = 0.94
@@ -18,8 +19,6 @@ STATIONS = {"FL": (AXLE, 1), "FR": (AXLE, -1),
             "RL": (-AXLE, 1), "RR": (-AXLE, -1)}
 LINE_Y = 3.80
 RAIL_Y = 1.57
-FEED = (7.72, 0.)
-SPLIT_X = 6.85
 REJECT_X = 4.25
 REJECT_GATE_HALF = .365
 REJECT_CRATE_Y = LINE_Y+1.05
@@ -33,15 +32,10 @@ AMR_GATE_X = -7.5
 AMR_AT_GATE = 20.                 # lateral transfer from the outer buffer
 AMR_DOCKED = 8.                    # order start (at the gate) -> docked
 AMR_LIFTED = AMR_DOCKED+3.
-AMR_OUT_GATE = 10.                 # dock -> gate after departure; gate -> outbound buffer follows
-AMR_OUT_BUFFER = AMR_AT_GATE
-# Two stops of the car (car centre x): A = DOCK_X, B = DOCK_X+WHEELBASE. The mount arm serves only
-# the hub at MOUNT_HUB_X (front wheels at A, rear wheels at B); the fastening arm sits midway between
-# the hubs at B, so front fastening at B overlaps rear mounting.
-# DOCK_X: at B the front bumper (x DOCK_X+WHEELBASE+2.355) keeps 0.54 m to the tyre splitter bend
-# (nearest belt edge x 5.16); ISO 13854 gives 500 mm as the minimum gap against crushing the body.
-DOCK_X = -.45
+DOCK_X, INDEX_X, FINAL_X, EXIT_X = LAYOUT.stops
+AMR_OUT_GATE = max(6., (EXIT_X-FINAL_X)/.8)  # stop C -> forward exit
 MOUNT_HUB_X = DOCK_X+AXLE
+FASTEN_HUB_X = MOUNT_HUB_X+WHEELBASE
 MOUNT_BASE_X = MOUNT_HUB_X-1.24
 FASTEN_BASE_X = MOUNT_HUB_X+WHEELBASE/2
 # Tyre stop on the feed belt, behind the mount arm: the arm turns round to it. 0.64 m from the hub
@@ -104,37 +98,21 @@ CN7_R16 = Wheel(.205, .55, 16, 6.5)
 WHEELS = (CN7_R16, Wheel(.225, .45, 17, 7.), Wheel(.195, .65, 15, 6.), CN7_R16)
 
 
-def bend(side):
-    # Keep the existing powered splitter and its exit tangent. Two circular bends
-    # and a lateral straight join it to the outboard feed at x=4.71.
-    points = [(SPLIT_X-2.14*t, 1.19*t*t*(3-2*t)) for t in (i/16 for i in range(9))]
-    x, y = points[-1]
-    angle = atan(1.5*1.19/2.14)
-    radius = 1.07/(2-sin(angle))
-    n = ceil(radius*(pi/2-angle)/.13)
-    for i in range(1, n+1):
-        a = angle+(pi/2-angle)*i/n
-        points.append((x-radius*(sin(a)-sin(angle)), y+radius*(cos(angle)-cos(a))))
-    x, y = points[-1]
-    span = LINE_Y-radius-y
-    n = ceil(span/.13)
-    points.extend((x, y+span*i/n) for i in range(1,n+1))
-    n = ceil(radius*pi/2/.13)
-    for i in range(1,n+1):
-        a = pi/2*(1-i/n)
-        points.append((x-radius*(1-sin(a)), LINE_Y-radius+radius*cos(a)))
-    return tuple((px, side*py) for px, py in points)
+def belt_height(x):
+    portion = (x-LAYOUT.ramp_bottom_x)/(LAYOUT.ramp_top_x-LAYOUT.ramp_bottom_x)
+    return BELT_Z + LAYOUT.floor_rise * max(0., min(1., portion))
 
 
 def route(x, side):
-    return (FEED, *bend(side), (x, side*LINE_Y))
+    y = side*LINE_Y
+    return ((LAYOUT.supply_x, y), (LAYOUT.ramp_top_x, y), (LAYOUT.ramp_bottom_x, y), (x, y))
 
 
 def motion(points, start, speed=SPEED):
     time = start
     yield time, points[0]
     for a, b in zip(points, points[1:]):
-        time += hypot(b[0] - a[0], b[1] - a[1]) / speed
+        time += hypot(b[0]-a[0], b[1]-a[1], belt_height(b[0])-belt_height(a[0])) / speed
         yield time, b
 
 
@@ -174,8 +152,11 @@ def schedule(inject, mixed_sizes=False):
         # Rear fastening once the mount arm has left the hub (parked 4.2 s after the seat, head at the
         # hub 1.94 s after the start) and the fasten arm is parked from the front (2.5 s after the
         # cycle; it leaves its park 5 s before the next start).
-        rear_tighten = max(rear_seat+3., front_tighten+NUT_CYCLE+7.5)
+        second_index = max(rear_seat+MOUNT_CLEAR, front_tighten+NUT_CYCLE+2.5)
+        final_dock = second_index+INDEX_TRAVEL
+        # Fasten leaves PARK 5 s before tighten; it starts after the second stop.
+        rear_tighten = final_dock+5.5
         departure = rear_tighten+NUT_CYCLE+8.
-        end = departure+AMR_OUT_GATE+AMR_OUT_BUFFER
-        yield number, wheel, start, deliveries, reject, front_seat, rear_seat, rear_tighten, front_tighten, departure, end
+        end = departure+AMR_OUT_GATE
+        yield number, wheel, start, deliveries, reject, front_seat, rear_seat, rear_tighten, front_tighten, second_index, final_dock, departure, end
         start = end+1.

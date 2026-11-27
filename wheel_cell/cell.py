@@ -12,6 +12,7 @@ from physical_data import box_inertia
 from physical_data import GUIDE_DYNAMIC_FRICTION, GUIDE_STATIC_FRICTION
 from physical_data import AMR_LIFT_MASS, AMR_MASS, AMR_SIZE
 from process import AMR_BAY_Y, STATIONS
+from layout import LAYOUT
 from sim_util import body, cube, mass_properties, material, pose, reference, transform
 from live_params import HZ, INTERLOCK_FAULTS, MIN_RAIL_SPACING, REFERENCE, ROOT, TERMINAL_PHASES
 from carrier import Carrier
@@ -35,6 +36,12 @@ class Cell:
         self._collider_paths={}
         self._robot_by_collider={}
         self.dock_ready_time=None
+        datums=stage.GetPrimAtPath("/World/LayoutDatums")
+        self.amr_stops=tuple(datums.GetAttribute("cell:amrStopsX").Get()) if datums else LAYOUT.stops
+        if self.amr_stops != LAYOUT.stops:
+            raise ValueError("Rebuild the stage or run with the CELL_LAYOUT_CONFIG used to build it")
+        self.amr_stop=0
+        self.amr_index_pending=False
         self.pending=[]
         self.interference=[]
         self.min_rail_spacing=float("inf")
@@ -65,6 +72,7 @@ class Cell:
                 clamp=f"/DockClamp_{axle}_{side}"
                 self.carrier.add_clamp(stage,ROOT+clamp,REFERENCE+clamp)
         car=body(stage,ROOT+"/CN7",car_start,None,BODY_MASS)
+        PhysxSchema.PhysxContactReportAPI.Apply(car).CreateThresholdAttr(0.)
         # The replay hierarchy contains wheel/nut animation, not just the car shell.
         # Copy only static car parts so timeline scrubbing cannot reveal extra wheels.
         visual=transform(stage,ROOT+"/CN7/Visual")
@@ -210,6 +218,19 @@ class Cell:
     def buffer_active(self):
         return self.buffer_run is not None and self.buffer_run.phase!="done"
 
+    def advance_amr(self, *, completed, robots_clear, load_secured):
+        """Accept measured completion/safety from the process controller before moving."""
+        needed=({"front_mounted"}, {"front_fastened","rear_mounted"}, {"rear_fastened"})
+        if (self.amr_stop>=len(needed) or self.amr_index_pending or self.buffer_active or
+            not robots_clear or not load_secured or self.interference or
+            any(unit.phase in INTERLOCK_FAULTS for unit in self.stations) or
+            not needed[self.amr_stop].issubset(completed)):
+            return False
+        if not self.carrier.request_index(self.amr_stops[self.amr_stop+1]):
+            return False
+        self.amr_index_pending=True
+        return True
+
     def _prepare_step(self,dt):
         if self.buffer_active:
             old=self.buffer_run.phase
@@ -223,6 +244,10 @@ class Cell:
                 self.carrier.previous_yaw=0.
         else:
             self.carrier.step(self.api,dt)
+            if self.amr_index_pending and self.carrier.index_arrived:
+                self.amr_stop+=1
+                self.amr_index_pending=False
+                self.pending.append((self.seconds,"AMR",("park_a","index_b","index_c","exit")[self.amr_stop]))
         if self.carrier.ready and self.dock_ready_time is None:
             self.dock_ready_time=self.seconds
             self.pending.append((self.seconds,"AMR","docked"))

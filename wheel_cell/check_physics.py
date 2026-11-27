@@ -22,7 +22,8 @@ sys.path.insert(0, str(root))
 from physical_data import AMR_LIFT_SPEED, AMR_SPEED_X, AMR_SPEED_Y, WHEEL_MASS
 from physics import Cell, DOCK_READY, HZ, MIN_RAIL_SPACING, ROOT, STATIONS
 from physics import constrain, drive, reference
-from process import AMR_GATE_X, BELT_Z, LINE_Y
+from process import AMR_GATE_X, BELT_Z, LINE_Y, PICK_X, belt_height
+from layout import LAYOUT, check_clearance
 
 
 def count_colliders(stage):
@@ -74,22 +75,73 @@ def check_actors(stage, robots, exported=False):
 
 def check_supply(stage,seed,side):
     cell=Cell(stage,seed,robots=False,branch_side=side,start="gate")
-    test_path=ROOT+"/IncomingWheel"
+    unit=next(unit for unit in cell.stations if unit.name==("FL" if side>0 else "FR"))
     try:
-        # A second tire from the truck infeed: rim and tread ring, held together for this probe.
-        wheel=reference(stage,test_path,cell.stations[0].wheel)
-        tire=reference(stage,test_path+"Tire",cell.stations[0].tire)
-        for prim in (wheel,tire):
-            UsdGeom.Xformable(prim).GetOrderedXformOps()[0].Set(Gf.Vec3d(7.57,0.,BELT_Z+.125))
-        constrain(UsdPhysics.FixedJoint.Define(stage,test_path+"Mount"),wheel,tire)
-        # The rear conveyor adds a lateral leg between the splitter and the feed.
-        for i in range(30*HZ):
+        for path in (unit.wheel,unit.tire):
+            prim=stage.GetPrimAtPath(path)
+            UsdGeom.Xformable(prim).GetOrderedXformOps()[0].Set(
+                Gf.Vec3d(LAYOUT.supply_x,side*LINE_Y,belt_height(LAYOUT.supply_x)+.125))
+        for frame in range(42*HZ):
             cell.step()
-            p=cell.api.get_rigidbody_transformation(test_path)["position"]
-            if i%HZ==0:
-                print("INFEED",i/HZ,tuple(round(v,4) for v in p),flush=True)
-            if p[0]<4.60 and abs(p[1]-side*LINE_Y)<.10 and .55<p[2]<.66:
+            p=cell.api.get_rigidbody_transformation(unit.wheel)["position"]
+            if frame%HZ==0:
+                print("INFEED",frame/HZ,tuple(round(v,4) for v in p),unit.phase,flush=True)
+            if unit.phase=="pick_ready" and abs(p[0]-PICK_X)<.02 and abs(p[1]-side*LINE_Y)<.02:
+                print("PASS 1F to B1 pick-ready",unit.name,tuple(round(v,4) for v in p),flush=True)
                 return True
+        print("FAIL supply did not reach the pick-ready position",unit.name,unit.phase,flush=True)
+        return False
+    finally:
+        cell.close()
+
+
+def check_layout(stage, seed):
+    envelope, nearest, conflicts=check_clearance(stage)
+    print("LAYOUT envelope_m",envelope,"nearest_m",nearest,flush=True)
+    if conflicts:
+        print("FAIL layout clearance",conflicts[:8],flush=True)
+        return False
+    if not all(group in nearest for group in ("conveyor","factory")):
+        print("FAIL layout geometry checks incomplete",flush=True)
+        return False
+    print("PASS layout clearance",flush=True)
+    cell=Cell(stage,seed,robots=False,start="gate")
+    completions=({"front_mounted"}, {"front_fastened","rear_mounted"}, {"rear_fastened"})
+    reported=set()
+    try:
+        for _ in range(50*HZ):
+            cell.step()
+            for header in cell.sim.get_contact_report()[0]:
+                if not header.num_contact_data:
+                    continue
+                pair=tuple(cell._collider(value) for value in (header.collider0,header.collider1))
+                load=any(path.startswith((cell.carrier.path+"/", cell.carrier.lift_path+"/", cell.car_path+"/"))
+                         for path in pair)
+                obstacle=any(path.startswith("/World/Factory/") and not path.endswith("/DockPlate")
+                             for path in pair)
+                if load and obstacle:
+                    print("FAIL loaded AMR met a factory collider",pair,flush=True)
+                    return False
+            if cell.carrier.ready and not cell.amr_index_pending and cell.amr_stop not in reported:
+                stop=cell.amr_stop
+                x=cell.api.get_rigidbody_transformation(cell.carrier.path)["position"][0]
+                car_x=cell.api.get_rigidbody_transformation(cell.car_path)["position"][0]
+                print("AMR_STOP",stop,"deck_x",round(x,4),"car_x",round(car_x,4),flush=True)
+                if abs(x-LAYOUT.stops[stop])>.01 or abs(car_x-x)>.05:
+                    return False
+                if stop==3:
+                    print("PASS AMR force-driven stops and forward exit",flush=True)
+                    return True
+                completed=completions[stop]
+                # Probe-only completion signals. Production must provide real verification.
+                if (cell.advance_amr(completed=set(),robots_clear=True,load_secured=True) or
+                    cell.advance_amr(completed=completed,robots_clear=False,load_secured=True) or
+                    cell.advance_amr(completed=completed,robots_clear=True,load_secured=False) or
+                    not cell.advance_amr(completed=completed,robots_clear=True,load_secured=True)):
+                    print("FAIL AMR interlock",stop,flush=True)
+                    return False
+                reported.add(stop)
+        print("FAIL AMR timeout",cell.amr_stop,cell.carrier.ready,flush=True)
         return False
     finally:
         cell.close()
@@ -248,7 +300,7 @@ def check(path, seed, robots, export, interference_probe, until=None, start="buf
         for station in cell.stations:
             p=cell.api.get_rigidbody_transformation(station.wheel)["position"]
             results[station.name]={"result":station.phase,
-                                   "along_mm":round((p[0]-station.hub[0])*1000,2),
+                                   "along_mm":round((p[0]-station.zone.axle)*1000,2),
                                    "across_mm":round((p[1]-station.side*LINE_Y)*1000,2),
                                    "s1":station.zone.s1.blocked,"s2":station.zone.s2.blocked,
                                    "belt_contact":station.belt_contact,"stopper_contact":station.stop_contact,
@@ -280,7 +332,7 @@ def check(path, seed, robots, export, interference_probe, until=None, start="buf
                     if any(v!=v for v in cell.api.get_rigidbody_transformation(s.wheel)["position"])]
             print("PARTIAL_CHECK",round(cell.seconds,2),faults,flush=True)
             return not faults and not broken and not cell.zone_contacts
-        if (not cell.carrier.ready or dist(measured_car,(0.,0.,0.))>.040
+        if (not cell.carrier.ready or dist(measured_car,(LAYOUT.dock_x,0.,0.))>.040
                 or any(found>rated+.020 for found,rated in zip(maximum_speed,(AMR_SPEED_X,AMR_SPEED_Y,AMR_LIFT_SPEED)))):
             return False
         if interference_probe:
@@ -308,7 +360,8 @@ def main():
     args.add_argument("--seed",type=int,default=42)
     args.add_argument("--without-robots",action="store_true")
     args.add_argument("--interference-probe",action="store_true",help="Command same-rail arms toward each other")
-    args.add_argument("--supply-probe",choices=("left","right"),help="Run one wheel from truck infeed into a branch")
+    args.add_argument("--layout-probe",action="store_true",help="Check loaded envelope and the four AMR stops")
+    args.add_argument("--supply-probe",choices=("left","right"),help="Run one wheel from 1F to the B1 pick zone")
     args.add_argument("--insertion-probe",choices=("nominal","skew"),help="Press the FL wheel onto its hub on a bench slide")
     args.add_argument("--export-setup",type=Path,help="Save the physical scene before stepping")
     args.add_argument("--config",type=Path,help="JSON overrides for cell_config.DEFAULTS")
@@ -328,9 +381,11 @@ def main():
         stage=Usd.Stage.Open(str(config.stage))
         stage.SetEditTarget(stage.GetSessionLayer())
         return check_buffer(stage,config.seed,config.buffer_probe,config.entry)
-    if config.supply_probe or config.insertion_probe:
+    if config.supply_probe or config.insertion_probe or config.layout_probe:
         stage=Usd.Stage.Open(str(config.stage))
         stage.SetEditTarget(stage.GetSessionLayer())
+        if config.layout_probe:
+            return check_layout(stage,config.seed)
         if config.insertion_probe:
             return check_insertion(stage,config.seed,config.insertion_probe=="skew")
         return check_supply(stage,config.seed,1 if config.supply_probe=="left" else -1)

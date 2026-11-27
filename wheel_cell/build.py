@@ -47,10 +47,12 @@ from physical_data import AMR_SIZE, AMR_WHEEL_RADIUS, DOCK_CLAMP_CLOSED, DOCK_CL
 from kmp1500_urdf import SCANNER_X, SCANNER_Y, SCANNER_Z, S300_SIZE
 from process import (
     AMR_AT_GATE, AMR_BAY_Y, AMR_DOCKED, AMR_GATE_X, AMR_LIFTED, AMR_OUT_GATE, AXLE, BELT_Z, BUFFER_CAR_Z,
-    BUFFER_SLOT_X, BUFFER_STAND_X, BUFFER_STAND_Y, CELL_Y, CN7_R16, DOCK_X, FASTEN_BASE_X, FEED_START_X, MOUNT_BASE_X, MOUNT_CLEAR, ROBOT_BASE_Y, FEED, FPS,
+    BUFFER_SLOT_X, BUFFER_STAND_X, BUFFER_STAND_Y, CELL_Y, CN7_R16, DOCK_X, FASTEN_BASE_X, FEED_START_X, MOUNT_BASE_X, MOUNT_HUB_X, MOUNT_CLEAR, ROBOT_BASE_Y, FPS,
     HUB_Z, INDEX_TRAVEL, LINE_Y, NUT_CYCLE, NUT_DRIVE, NUT_ENGAGE, NUT_FINAL,
-    REJECT_CRATE_Y, REJECT_GATE_HALF, REJECT_X, STATIONS, bend, schedule,
+    REJECT_CRATE_Y, REJECT_GATE_HALF, REJECT_X, STATIONS, schedule,
 )
+from layout import LAYOUT
+from process import EXIT_X, FASTEN_HUB_X, FINAL_X, INDEX_X, belt_height
 from wheel_geometry import barrel, center_web, hub as make_hub, nut as make_nut, wheelhouse
 from robot import Arm
 from cell_motion import (GRIP_AT, GRIP_CENTRE, HEAD_LENGTH, MAGAZINE, NUT_ADVANCE, NUT_PICK_AT, fasten_keys,
@@ -73,7 +75,7 @@ FLOOR_Y = HALL_Y+.40
 # The outbound (-y) side is open (no hall wall); the floor ends as far out as on the inbound side.
 FLOOR_S = FLOOR_Y
 # Floor x range: 1 m extra on the aisle (west) side so the aisle paint keeps 1.05 m to the floor edge.
-FLOOR_X0, FLOOR_X1 = -11., 10.
+FLOOR_X0, FLOOR_X1 = -11., max(10., EXIT_X+2.65, LAYOUT.supply_x+.7)
 FLOOR_XMID, FLOOR_W = (FLOOR_X0+FLOOR_X1)/2, FLOOR_X1-FLOOR_X0
 FLOOR_MID, FLOOR_LEN = (FLOOR_Y-FLOOR_S)/2, FLOOR_Y+FLOOR_S
 # AMR travel zones painted on the floor: the car-carrying AMR's swept area (CN7 body 4.71 x 1.825 m
@@ -205,24 +207,6 @@ def belt(stage, name, a, b, width=.8, outlet_x=None):
     return gate
 
 
-def curved_belt(stage, path, points):
-    for i, (a,b) in enumerate(zip(points, points[1:])):
-        dx, dy = b[0]-a[0], b[1]-a[1]
-        yaw = degrees(atan2(dy,dx))
-        length = hypot(dx,dy)
-        pos = ((a[0]+b[0])/2,(a[1]+b[1])/2,0.)
-        cell, _ = xform(stage, path+f"/Section_{i}", pos)
-        cell.AddRotateZOp().Set(yaw)
-        sub = str(cell.GetPath())
-        for j in (-1,1):
-            box(stage, sub+f"/Edge_{j+1}", (0,j*.375,.527), (length+.035,.035,.139), BRUSHED)
-        # At the inside of the bend two full-width rollers per chord would touch.
-        cylinder(stage,sub+"/Roller_0",(0.,0.,BELT_Z-ROLLER_RADIUS),ROLLER_RADIUS,.68,ZINC,"Y")
-        if i%4==0:
-            for j in (-1,1):
-                box(stage, sub+f"/Leg_{j+1}", (0,j*.25,.217), (.064,.064,.432), STEEL)
-
-
 def fence(stage, path, a, b, height=1.46):
     dx,dy=b[0]-a[0],b[1]-a[1]
     for i in range(ceil(hypot(dx,dy)/1.40)):
@@ -338,6 +322,37 @@ def write_concrete(path):
     Image.fromarray(np.clip(rgb,0,255).astype(np.uint8)).save(path,optimize=True)
 
 
+def tiered_feed(stage, label, side):
+    """One outboard lane from the 1F loading deck to the B1 pick conveyor."""
+    y = side*LINE_Y
+    prefix = f"/World/Factory/{label}TieredFeed"
+    for name, start, end in (("Ramp", LAYOUT.ramp_bottom_x, LAYOUT.ramp_top_x),
+                              ("Upper", LAYOUT.ramp_top_x, LAYOUT.supply_x+.4)):
+        z0, z1 = belt_height(start), belt_height(end)
+        length = hypot(end-start, z1-z0)
+        part = f"{prefix}/{name}"
+        frame, _ = xform(stage, part, ((start+end)/2,y,(z0+z1)/2))
+        frame.AddRotateYOp().Set(-degrees(atan2(z1-z0,end-start)))
+        box(stage, part+"/Bed", (0,0,-.090), (length,.67,.060), RUBBER)
+        for sign in (-1, 1):
+            box(stage, part+f"/Edge_{sign+1}", (0,sign*.347,.04), (length,.040,.12), BRUSHED)
+        count = ceil(length/.105)
+        for i in range(count):
+            x = ((i+.5)/count-.5)*length
+            cylinder(stage, part+f"/Roller_{i}", (x,0,-ROLLER_RADIUS), ROLLER_RADIUS,.58,ZINC,"Y")
+        for i in range(max(1,ceil((end-start)/1.25))):
+            x = start+(i+.5)*(end-start)/max(1,ceil((end-start)/1.25))
+            height = belt_height(x)-.12
+            for sign in (-1,1):
+                box(stage,prefix+f"/{name}Support_{i}_{sign+1}",(x,y+sign*.25,height/2),
+                    (.08,.08,height),BRUSHED)
+    box(stage,prefix+"/FirstFloorLoadingDeck",(LAYOUT.supply_x,y+side*.8,LAYOUT.floor_rise-.10),
+        (1.1,.95,.20),CONCRETE)
+    for sign in (-1,1):
+        box(stage,prefix+f"/DeckSupport_{sign+1}",(LAYOUT.supply_x+sign*.44,y+side*1.10,
+            LAYOUT.floor_rise/2),(.12,.12,LAYOUT.floor_rise),BRUSHED)
+
+
 def factory(stage, arm):
     path="/World/Factory"
     concrete_floor(stage,path)
@@ -346,13 +361,27 @@ def factory(stage, arm):
     joints,south=int(FLOOR_Y//2.5),int(FLOOR_S//2.5)
     for j in range(-south,joints+1):
         box(stage,path+f"/TransverseJoint_{j+south}",(FLOOR_XMID,j*2.5,.001),(FLOOR_W-.04,.007,.002),(.17,.19,.20))
-    box(stage,path+"/DockPlate",(DOCK_X+WHEELBASE/2,0,-.012),(4.95+WHEELBASE,2.22,.024),(.15,.18,.20))
+    box(stage,path+"/DockPlate",(DOCK_X+WHEELBASE,0,-.012),(4.95+2*WHEELBASE,2.22,.024),(.15,.18,.20))
     for i in range(int((-2.69-(AMR_GATE_X+.47))/.48)+1):     # gate -> dock arrow
         box(stage,path+f"/AMR_Center_{i}",(AMR_GATE_X+.47+i*.48,0,.003),(.265,.045,.005),(.04,.54,.78))
     arrow_points=[(-2.62,0.,.004),(-3.06,.20,.004),(-3.06,.071,.004),
                   (-3.52,.071,.004),(-3.52,-.071,.004),(-3.06,-.071,.004),(-3.06,-.20,.004)]
     mesh(stage,path+"/DockDirection",arrow_points,[3,4],[0,1,6,2,3,4,5],(.04,.54,.78),True)
     amr_zones(stage,path+"/AMRZone")
+    datums, _ = xform(stage, "/World/LayoutDatums")
+    datums.GetPrim().CreateAttribute("cell:amrStopsX", Sdf.ValueTypeNames.DoubleArray).Set(list(LAYOUT.stops))
+    datums.GetPrim().CreateAttribute("cell:floorRise", Sdf.ValueTypeNames.Double).Set(LAYOUT.floor_rise)
+    for name, x in zip(("ParkA","IndexB","IndexC","Exit"), LAYOUT.stops):
+        xform(stage, f"/World/LayoutDatums/{name}", (x,0,0))
+        if name!="Exit":
+            box(stage,f"{path}/AMR_{name}",(x,0,.004),(.06,2.10,.004),TEAL)
+    for i in range(1,5):
+        x = FINAL_X+(EXIT_X-FINAL_X)*i/5
+        box(stage,f"{path}/AMR_ExitLine_{i}",(x,0,.004),(.30,.045,.004),TEAL)
+    for side, name in ((1,"Left"),(-1,"Right")):
+        for role, x in (("Mount",MOUNT_HUB_X),("Fasten",FASTEN_HUB_X)):
+            xform(stage, f"/World/LayoutDatums/{name}{role}", (x,side*LAYOUT.work_hub_y,LAYOUT.work_hub_z))
+
     cell_floor=(.36,.43,.52)  # inside-cell tint from the layout legend; the dock plate stays dark
     for name,(x0,x1,y0,y1) in (("Left",(-4.52,6.65,1.11,CELL_Y)),("Right",(-4.52,6.65,-CELL_Y,-1.11)),
                                ("Entry",(-4.52,DOCK_X-2.475,-1.11,1.11)),("Exit",(DOCK_X+2.475+WHEELBASE,5.65,-1.11,1.11))):
@@ -382,9 +411,13 @@ def factory(stage, arm):
         fence(stage,door,(-3.79,fy),(-2.71,fy),1.80)
         box(stage,door+"/Interlock",(-2.74,fy+side*.05,1.42),(.10,.07,.13),AMBER)
         box(stage,door+"/Handle",(-2.83,fy+side*.07,1.05),(.045,.06,.20),DARK)
-        for x,tag,opening in ((-4.52,"AMR",1.50),(6.65,"Infeed",1.06)):
-            fence(stage,path+f"/{label}{tag}Guard",(x,side*opening),(x,fy),1.80)
-            box(stage,path+f"/{label}{tag}Guard/LightCurtainPost",(x,side*opening,.90),(.065,.065,1.80),AMBER)
+        for x, tag, opening in ((-4.52, "AMR", 1.50), (6.65, "Infeed", 1.16)):
+            spans = ((opening, CELL_Y),) if tag=="AMR" else (
+                (opening, LINE_Y-.48), (LINE_Y+.48, CELL_Y))
+            for i,(lower,upper) in enumerate(spans):
+                fence(stage,f"{path}/{label}{tag}Guard_{i}",(x,side*lower),(x,side*upper),1.80)
+            box(stage,path+f"/{label}{tag}Guard_0/LightCurtainPost",(x,side*opening,.90),
+                (.065,.065,1.80),AMBER)
         for x,tag in ((-3.94,"Service"),(6.44,"Supply")):
             station = path+f"/{label}{tag}GuardControl"
             box(stage,station+"/Post",(x,fy+side*.09,.62),(.07,.08,1.24),BRUSHED)
@@ -397,34 +430,14 @@ def factory(stage, arm):
         fence(stage,path+f"/{label}OuterGuard",(-5.55,side*OUTER_GUARD_Y),(6.10,side*OUTER_GUARD_Y))
         fence(stage,path+f"/{label}EndGuard",(5.65,side*(CELL_Y+.02)),(5.65,side*OUTER_GUARD_Y))
         if side>0:
-            reject_gate=belt(stage,label+"Feed",(FEED_START_X,side*LINE_Y),bend(side)[-1],.67,outlet_x=REJECT_X)
+            reject_gate=belt(stage,label+"Feed",(FEED_START_X,side*LINE_Y),(LAYOUT.ramp_bottom_x,side*LINE_Y),.67,outlet_x=REJECT_X)
         else:
-            belt(stage,label+"Feed",(FEED_START_X,side*LINE_Y),bend(side)[-1],.67)
-        curved_belt(stage,path+f"/{label}ConveyorBend",bend(side)[8:])
+            belt(stage,label+"Feed",(FEED_START_X,side*LINE_Y),(LAYOUT.ramp_bottom_x,side*LINE_Y),.67)
+        tiered_feed(stage,label,side)
         for j in (-1,1):
             beacon(stage,path+f"/{label}Signal_{j+1}",(j*4.65,side*CELL_Y))
-    belt(stage,"TruckUnload",FEED,bend(1)[0],.77)
-    box(stage,path+"/PoweredDiverter",(6.272,0,.405),(1.16,1.87,.071),BRUSHED)
-    # End the straight roller bank ahead of the first angled branch rollers.
-    for row in range(7):
-        for lane in range(10):
-            x=6.085+row*.115
-            y=(lane-4.5)*.162
-            cylinder(stage,path+f"/DiverterRoll_{row}_{lane}",(x,y,BELT_Z-ROLLER_RADIUS),
-                     ROLLER_RADIUS,.10,ZINC,"Y")
     belt(stage,"QA_Reject",(REJECT_X,LINE_Y+.38),(REJECT_X,REJECT_CRATE_Y-.22),.67)
     box(stage,path+"/RejectCrate",(REJECT_X,REJECT_CRATE_Y,.255),(.72,.42,.48),RED)
-    truck_setback=.30
-    box(stage,path+"/TruckCargo",(7.91,2.28+truck_setback,1.50),(2.07,4.00,1.77),(.61,.63,.65))
-    box(stage,path+"/TruckCab",(7.91,4.93+truck_setback,1.02),(2.06,1.31,1.73),(.16,.22,.29))
-    box(stage,path+"/Windshield",(7.92,5.59+truck_setback,1.44),(1.72,.028,.51),GLASS)
-    box(stage,path+"/TruckFrame",(7.91,2.86+truck_setback,.46),(1.59,5.29,.22),BRUSHED)
-    for i,y in enumerate((.91,1.65,4.83)):
-        for j in (-1,1):
-            cylinder(stage,path+f"/TruckTire_{i}_{j+1}",(7.91+j*.91,y+truck_setback,.34),.34,.23,RUBBER,"X")
-            cylinder(stage,path+f"/TruckHub_{i}_{j+1}",(7.91+j*1.04,y+truck_setback,.34),.16,.038,ALLOY,"X")
-    for i in range(12):
-        box(stage,path+f"/TruckBay_{i}",(6.55+i*.23,5.81,.006),(.121,.089,.007),AMBER)
     industrial_hall(stage,path)
     for name,eye,target,focal in (
             ("Overview",(-17.6,0.,16.6),(.65,0.,.44),20.8),
@@ -722,7 +735,7 @@ def dock_clamps(stage, root, dock, release, *, base_x=0., prefix="DockClamp"):
 
 
 def order(stage, assets, arm, data, record):
-    number,wheel,start,deliveries,reject,front,rear,rear_tight,front_tight,departure,end=data
+    number,wheel,start,deliveries,reject,front,rear,rear_tight,front_tight,second_index,final_dock,departure,end=data
     vehicle=f"CN7-{number:03}"
     root=f"/World/Orders/CN7_{number:03}"
     cycle,_=xform(stage,root)
@@ -734,21 +747,25 @@ def order(stage, assets, arm, data, record):
     index_start=front+MOUNT_CLEAR
     redock=index_start+INDEX_TRAVEL
     dock_clamps(stage,root,start+AMR_DOCKED,index_start,base_x=DOCK_X)
-    dock_clamps(stage,root,redock,departure,base_x=DOCK_X+WHEELBASE,prefix="RearDockClamp")
+    dock_clamps(stage,root,redock,second_index,base_x=INDEX_X,prefix="RearDockClamp")
+    dock_clamps(stage,root,final_dock,departure,base_x=FINAL_X,prefix="FinalDockClamp")
     route=((start-AMR_AT_GATE,AMR_GATE_X,AMR_BAY_Y),(start,AMR_GATE_X,0.),(start+AMR_DOCKED,DOCK_X,0.),
-           (index_start,DOCK_X,0.),(redock,DOCK_X+WHEELBASE,0.),
-           (departure,DOCK_X+WHEELBASE,0.),(departure+AMR_OUT_GATE,AMR_GATE_X,0.),(end,AMR_GATE_X,-AMR_BAY_Y))
+           (index_start,DOCK_X,0.),(redock,INDEX_X,0.),
+           (second_index,INDEX_X,0.),(final_dock,FINAL_X,0.),
+           (departure,FINAL_X,0.),(end,EXIT_X,0.))
     for t,x,y in route:
         move(amr,t,(x,y,0.))
     for t,height in ((start-AMR_AT_GATE,-.12),(start+AMR_DOCKED,-.12),(start+AMR_LIFTED,0.),
-                     (departure+AMR_OUT_GATE,0.),(end,-.10)):
+                     (end,0.)):
         move(lift,t,(0.,0.,height))
     record(start,vehicle,"","order",wheel.name)
     record(start+AMR_LIFTED,vehicle,"","docked","AMR dock and lift complete")
     record(index_start,vehicle,"","index_start","Front wheels hung, mount arms parked; moving to stop B")
     record(redock+2.,vehicle,"","rear_docked","Stop B: front hubs at the fastening arms, rear hubs at the mount arms")
+    record(second_index,vehicle,"","second_index","Front fastening and rear mounting complete; arms parked")
+    record(final_dock,vehicle,"","final_docked","Stop C: rear hubs at the fastening arms")
     record(departure,vehicle,"","depart","AMR leaving the dock")
-    record(end,vehicle,"","outbound","AMR reached outbound apron")
+    record(end,vehicle,"","outbound","AMR reached forward exit")
     record(staged,vehicle,"","staged","AMR leaves inbound buffer for the gate")
     for name,(x,side) in STATIONS.items():
         wheel_y=side*half_track(x)
@@ -761,14 +778,14 @@ def order(stage, assets, arm, data, record):
         # Flat on the belt until the mount arm's jaws close on the tread.
         visibility(item,path[0][0],seated+GRIP_AT)
         for t,(wx,wy) in path:
-            move(pos,t,(wx,wy,BELT_Z+wheel.width/2))
+            move(pos,t,(wx,wy,belt_height(wx)+wheel.width/2))
         # Carried in the PHL-W jaws: wheel axis on the flange Z, outboard face toward the flange.
         held,held_pos,held_tilt,_=make_wheel(stage,assets,mount+f"/Link_6/HeldWheel_{number:03}_{name}",wheel)
         held_pos.Set(vector((0,0,GRIP_CENTRE)))
         held_tilt.Set(180)
         visibility(held,seated+GRIP_AT,seated)
-        animate_arm(stage,arm,mount,solve_plan(arm,MOUNT_BASE_X,side,mount_keys(side,seated,wheel,x)))
-        animate_arm(stage,arm,fasten,solve_plan(arm,FASTEN_BASE_X,side,fasten_keys(side,tight,x,DOCK_X+AXLE+(WHEELBASE if x>0 else 0.))))
+        animate_arm(stage,arm,mount,solve_plan(arm,MOUNT_BASE_X,side,mount_keys(side,seated,wheel)))
+        animate_arm(stage,arm,fasten,solve_plan(arm,FASTEN_BASE_X,side,fasten_keys(side,tight)))
         for k,(sx,sy) in enumerate(SOCKET_LAYOUT):
             carried_root=fasten+f"/Link_6/CarriedNut_{number:03}_{name}_{k}"
             carried,_=xform(stage,carried_root,(sx,sy,HEAD_LENGTH+NUT_LENGTH))

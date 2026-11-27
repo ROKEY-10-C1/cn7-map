@@ -50,7 +50,7 @@ cd "$HOME/project"
 ./map/wheel_cell/check_physics.sh --export-setup "$PWD/map/wheel_cell/output/wheel_cell_physics.usdc"
 ```
 
-부분 실행: `check_physics.sh --start gate`(게이트부터), `--buffer-probe 0|1|2`(버퍼에서 꺼내 통로로 나오기까지만), `--until 초`(그 시각까지만). 기본 검사는 기준 질량·관성, 중복 바디, AMR 도킹, USD와 PhysX 자세 일치, 네 타이어가 집는 위치(흐름 방향 ±3 mm, 폭 방향 ±2 mm)에 `pick_ready`로 섰는지, 로봇과 집는 구역 장비에 다른 물체가 닿지 않았는지 확인합니다. `--until 초`는 그 시각까지만 돌리고 고장 여부만 봅니다. `--supply-probe`는 트럭 하역 위치의 휠 하나가 선택한 가지로 이동하는지 검사합니다. 라이브 데모는 스테이션 앞에서 휠 네 개를 공급하는 조건입니다. 자동으로 다수 휠을 투입하고 분기를 변경하는 운영 제어는 별도 구현이 필요합니다.
+부분 실행: `check_physics.sh --start gate`(게이트부터), `--buffer-probe 0|1|2`(버퍼에서 꺼내 통로로 나오기까지만), `--until 초`(그 시각까지만). 기본 검사는 기준 질량·관성, 중복 바디, AMR 도킹, USD와 PhysX 자세 일치, 네 타이어가 집는 위치(흐름 방향 ±3 mm, 폭 방향 ±2 mm)에 `pick_ready`로 섰는지, 로봇과 집는 구역 장비에 다른 물체가 닿지 않았는지 확인합니다. `--until 초`는 그 시각까지만 돌리고 고장 여부만 봅니다. `--supply-probe left|right`는 1F 공급점에서 투입한 휠 한 개를 B1의 해당 픽업 위치까지 물리 구동하고 `pick_ready`를 확인합니다. `--layout-probe`는 적재 외형의 통과 여유, 인덱싱 인터록, 세 정차점 및 전방 출차를 검증합니다. 자동 타이어 투입과 후륜 공급 전환은 운영 제어에서 연결해야 합니다.
 
 `--insertion-probe`는 차체를 고정한 시험대에서 FL 휠을 힘 제한(145 N) 슬라이드로 허브에 밀어 넣습니다. `nominal`은 장착면 안착을, `skew`는 4 mm 반경 어긋남에서 스터드가 삽입을 막는지를 확인합니다.
 
