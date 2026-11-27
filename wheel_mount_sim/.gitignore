@@ -1,0 +1,5 @@
+# simulation outputs (curated media are copied to docs/)
+output/
+# fetched robot asset (NVIDIA Isaac Sim asset terms): run tools/fetch_assets.sh
+assets/rs080n/
+__pycache__/

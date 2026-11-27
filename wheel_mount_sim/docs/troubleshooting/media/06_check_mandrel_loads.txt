@@ -1,0 +1,54 @@
+wheel 17.10 kg (I axial 0.816, transverse 0.457 kg m2), tool 1.65 kg
+payload 18.75 kg, CoG 129 mm along the flange normal, 1.0 mm radial
+
+1) Robot H2515 payload diagram
+  OK  CoG distance allowed at this mass (mm)       need    129.4 mm   have    175.0 mm   SF  1.35  
+     inertia about the wrist (transverse) 0.79 kg m2, about J6 0.82 kg m2 - H2515 limits not published (H2017: J5 4.5, J6 2.0)
+
+2) Jaw forces when the wheel axis is horizontal (mounting pose)
+  OK  top jaw radial force vs catalogue moment     need     27.9 Nm   have     60.0 Nm   SF  2.15  N_top 998 N x P 28 mm
+     pitch moment 14.3 Nm (CoG 57 mm inboard of the grip), top jaw must hold 195 N axially
+  NG  top jaw axial friction, mu 0.1               need    390.0 N    have     99.8 N    SF  0.26  
+  NG  top jaw axial friction, mu 0.3               need    390.0 N    have    299.3 N    SF  0.77  
+  OK  top jaw axial friction, mu 0.5               need    390.0 N    have    498.9 N    SF  1.28  
+
+3) Picking the wheel lying flat (axis vertical, wheel hangs below the jaws)
+  NG  axial friction of 3 jaws, mu 0.1             need    503.3 N    have    249.0 N    SF  0.49  
+  OK  axial friction of 3 jaws, mu 0.3             need    503.3 N    have    747.0 N    SF  1.48  
+  OK  axial friction of 3 jaws, mu 0.5             need    503.3 N    have   1245.0 N    SF  2.47  
+  OK  axial load per jaw vs Fz                     need     83.9 N    have   1500.0 N    SF 17.88  
+
+4) Turning the wheel about its axis with J6 (phase alignment)
+  NG  friction torque, mu 0.1                      need     25.6 Nm   have      8.4 Nm   SF  0.33  alpha 900 deg/s2
+  NG  friction torque, mu 0.3                      need     25.6 Nm   have     25.1 Nm   SF  0.98  alpha 900 deg/s2
+  OK  friction torque, mu 0.5                      need     25.6 Nm   have     41.8 Nm   SF  1.63  alpha 900 deg/s2
+
+5) Pushing onto the hub
+  OK  press force per jaw vs Fz                    need     48.3 N    have   1500.0 N    SF 31.03  
+  OK  finger mass                                  need      0.1 kg   have      0.6 kg   SF 10.00  
+  OK  finger length                                need     28.0 mm   have    105.0 mm   SF  3.75  
+
+6) After release at d = 6 mm (wheel hangs on the studs, pilot 6 mm into the bore)
+     lean limited by the pilot: <= 1.53 deg (0.08 mm clearance over 6 mm)
+
+7) Same cases with a pull-down nose: 45 deg flank on the bore's outboard edge chamfer (estimate)
+     clamp preload 1341 N (wedge with mu 0.3)
+  OK  pitch moment, mounting pose                  need     28.7 Nm   have     53.6 Nm   SF  1.87  
+  OK  wheel hanging (flat pick): radial force to hold wedge need    503.3 N    have   2490.0 N    SF  4.95  
+  OK  J6 phase torque                              need     25.6 Nm   have     51.5 Nm   SF  2.01  
+
+8) No chamfer assumed: 5 support pads on the web front between the lug holes (r 70 mm),
+   fixed to the gripper body, plus slower J6 phase moves (450 deg/s2)
+  OK  pitch moment, top jaw friction, mu 0.3       need    277.0 N    have    299.3 N    SF  1.08  
+  OK  flat pick, 3 jaws, mu 0.3                    need    503.3 N    have    747.0 N    SF  1.48  
+  OK  J6 phase torque at 450 deg/s2, mu 0.3        need     12.8 Nm   have     25.1 Nm   SF  1.95  
+  OK  pitch moment, top jaw friction, mu 0.5       need    277.0 N    have    498.9 N    SF  1.80  
+  OK  flat pick, 3 jaws, mu 0.5                    need    503.3 N    have   1245.0 N    SF  2.47  
+  OK  J6 phase torque at 450 deg/s2, mu 0.5        need     12.8 Nm   have     41.8 Nm   SF  3.26  
+
+9) Industry-standard alternative: claws on the tire tread (Mitsubishi US4942659, Honda US9757828,
+   Quatro US5125298). Lightest plausible tool, same H2515 diagram
+     claws must press the tread with >= 1438 N in total (mu 0.35)
+     tool 8.5 kg, payload 25.6 kg, CoG 185 mm
+  NG  H2515 rated payload                          need     25.6 kg   have     25.0 kg   SF  0.98  
+  NG  H2515 CoG distance at this mass              need    184.8 mm   have    100.0 mm   SF  0.54  
