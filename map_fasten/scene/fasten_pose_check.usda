@@ -1,0 +1,80 @@
+#usda 1.0
+(
+    defaultPrim = "World"
+    metersPerUnit = 1
+    upAxis = "Z"
+    subLayers = [
+        # 회전 관절과 너트가 포함된 5축 체결 헤드 레이어
+        @./fasten_head.usdc@,
+        @../../scene/shared/materials.usdc@
+    ]
+)
+
+def Xform "World"
+{
+    def PhysicsScene "Physics"
+    {
+        vector3f physics:gravityDirection = (0, 0, -1)
+        float physics:gravityMagnitude = 9.81
+    }
+
+    def DomeLight "Lighting"
+    {
+        float inputs:intensity = 800
+    }
+
+    def Cube "WhiteFloor"
+    {
+        double size = 1
+        color3f[] primvars:displayColor = [(1, 1, 1)]
+        double3 xformOp:translate = (0, 0, -0.05)
+        float3 xformOp:scale = (100, 100, 0.1)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+    }
+
+    def Xform "Car" (
+        prepend references = @../../assets/vehicle/Hyundai_Avante_CN7_Body.usd@
+    )
+    {
+        bool physics:rigidBodyEnabled = false
+        double3 xformOp:translate = (0, 0, 0.62405)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Xform "Wheel" (
+        prepend references = @../../assets/vehicle/CN7_Wheel_205-55R16.usd@
+    )
+    {
+        bool physics:rigidBodyEnabled = false
+        double3 xformOp:translate = (1.36, 0.7925, 0.94)
+        float xformOp:rotateX = -90
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateX"]
+    }
+
+    # 체결 로봇 에셋을 배치하고 베이스를 작업 바닥에 고정한다.
+    def Xform "FastenRobot" (
+        prepend references = @../assets/RS080N.usdc@
+    )
+    {
+        double3 xformOp:translate = (1.8, 2.65, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+
+        over "Joints"
+        {
+            over "root_joint"
+            {
+                point3f physics:localPos0 = (1.8, 2.65, 0)
+            }
+        }
+
+        over "link_6"
+        {
+            # 플랜지 로컬 +Z 방향 464 mm에 체결기 중심 TCP를 둔다.
+            def Xform "TCP"
+            {
+                double3 xformOp:translate = (0, 0, 0.464)
+                uniform token[] xformOpOrder = ["xformOp:translate"]
+            }
+        }
+    }
+}
