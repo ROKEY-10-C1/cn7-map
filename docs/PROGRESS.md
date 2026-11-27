@@ -83,6 +83,18 @@ AMR 흐름(정한 내용): 입고 칸은 **1 → 2 → 3**(통로 쪽부터) 꺼
 
 아직 안 된 것: Isaac 물리 검증(`check_physics.sh`), 키프레임 시연(주문 차량은 아직 통로 끝에서 실린 채 나타남), 주문 4대 중 4번째 차를 둘 칸.
 
+### 2026-11-27 출고 쪽 바닥 확장 · AMR 주행 구역 바닥 표시
+
+pull 후 다시 빌드할 필요는 없습니다. 바뀐 레이어 3개를 Isaac Sim 5.1.0(IsaacSim04)의 `build.sh`로 만들어 넣었습니다(crate 0.9).
+같은 PC에서 바꾸기 전 코드로 빌드한 결과가 main의 레이어와 똑같아서, 바뀐 3개만 이번 수정의 결과입니다.
+
+| 파일 | 내용 |
+|---|---|
+| `wheel_cell/build.py` | 바닥 남쪽(출고 쪽) 끝 `FLOOR_S = FLOOR_Y + 8` → 바닥 y -18 ~ +10. 슬래브·콘크리트·줄눈·오른쪽 끝 벽을 새 끝까지 늘림 |
+| `wheel_cell/build.py` `amr_zones()` | AMR 주행 구역 바닥 표시 `/World/AMRZone`: 연한 황토색 면(z 1.8 mm) + 노란 테두리(z 4 mm). 통로 띠(x -7 ± 2.455), 입고·출고 칸 줄 띠(칸 3 끝까지), 통로 양 끝 회전 원(반지름 2.68 m = 실은 차 대각선 절반 + 0.1 m). 표시만 있고 충돌체 없음 |
+| `wheel_cell/split_scene.py` | `AMRZone`을 `factory/floor` 레이어로 보냄 (없으면 `factory/misc`가 새로 생김) |
+| `scene/factory/floor.usdc`, `building.usdc`, `shared/materials.usdc` | 위 변경으로 다시 생성 |
+
 ## 4. 에러 기록 (발생 순서)
 
 모든 물리 결과는 `./map/wheel_cell/check_physics.sh --seed 42` 기준입니다.

@@ -46,7 +46,7 @@ from fitment import (
 from physical_data import AMR_SIZE, AMR_WHEEL_RADIUS, DOCK_CLAMP_CLOSED, DOCK_CLAMP_OPEN, ROLLER_RADIUS
 from process import (
     AMR_AT_GATE, AMR_BAY_Y, AMR_DOCKED, AMR_GATE_X, AMR_LIFTED, AMR_OUT_GATE, AXLE, BELT_Z, BUFFER_CAR_Z,
-    BUFFER_STAND_X, BUFFER_STAND_Y, CN7_R16, FASTEN_PARK, FEED, FPS,
+    BUFFER_SLOT_X, BUFFER_STAND_X, BUFFER_STAND_Y, CN7_R16, FASTEN_PARK, FEED, FPS,
     HUB_Z, LINE_Y, MOUNT_PARK, NUT_CYCLE, NUT_DRIVE, NUT_ENGAGE, NUT_FINAL, NUT_PICKUP,
     RAIL_Y, REJECT_GATE_HALF, REJECT_X, STATIONS, bend, schedule,
 )
@@ -68,6 +68,14 @@ BUFFER_GUARD_Y = AMR_BAY_Y-2.65
 OUTER_GUARD_Y = AMR_BAY_Y+2.65
 HALL_Y = OUTER_GUARD_Y+.40
 FLOOR_Y = HALL_Y+.40
+# The outbound (-y) side is open (no hall wall); the floor runs 8 m further there.
+FLOOR_S = FLOOR_Y+8.
+FLOOR_MID, FLOOR_LEN = (FLOOR_Y-FLOOR_S)/2, FLOOR_Y+FLOOR_S
+# AMR travel zones painted on the floor: the car-carrying AMR's swept area (CN7 body 4.71 x 1.825 m
+# plus 0.1 m) and the in-place turn circles at the aisle ends.
+CAR_HALF = (4.71/2, 1.825/2)
+ZONE_MARGIN = .10
+ZONE_FILL = (.78, .70, .44)
 DOOSAN_ASSETS = Path(__file__).parent/"assets"
 NUT_ADVANCE = 5*PITCH
 # Flange frame of the fastening tool (see Arm.solve): x = world x, y = world z * side, so
@@ -273,12 +281,39 @@ def parking(stage, root, side):
                     (.20,.20,top+BUFFER_CAR_Z),STEEL)
 
 
+def amr_zones(stage, path):
+    """Floor paint for where the AMR runs with a car: a tinted fill (z 1-2.6 mm, under the lane and
+    slot lines) with amber edge lines and turn circles at the aisle ends."""
+    half_l, half_w = CAR_HALF[0]+ZONE_MARGIN, CAR_HALF[1]+ZONE_MARGIN
+    turn = hypot(*CAR_HALF)+ZONE_MARGIN          # car corner radius when it turns in place
+    cut = sqrt(turn**2-half_l**2)                # where a straight lane edge meets the circle
+    fill = lambda name, x0, x1, y0, y1, rgb=ZONE_FILL: box(
+        stage, path+f"/{name}", ((x0+x1)/2, (y0+y1)/2, .0018), (x1-x0, y1-y0, .0016), rgb)
+    def line(name, a, b, rgb=AMBER, width=.06):
+        (x0, y0), (x1, y1) = a, b
+        size = (abs(x1-x0)+width, width, .003) if y0 == y1 else (width, abs(y1-y0)+width, .003)
+        box(stage, path+f"/{name}", ((x0+x1)/2, (y0+y1)/2, .004), size, rgb)
+    gx, far = AMR_GATE_X, BUFFER_SLOT_X[-1]+half_w
+    # Aisle along x = AMR_GATE_X between the two buffer lanes (car lengthwise along x).
+    fill("Aisle", gx-half_l, gx+half_l, -AMR_BAY_Y, AMR_BAY_Y)
+    for k, x in enumerate((gx-half_l, gx+half_l)):
+        line(f"AisleEdge_{k}", (x, -AMR_BAY_Y+cut), (x, AMR_BAY_Y-cut))
+    for side, label in ((1, "In"), (-1, "Out")):
+        y = side*AMR_BAY_Y
+        # Buffer lane: the AMR crabs along the slot row with the car across it.
+        fill(f"{label}Lane", gx, far, y-half_l, y+half_l)
+        for k, e in enumerate((-1, 1)):
+            line(f"{label}LaneEdge_{k}", (gx+cut, y+e*half_l), (far, y+e*half_l))
+        line(f"{label}LaneEnd", (far, y-half_l), (far, y+half_l))
+        cylinder(stage, path+f"/{label}Turn", (gx, y, .0018), turn, .0016, ZONE_FILL)
+        ring(stage, path+f"/{label}TurnEdge", (gx, y, .004), turn+.03, turn-.03, .003, AMBER, 96)
+
 def concrete_floor(stage, path):
-    box(stage,path+"/Slab",(0,0,-.108),(20,2*FLOOR_Y,.2),CONCRETE)
-    floor=mesh(stage,path+"/Concrete", [(-10,-FLOOR_Y,0),(10,-FLOOR_Y,0),(10,FLOOR_Y,0),(-10,FLOOR_Y,0)],
+    box(stage,path+"/Slab",(0,FLOOR_MID,-.108),(20,FLOOR_LEN,.2),CONCRETE)
+    floor=mesh(stage,path+"/Concrete", [(-10,-FLOOR_S,0),(10,-FLOOR_S,0),(10,FLOOR_Y,0),(-10,FLOOR_Y,0)],
                [4],[0,1,2,3],CONCRETE)
     uv=UsdGeom.PrimvarsAPI(floor).CreatePrimvar("st", Sdf.ValueTypeNames.TexCoord2fArray,"vertex")
-    uv.Set([(0.,0.),(5.,0.),(5.,FLOOR_Y/2),(0.,FLOOR_Y/2)])
+    uv.Set([(0.,0.),(5.,0.),(5.,FLOOR_LEN/4),(0.,FLOOR_LEN/4)])
     shader=UsdShade.Shader.Get(stage,"/Looks/Concrete/Surface")
     coords=UsdShade.Shader.Define(stage,"/Looks/Concrete/UV")
     coords.CreateIdAttr("UsdPrimvarReader_float2")
@@ -312,16 +347,17 @@ def factory(stage):
     path="/World/Factory"
     concrete_floor(stage,path)
     for i in range(1,8):
-        box(stage,path+f"/FloorJoint_{i}",(-10+i*2.5,0,.001),(.007,2*FLOOR_Y-.05,.002),(.17,.19,.20))
-    joints=int(FLOOR_Y//2.5)
-    for j in range(-joints,joints+1):
-        box(stage,path+f"/TransverseJoint_{j+joints}",(0,j*2.5,.001),(19.96,.007,.002),(.17,.19,.20))
+        box(stage,path+f"/FloorJoint_{i}",(-10+i*2.5,FLOOR_MID,.001),(.007,FLOOR_LEN-.05,.002),(.17,.19,.20))
+    joints,south=int(FLOOR_Y//2.5),int(FLOOR_S//2.5)
+    for j in range(-south,joints+1):
+        box(stage,path+f"/TransverseJoint_{j+south}",(0,j*2.5,.001),(19.96,.007,.002),(.17,.19,.20))
     box(stage,path+"/DockPlate",(0,0,-.012),(4.95,2.22,.024),(.15,.18,.20))
     for i in range(9):
         box(stage,path+f"/AMR_Center_{i}",(-6.53+i*.48,0,.003),(.265,.045,.005),(.04,.54,.78))
     arrow_points=[(-2.62,0.,.004),(-3.06,.20,.004),(-3.06,.071,.004),
                   (-3.52,.071,.004),(-3.52,-.071,.004),(-3.06,-.071,.004),(-3.06,-.20,.004)]
     mesh(stage,path+"/DockDirection",arrow_points,[3,4],[0,1,6,2,3,4,5],(.04,.54,.78),True)
+    amr_zones(stage,path+"/AMRZone")
     cell_floor=(.36,.43,.52)  # inside-cell tint from the layout legend; the dock plate stays dark
     for name,(x0,x1,y0,y1) in (("Left",(-4.52,5.65,1.11,2.36)),("Right",(-4.52,5.65,-2.36,-1.11)),
                                ("Entry",(-4.52,-2.475,-1.11,1.11)),("Exit",(2.475,5.65,-1.11,1.11))):
@@ -427,7 +463,7 @@ def industrial_hall(stage, root):
         box(stage, root+f"/UpperCladding_{i}", (center, HALL_Y+.03, 4.77), (4.98, .12, .74), wall)
     # End wall from the open front edge to the side wall, in equal bays.
     bays = 4
-    y0, y1 = -FLOOR_Y+.5, HALL_Y
+    y0, y1 = -FLOOR_S+.5, HALL_Y
     width = (y1-y0)/bays
     for i in range(bays):
         y = y0+(i+.5)*width

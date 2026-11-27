@@ -43,6 +43,11 @@ override 레이어에 쓴 값이 생성된 값을 이깁니다. 빌드를 다시
 
 ## 변경 기록
 
+### 2026-11-27 바닥 확장 · AMR 주행 구역 표시 (`factory/floor.usdc`, `factory/building.usdc`, `shared/materials.usdc`)
+- 출고 쪽(남쪽) 바닥을 8 m 늘림: 바닥 y -18 ~ +10. 슬래브·줄눈·끝 벽 포함
+- `/World/AMRZone`: AMR이 차를 싣고 다니는 구역을 바닥에 표시(통로 띠, 칸 줄 띠, 통로 양 끝 회전 원). 페인트만 있고 충돌체 없음
+- Isaac Sim 5.1.0 `build.sh`로 생성(crate 0.9). 자세한 내용: `docs/PROGRESS.md` 3절
+
 ### 2026-11-26 차량 버퍼 받침대 (`factory/vehicle_buffers.usdc`)
 AMR+행거가 칸에 세워 둔 차 밑으로 옆 이동해 들어갈 수 있게 고쳤습니다. 흐름과 칸 순서는 [`../docs/PROCESS_SCENARIO.md`](../docs/PROCESS_SCENARIO.md) 1단계를 보세요.
 
@@ -56,7 +61,7 @@ AMR+행거가 칸에 세워 둔 차 밑으로 옆 이동해 들어갈 수 있게
 - 확인(이 PC, usd-core 26.11로 생성): 빈 AMR+행거(진입 높이 -0.12)가 통로 x -7에서 칸 3까지 옆 이동할 때 장면 형상과 겹치지 않음. 차를 실은 AMR(-0.04)은 빈 칸 받침대 위를 4.7 cm 띄워 지나감.
 - 이 레이어는 usd-core로 생성해 crate 0.8 형식입니다(Isaac 생성본은 0.9). 나머지 레이어는 내용이 같아 되돌렸습니다.
 - 키프레임 시연은 그대로라 주문 차량이 칸이 아니라 통로 끝에서 실린 채 나타납니다.
-- amr_test 2D 맵: `usd_to_map.py ... --z-min 0.05 --z-max 0.70 --exclude RightVehicleBuffer/Vehicle_` (칸의 차체·허브는 빠지고 받침대만 남음)
+- amr_part 2D 맵 (2026-11-27 이름 변경, 전 amr_test): `usd_to_map.py ... --z-min 0.05 --z-max 0.70 --exclude RightVehicleBuffer/Vehicle_` (칸의 차체·허브는 빠지고 받침대만 남음)
 
 ### 2026-11-26 차량 버퍼 물리 검증 (`check_physics.sh --buffer-probe 0|1|2`)
 라이브 PhysX로 AMR+행거가 입고 칸의 차를 꺼내는 과정을 시험했습니다(받침대는 충돌체, 차는 물리 바디). 고친 것:
