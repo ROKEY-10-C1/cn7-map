@@ -29,6 +29,7 @@
 | `tools/` | 에셋 받기, USD 구조 조사 도구 |
 | `analysis/check_mandrel_loads.py` | (이력) H2515 + 센터보어 맨드릴 안의 하중 계산 |
 | `docs/troubleshooting/` | 트러블슈팅 기록과 이미지(노션 「트러블슈팅 → 장착로봇팔」 원본) |
+| `docs/GOALS.md` | **목표와 합격 기준** (공정 시간, 단계별 수치 범위와 근거) |
 | `docs/history_H2515_mandrel_spec.md` | (이력) 폐기한 H2515 맨드릴 안의 정리 문서 |
 
 ## 현재 상태 (2026-11-27)
