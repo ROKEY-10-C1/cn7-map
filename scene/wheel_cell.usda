@@ -1,7 +1,7 @@
 #usda 1.0
 (
     defaultPrim = "World"
-    endTimeCode = 10022.272115358724
+    endTimeCode = 12673.231157723003
     framesPerSecond = 24
     metersPerUnit = 1
     startTimeCode = 0
@@ -15,8 +15,9 @@
         @./environment/lighting_cameras.usdc@,
         @./factory/building.usdc@,
         @./factory/conveyor.usdc@,
+        @./factory/fasten_robots.usdc@,
         @./factory/floor.usdc@,
-        @./factory/robot_rails.usdc@,
+        @./factory/mount_robots.usdc@,
         @./factory/safety.usdc@,
         @./factory/truck.usdc@,
         @./factory/vehicle_buffers.usdc@,
