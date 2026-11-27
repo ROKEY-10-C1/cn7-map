@@ -46,7 +46,7 @@ from fitment import (
 from physical_data import AMR_SIZE, AMR_WHEEL_RADIUS, DOCK_CLAMP_CLOSED, DOCK_CLAMP_OPEN, ROLLER_RADIUS
 from process import (
     AMR_AT_GATE, AMR_BAY_Y, AMR_DOCKED, AMR_GATE_X, AMR_LIFTED, AMR_OUT_GATE, AXLE, BELT_Z, BUFFER_CAR_Z,
-    BUFFER_SLOT_X, BUFFER_STAND_X, BUFFER_STAND_Y, CELL_Y, CN7_R16, FASTEN_BASE_X, MOUNT_BASE_X, ROBOT_BASE_Y, FEED, FPS,
+    BUFFER_SLOT_X, BUFFER_STAND_X, BUFFER_STAND_Y, CELL_Y, CN7_R16, FASTEN_BASE_X, FEED_START_X, MOUNT_BASE_X, MOUNT_CLEAR, ROBOT_BASE_Y, FEED, FPS,
     HUB_Z, INDEX_TRAVEL, LINE_Y, NUT_CYCLE, NUT_DRIVE, NUT_ENGAGE, NUT_FINAL,
     REJECT_CRATE_Y, REJECT_GATE_HALF, REJECT_X, STATIONS, bend, schedule,
 )
@@ -395,11 +395,10 @@ def factory(stage, arm):
             box(stage,path+f"/CellFloor_{label}Walkway_{k}",(.215,side*y,.004),(9.47,.06,.003),AMBER)
         fence(stage,path+f"/{label}OuterGuard",(-5.55,side*OUTER_GUARD_Y),(6.10,side*OUTER_GUARD_Y))
         fence(stage,path+f"/{label}EndGuard",(5.65,side*(CELL_Y+.02)),(5.65,side*OUTER_GUARD_Y))
-        belt(stage,label+"AxleTransfer",(-1.04,side*LINE_Y),(1.04,side*LINE_Y),.67)
         if side>0:
-            reject_gate=belt(stage,label+"Feed",(1.68,side*LINE_Y),bend(side)[-1],.67,outlet_x=REJECT_X)
+            reject_gate=belt(stage,label+"Feed",(FEED_START_X,side*LINE_Y),bend(side)[-1],.67,outlet_x=REJECT_X)
         else:
-            belt(stage,label+"Feed",(1.68,side*LINE_Y),bend(side)[-1],.67)
+            belt(stage,label+"Feed",(FEED_START_X,side*LINE_Y),bend(side)[-1],.67)
         curved_belt(stage,path+f"/{label}ConveyorBend",bend(side)[8:])
         for j in (-1,1):
             beacon(stage,path+f"/{label}Signal_{j+1}",(j*4.65,side*CELL_Y))
@@ -726,7 +725,7 @@ def order(stage, assets, arm, data, record):
     staged=max(0.,start-AMR_AT_GATE)
     visibility(cycle,staged,end)
     amr,lift=carrier(stage,assets,root+"/Carrier")
-    index_start=front_tight+NUT_CYCLE+4.
+    index_start=front+MOUNT_CLEAR
     redock=index_start+INDEX_TRAVEL
     dock_clamps(stage,root,start+AMR_DOCKED,index_start)
     dock_clamps(stage,root,redock,departure,base_x=WHEELBASE,prefix="RearDockClamp")
@@ -740,8 +739,8 @@ def order(stage, assets, arm, data, record):
         move(lift,t,(0.,0.,height))
     record(start,vehicle,"","order",wheel.name)
     record(start+AMR_LIFTED,vehicle,"","docked","AMR dock and lift complete")
-    record(index_start,vehicle,"","index_start","Front tools withdrawn and first dock released")
-    record(redock+2.,vehicle,"","rear_docked","Rear axle at common assembly position")
+    record(index_start,vehicle,"","index_start","Front wheels hung, mount arms parked; moving to stop B")
+    record(redock+2.,vehicle,"","rear_docked","Stop B: front hubs at the fastening arms, rear hubs at the mount arms")
     record(departure,vehicle,"","depart","AMR leaving the dock")
     record(end,vehicle,"","outbound","AMR reached outbound apron")
     record(staged,vehicle,"","staged","AMR leaves inbound buffer for the gate")
@@ -763,7 +762,7 @@ def order(stage, assets, arm, data, record):
         held_tilt.Set(180)
         visibility(held,seated+GRIP_AT,seated)
         animate_arm(stage,arm,mount,solve_plan(arm,MOUNT_BASE_X,side,mount_keys(side,seated,wheel,x)))
-        animate_arm(stage,arm,fasten,solve_plan(arm,FASTEN_BASE_X,side,fasten_keys(side,tight,x)))
+        animate_arm(stage,arm,fasten,solve_plan(arm,FASTEN_BASE_X,side,fasten_keys(side,tight,x,AXLE+(WHEELBASE if x>0 else 0.))))
         for k,(sx,sy) in enumerate(SOCKET_LAYOUT):
             carried_root=fasten+f"/Link_6/CarriedNut_{number:03}_{name}_{k}"
             carried,_=xform(stage,carried_root,(sx,sy,HEAD_LENGTH+NUT_LENGTH))

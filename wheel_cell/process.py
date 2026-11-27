@@ -33,12 +33,21 @@ AMR_DOCKED = 8.                    # order start (at the gate) -> docked
 AMR_LIFTED = AMR_DOCKED+3.
 AMR_OUT_GATE = 10.                 # dock -> gate after departure; gate -> outbound buffer follows
 AMR_OUT_BUFFER = AMR_AT_GATE
-# RS080N bases on each side of the central dock. The fastening arm sits between axles.
-MOUNT_BASE_X = 2.60
-# Tyre stop on the feed belt (belt end x 1.68 + tyre radius): the mount RS080N turns round to it.
-# At the axle line (x 1.36) the flat wheel is out of reach; x 1.86-2.16 leaves >= 20 deg joint margin.
-PICK_X = 2.00
-FASTEN_BASE_X = 0.
+# Two stops of the car (car centre x): A = 0, B = WHEELBASE. The mount arm serves only the hub at
+# x = AXLE (front wheels at A, rear wheels at B); the fastening arm sits midway between the hubs at
+# B (x AXLE and AXLE+WHEELBASE), so front fastening at B overlaps rear mounting.
+MOUNT_BASE_X = AXLE-1.24
+FASTEN_BASE_X = AXLE+WHEELBASE/2
+# Tyre stop on the feed belt, behind the mount arm: the arm turns round to it. 0.64 m from the hub
+# line toward the base side keeps >= 20 deg joint margin (mirror of the x 1.86-2.16 scan, 2026-11-27).
+PICK_X = AXLE-.64
+FEED_START_X = PICK_X-.32          # belt end just behind the stopped tyre (radius 0.316)
+# Mount arm timing relative to the seat time (cell_motion.mount_keys): jaws close on the flat wheel,
+# arm parked again after hanging it.
+GRIP_AT = -5.3
+MOUNT_CLEAR = 4.2
+# The rear wheel waits upstream of the stop (0.27 m tread gap, room for the jaws) until the front wheel is lifted.
+QUEUE_GAP = .90
 ROBOT_BASE_Y = 2.50
 # Keep 1.55 m clear beside the control button (0.21 m) and buffer posts (0.03 m).
 CELL_Y = 5.25
@@ -138,14 +147,28 @@ def schedule(inject, mixed_sizes=False):
                                               (REJECT_X,REJECT_CRATE_Y)), reject_start))
             deliveries["FL"] = delivery("FL", reject[-1][0]+1.)
         front_seat = max(path[-1][0] for path in deliveries.values())+7.
-        front_tighten = front_seat+5.
-        # Both front supports are withdrawn before the first clamps open.
-        index_start = front_tighten+NUT_CYCLE+4.
+        # Stop A: front wheels hung, mount arms parked -> the car moves on to stop B with the front
+        # wheels hung on the studs (retention during the move is handled outside this model).
+        index_start = front_seat+MOUNT_CLEAR
+        redock = index_start+INDEX_TRAVEL
+        # Stop B: fasten the front (hub AXLE+WHEELBASE) while the rear is mounted at hub AXLE.
+        front_tighten = redock+2.
+        # Rear wheels follow the front ones on the trunk (4.2 s apart), wait at the queue spot and
+        # move onto the stop once the front wheel of their side has been lifted (0.7 s after the grip).
+        last_launch = max(deliveries[name][0][0] for name in ("FL","FR"))
         for i,name in enumerate(("RL","RR")):
-            deliveries[name] = delivery(name, front_seat+4.2*i)
+            side = STATIONS[name][1]
+            queued = list(motion(route(PICK_X+QUEUE_GAP, side), last_launch+4.2*(i+1)))
+            release = max(queued[-1][0], front_seat+GRIP_AT+.8)
+            deliveries[name] = queued+list(motion(((PICK_X+QUEUE_GAP, side*LINE_Y), (PICK_X, side*LINE_Y)), release))
         rear_ready = max(deliveries[name][-1][0] for name in ("RL","RR"))
-        rear_seat = max(rear_ready, index_start+INDEX_TRAVEL+2.)+7.
-        rear_tighten = rear_seat+5.
+        # Wheel on the stop before the grip (+0.5 s), arm leaves its park 8.5 s ahead (it parked
+        # MOUNT_CLEAR after the front seat), car docked 2 s before the 2.6 s approach.
+        rear_seat = max(rear_ready-GRIP_AT+.5, index_start+8.5, redock+2.+2.6)
+        # Rear fastening once the mount arm has left the hub (parked 4.2 s after the seat, head at the
+        # hub 1.94 s after the start) and the fasten arm is parked from the front (2.5 s after the
+        # cycle; it leaves its park 5 s before the next start).
+        rear_tighten = max(rear_seat+3., front_tighten+NUT_CYCLE+7.5)
         departure = rear_tighten+NUT_CYCLE+8.
         end = departure+AMR_OUT_GATE+AMR_OUT_BUFFER
         yield number, wheel, start, deliveries, reject, front_seat, rear_seat, rear_tighten, front_tighten, departure, end

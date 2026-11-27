@@ -5,7 +5,7 @@ from math import degrees
 from pxr import Gf, PhysxSchema, UsdGeom, UsdPhysics, UsdShade
 
 from physical_data import ROLLER_RATED_SPEED, ROLLER_TORQUE, tube_properties
-from process import LINE_Y, REJECT_GATE_HALF, REJECT_X
+from process import FEED_START_X, LINE_Y, REJECT_GATE_HALF, REJECT_X
 
 FACTORY="/World/Factory"
 START_AHEAD=.76
@@ -112,7 +112,7 @@ def setup_factory(stage, root, material, guide_material, branch_side):
                 "Guard" in main and name.startswith(("Stile_","Header_"))):
             collider(prim)
     for side,label in ((1,"Left"),(-1,"Right")):
-        for i,(x0,x1) in enumerate(((-1.04,1.04),(1.68,4.71))):
+        for i,(x0,x1) in ((1,(FEED_START_X,4.71)),):  # feed belt only (index 1 keeps the reject-gate rule)
             for edge in (-1,1):
                 spans=((x0,REJECT_X-REJECT_GATE_HALF),(REJECT_X+REJECT_GATE_HALF,x1)) if (
                     side==edge==i==1 and stage.GetPrimAtPath(FACTORY+"/LeftFeed_Gate")) else ((x0,x1),)
