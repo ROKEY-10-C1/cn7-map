@@ -16,6 +16,16 @@
 ~/isaacsim/python.sh wheel_mount_sim/run.py --mu-hub .30 .25     # 휠-허브 마찰 민감도
 ```
 
+### 장면 USD
+
+`wheel_mount_sim/scene/wheel_mount.usda`는 `run.py`가 만드는 장면을 그대로 내보낸 파일이다(시드 1: 바퀴·허브 각도 고정).
+Isaac Sim에서 **File → Open**으로 열어 형상·충돌체·관절·재질을 확인할 수 있다. 로봇 동작(IK·힘 제어)은 `run.py`에만 있으므로,
+파일을 열고 재생하면 로봇은 처음 자세를 유지한 채 물리만 돈다. 장면을 바꾼 뒤에는 다시 내보낸다.
+
+```bash
+~/isaacsim/python.sh wheel_mount_sim/run.py --export-usd wheel_mount_sim/scene/wheel_mount.usda   # 시드는 --seed
+```
+
 결과: `wheel_mount_sim/output/<시각>/` — `log.csv`(1/60 s), `summary.json`(이벤트·최대 접촉력), `wide.gif`·`hub.gif`.
 판정 줄은 `EVENT ...`와 `RESULT ...`로 출력된다.
 
@@ -28,6 +38,7 @@
 | `scene.py` | 작업대, 허브 코너(서스펜션·베어링·파일럿·스터드·로터·캘리퍼), 휠하우스·펜더, 바퀴 장착면·배럴, 링 타이어, 로봇, 그리퍼 |
 | `run.py` | 동작 순서: 측정 → 집기 → 들기 → 세우기 → 허브 축 진입 → 비전 정렬 → 힘 제어 삽입 → 놓기 → 후퇴 |
 | `geom.py` | USD/PhysX 작성 도구 |
+| `scene/wheel_mount.usda` | 장면을 내보낸 USD (Isaac Sim에서 열어 보기용, `--export-usd`로 다시 생성) |
 | `tools/` | 에셋 받기, USD 구조 조사 도구 |
 | `docs/troubleshooting/` | 트러블슈팅 기록과 이미지(노션 「트러블슈팅 → 장착로봇팔」 원본) |
 | `docs/GOALS.md` | **목표와 합격 기준** (공정 시간, 단계별 수치 범위와 근거) |
