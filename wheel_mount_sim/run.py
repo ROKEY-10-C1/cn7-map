@@ -22,7 +22,13 @@ ap.add_argument("--scenario", default="nominal",
                 help="replay one earlier failure: only that one cause is put back")
 ap.add_argument("--stop-after", default=None, help="end the run after this event (e.g. lifted, aligned_1)")
 ap.add_argument("--speed", type=float, default=.35, help="fraction of the RS080N joint speed limits")
+ap.add_argument("--fast", action="store_true", help="cycle-time profile (docs/GOALS.md section 1)")
+ap.add_argument("--transfer-speed", type=float, default=.35,
+                help="joint-speed fraction while standing the wheel up (grip retention limits it)")
 args = ap.parse_args()
+FAST = args.fast
+if FAST and args.speed == .35:
+    args.speed = .50
 
 from isaacsim import SimulationApp  # noqa: E402
 
@@ -439,11 +445,12 @@ try:
     R_pick = S.rot((0, 0, 1), spin+g)
     event("measured", wheel_spin_deg=round(spin, 3), hub_deg=round(hub_deg, 3), grip_yaw_deg=round(g, 3))
 
+    T_CYCLE0 = [t_sim[0]]
     phase[0] = "approach"
     above = ow+np.array([0, 0, .20])
     move_joints(solve(R_pick, above, q_cmd[ARM]))
     phase[0] = "descend"
-    move_line(R_pick, above, ow, .10)
+    move_line(R_pick, above, ow, .25 if FAST else .10)
     Rf, of = pose("/World/Robot/link6")
     Rt_, ot_ = pose("/World/Tool")
     fk_p, fk_R = ik.compute_forward_kinematics("link6", q_cmd[ARM])
@@ -456,7 +463,7 @@ try:
           link6_z_world=[round(float(v), 3) for v in Rf[:, 2]])
     phase[0] = "close"
     grip(close=True)
-    wait(P.GRIP["t_close"]+.6)
+    wait(P.GRIP["t_close"]+(.2 if FAST else .6))
     qj, ej = jaw_state()
     Rt0, ot0 = pose("/World/Tire")
     Rj0, oj0 = pose("/World/JawR")
@@ -464,10 +471,14 @@ try:
         raise RuntimeError("debug stop")
     event("gripped", jaw_mm=[round(v*1000, 2) for v in qj], jaw_force_N=[round(v, 1) for v in ej])
 
+    Rf_, of_ = pose("/World/Robot/link6")
+    RG_ = Rf_@S.R_FG.T
+    _, ow_ = pose("/World/Wheel")
+    W_IN_G0 = [RG_.T@(ow_-(of_-RG_@S.T_GF))]
     phase[0] = "lift"
     up = ow+np.array([0, 0, .25])
-    move_line(R_pick, ow, up, .10)
-    wait(.3)
+    move_line(R_pick, ow, up, .25 if FAST else .10)
+    wait(.1 if FAST else .3)
     Rt1, ot1 = pose("/World/Tire")
     Rj1, oj1 = pose("/World/JawR")
     slip = np.linalg.norm(Rj1.T@(ot1-oj1)-Rj0.T@(ot0-oj0))*1000
@@ -480,9 +491,14 @@ try:
         move_joints(solve(R_m, pre, q_cmd[ARM]))           # earlier design: one joint-space move to the hub
     else:
         via = S.H+np.array([0, .45, 0])                   # on the hub axis, well outboard of the fender
-        move_joints(solve(R_m, via, q_cmd[ARM]))
-        move_line(R_m, via, pre, .15)
-    event("at_hub")
+        move_joints(solve(R_m, via, q_cmd[ARM]), scale=args.transfer_speed)
+        move_line(R_m, via, pre, .30 if FAST else .15)
+    Rf_, of_ = pose("/World/Robot/link6")
+    RG_ = Rf_@S.R_FG.T
+    _, ow_ = pose("/World/Wheel")
+    w_in_G = RG_.T@(ow_-(of_-RG_@S.T_GF))
+    event("at_hub", transfer_slip_mm=round(float(np.linalg.norm(w_in_G-W_IN_G0[0]))*1000, 2),
+          wheel_in_G_mm=[round(float(v)*1000, 1) for v in w_in_G])
     wait(.5)
 
     phase[0] = "align"
@@ -490,7 +506,7 @@ try:
     # the robot knows its own flange pose from the encoders. Re-target the grip frame so the measured wheel
     # lands on the hub axis, parallel, with the holes on the studs. Two passes.
     gap_pre = .12
-    for it in range(0 if SC == "novision" else 2):
+    for it in range(0 if SC == "novision" else (1 if FAST else 2)):
         Rh, oh = pose("/World/Car/Hub")
         Rw, ow = pose("/World/Wheel")
         ow = ow+rng.normal(0, CENTER_NOISE, 3)
@@ -509,8 +525,8 @@ try:
         Rfk, pfk = fk(q_cmd[ARM])
         BIAS["p"] = of-pfk
         BIAS["R"] = Rf@Rfk.T
-        move_joints(solve(RG_t, oG_t, q_cmd[ARM]), scale=.08)
-        wait(.4)
+        move_joints(solve(RG_t, oG_t, q_cmd[ARM]), scale=.2 if FAST else .08)
+        wait(.15 if FAST else .4)
         rel, tilt = seat()
         event(f"aligned_{it}", wheel_in_G_mm=[round(float(v)*1000, 1) for v in p_GW],
               radial_mm=round(float(np.hypot(rel[0], rel[1]))*1000, 3))
@@ -533,12 +549,12 @@ try:
     # free approach to 2 mm before the stud tips, then force-controlled insertion
     near = oG_t-axis*(gap_pre-.032)
     halt = lambda f: filtered(f) > F_STOP
-    stop_at = move_line(RG_t, oG_t, near, .020, stop=halt)
+    stop_at = move_line(RG_t, oG_t, near, .050 if FAST else .020, stop=halt)
     if SC == "position_insert":
         stop_at = move_line(RG_t, np.asarray(stop_at), seated, .005,
                             stop=lambda f: filtered(f) > F_STOP or seat()[0][2] < .0002)
     else:
-        stop_at = force_insert(RG_t, np.asarray(stop_at), axis)
+        stop_at = force_insert(RG_t, np.asarray(stop_at), axis, v=.020 if FAST else .010)
     wait(.3)
     if args.debug_stop == "inserted":
         raise RuntimeError("debug stop")
@@ -547,10 +563,16 @@ try:
 
     phase[0] = "release"
     grip(close=False)
-    wait(P.GRIP["t_open"]+.3)
+    # shoes clear the tread after ~10 mm of jaw travel: start retracting then (fast) or after full opening
+    wait(.90 if FAST else P.GRIP["t_open"]+.3)
     phase[0] = "retract"
     cur = np.asarray(stop_at)
-    move_line(R_m2, cur, cur+axis*.15, .05)
+    out = S.H+axis*.45+(cur-S.H-axis*((cur-S.H)@axis))   # back along the hub axis to the transfer via point
+    move_line(R_m2, cur, out, .20 if FAST else .05)
+    event("retracted")
+    phase[0] = "return"
+    move_joints(solve(R_pick, above, q_cmd[ARM]))         # back over the pick point: end of one wheel cycle
+    event("cycle_end", cycle_s=round(t_sim[0]-T_CYCLE0[0], 2))
     phase[0] = "observe"
     wait(2.0)
     rel, tilt = seat()

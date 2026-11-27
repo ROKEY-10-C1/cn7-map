@@ -9,6 +9,7 @@
 ```bash
 ./wheel_mount_sim/tools/fetch_assets.sh                          # 처음 한 번: RS080N USD 받기 (커밋하지 않음)
 ~/isaacsim/python.sh wheel_mount_sim/run.py --no-video           # 빠른 확인 (~5분)
+~/isaacsim/python.sh wheel_mount_sim/run.py --fast --no-video    # 공정 시간 단축 프로필 (바퀴 1개 22.3 s)
 ~/isaacsim/python.sh wheel_mount_sim/run.py                      # 영상(GIF) 포함
 ~/isaacsim/python.sh wheel_mount_sim/run.py --mu-shoe .35 .28    # 슈-트레드 마찰 민감도
 ~/isaacsim/python.sh wheel_mount_sim/run.py --mu-hub .30 .25     # 휠-허브 마찰 민감도
