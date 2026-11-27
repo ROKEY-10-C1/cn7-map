@@ -1,7 +1,7 @@
 # 좌전륜 장착 단독 시뮬레이션 (`wheel_mount_sim/`)
 
 컨베이어 높이(0.50 m) 작업대에 누워 있는 CN7 바퀴를 **Kawasaki RS080N**이 **SCHUNK PHL-W 63-080-S** 트레드 클램프로
-집어 세우고, 앞 왼쪽 허브에 끼운 뒤 놓는 단독 시험이다. 전체 셀(`wheel_cell/`)·다른 단독 시험(`map_wheel/`, `map_fasten/`)과
+집어 세우고, 앞 왼쪽 허브에 끼운 뒤 놓는 단독 시험이다. 전체 셀(`wheel_cell/`)·다른 단독 시험(`map_fasten/`)과
 섞이지 않도록 이 폴더에서만 관리한다. 공용 파일은 읽기만 한다(`assets/vehicle/CN7_Wheel_205-55R16.usd`).
 
 ## 실행 (저장소 루트에서)
@@ -27,10 +27,8 @@
 | `run.py` | 동작 순서: 측정 → 집기 → 들기 → 세우기 → 허브 축 진입 → 비전 정렬 → 힘 제어 삽입 → 놓기 → 후퇴 |
 | `geom.py` | USD/PhysX 작성 도구 |
 | `tools/` | 에셋 받기, USD 구조 조사 도구 |
-| `analysis/check_mandrel_loads.py` | (이력) H2515 + 센터보어 맨드릴 안의 하중 계산 |
 | `docs/troubleshooting/` | 트러블슈팅 기록과 이미지(노션 「트러블슈팅 → 장착로봇팔」 원본) |
 | `docs/GOALS.md` | **목표와 합격 기준** (공정 시간, 단계별 수치 범위와 근거) |
-| `docs/history_H2515_mandrel_spec.md` | (이력) 폐기한 H2515 맨드릴 안의 정리 문서 |
 
 ## 현재 상태 (2026-11-27)
 

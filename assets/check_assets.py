@@ -1,13 +1,10 @@
 """Drop each asset on a floor in CPU PhysX for 2 s and check it settles where it should."""
-import sys
 from pathlib import Path
 
 import omni.kit.app
 from pxr import Gf, Sdf, Usd, UsdGeom, UsdPhysics, UsdUtils
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE))
-from build_assets import urdf_joints  # noqa: E402
 HZ = 120
 
 
@@ -75,28 +72,6 @@ def main():
     chassis, hanger = run(s, "/Asset/Chassis", "/Asset/Hanger")
     results.append(expect("AMR chassis height m", chassis[2], 0., .01))
     results.append(expect("AMR hanger height m", hanger[2], 0., .005))
-    # Fixed-base arms hold the URDF zero pose against gravity.
-    for asset, root in (("robots/Doosan_H2515.usd", "H2515"), ("robots/Doosan_M1509.usd", "M1509"),
-                        ("robots/MountRobot_H2515.usd", "MountRobot"),
-                        ("robots/FastenRobot_M1509.usd", "FastenRobot")):
-        s = scene(asset)
-        start = position(s, "/Asset/link_6")
-        end, = run(s, "/Asset/link_6")
-        drift = (end-start).GetLength()
-        results.append(expect(f"{root} link_6 drift m", drift, 0., .005))
-    # Joint drives follow targets: the flange reaches the URDF forward-kinematics position.
-    # Gravity off: with the live cell's drive gains the H2515 sags ~1 cm when stretched out.
-    for asset, model in (("robots/MountRobot_H2515.usd", "h2515"), ("robots/FastenRobot_M1509.usd", "m1509")):
-        s = scene(asset, gravity=0.)
-        _, joints = urdf_joints(HERE.parent/"wheel_cell"/"assets"/f"{model}.urdf")
-        q = (20., 30., 40., 0., 30., 0.)
-        world = Gf.Matrix4d(1.)
-        for i, ((xyz, rot, _), angle) in enumerate(zip(joints, q), 1):
-            s.GetPrimAtPath(Sdf.Path(f"/Asset/Joints/joint_{i}")).GetAttribute(
-                "drive:angular:physics:targetPosition").Set(angle)
-            world = Gf.Matrix4d(Gf.Rotation((0, 0, 1), angle), Gf.Vec3d(0))*Gf.Matrix4d(rot, xyz)*world
-        end, = run(s, "/Asset/link_6", seconds=4.)
-        results.append(expect(f"{model} flange error vs FK m", (end-world.ExtractTranslation()).GetLength(), 0., .001))
     return all(results)
 
 

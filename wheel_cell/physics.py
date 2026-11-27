@@ -10,7 +10,7 @@ Entry point that keeps `from physics import ...` working. The code lives in:
     handling.py     pick zone (V-stop, photo-eyes, centering arms, lift bars)
     gripper.py      roller / centre-pin gripper on the mount robot flange
     station.py      wheel station: pick zone + wheel + measurement
-    live_robot.py   Doosan mount and fasten robots
+    live_robot.py   mount and fasten robots (old rail layout, RS080N port pending)
     carrier.py      AMR carrier and dock clamps
     cell.py         the cell: build and step everything
 """

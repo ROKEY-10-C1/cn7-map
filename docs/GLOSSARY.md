@@ -14,11 +14,11 @@
 
 | 용어 | 뜻 | 맵·코드 |
 |---|---|---|
-| **타이어 장착 로봇** | 타이어를 차체에 장착하는 로봇팔 (2대) | 두산 H2515, `LeftMount` / `RightMount` |
-| **볼트 체결 로봇** | 나사를 체결하는 로봇팔 (2대) | 두산 M1509, `LeftFasten` / `RightFasten` |
+| **타이어 장착 로봇** | 타이어를 차체에 장착하는 로봇팔 (좌우 각 1대, 바닥 고정) | Kawasaki RS080N + SCHUNK 트레드 클램프, `factory/mount_robots` (`LeftMountRobot` / `RightMountRobot`) |
+| **볼트 체결 로봇** | 너트를 체결하는 로봇팔 (좌우 각 1대, 바닥 고정) | Kawasaki RS080N + QST50-150CT 5축 헤드, `factory/fasten_robots` (`LeftFastenRobot` / `RightFastenRobot`) |
 | **AMR** | 차체를 공정 구역 사이로 옮기는 자율주행 이동 로봇 | `Carrier`, `DockedAMR`, `DockLift` |
 | **타이어 공급 라인** | 타이어가 이송되어 오는 라인 | `factory/conveyor` (`LeftFeed`, `RightFeed`, `*AxleTransfer`) |
-| **로봇팔 레인** | 로봇팔이 이동하는 레인 (2개) | `factory/robot_rails` (`LeftRail`, `RightRail`) |
+| **인덱스 이동** | 앞바퀴 장착·체결 뒤 차를 축간거리(2.72 m)만큼 옮겨 뒷바퀴를 같은 로봇 앞에 두는 이동 | `INDEX_TRAVEL` (`process.py`) |
 | **나사선** | (정의 보완 필요) | 허브 스터드 M12×1.5 (`Stud_*`) |
 
 ## 정렬 기준

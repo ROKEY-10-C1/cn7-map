@@ -1,4 +1,4 @@
-"""Method 1 wheel gripper on the mount robot flange (H2515), environment only.
+"""Method 1 wheel gripper on the mount robot flange, environment only (not yet ported to RS080N).
 
 Tool frame = robot Link_6 frame: +Z is the flange normal. Holding a wheel upright, the flange
 sits below the tire and +Z points up at the wheel centre; the wheel axle lies along tool X with

@@ -1,12 +1,12 @@
-"""Export the cell's AMR, robots, car body and wheel as standalone USD assets.
+"""Export the cell's AMR, car body, wheel and camera as standalone USD assets.
+
+The RS080N robot asset is map_fasten/assets/RS080N.usdc (Kawasaki khi_robot meshes).
 
 Source: the composed scene map/scene/wheel_cell.usda (order CN7_001, before the process starts).
 Every output file is self-contained (meshes and materials copied in), metres / kilograms, +Z up.
 Run with ./map/assets/build_assets.sh after ./map/wheel_cell/build.sh.
 """
 import sys
-import xml.etree.ElementTree as ET
-from math import degrees
 from pathlib import Path
 
 import numpy as np
@@ -23,7 +23,6 @@ SCENE = MAP/"scene"/"wheel_cell.usda"
 ORDER = "/World/Orders/CN7_001"
 LIBRARY = "/AssetLibrary"
 LIFT_TRAVEL = .12           # hanger lift stroke in the scene animation
-ARM_DRIVE = (550., 16.)     # same position-drive gains as the live cell (per degree)
 VERSION = "1.0"
 CAMERA_FILE = "RealSense_D455.usd"
 
@@ -320,131 +319,6 @@ def build_car(src, out, wheel_file):
     stage.GetRootLayer().Save()
 
 
-# ---------------------------------------------------------------- Doosan arms
-def urdf_joints(urdf):
-    tree = ET.parse(urdf).getroot()
-    joints = []
-    for i in range(1, 7):
-        j = tree.find(f"./joint[@name='joint_{i}']")
-        origin = j.find("origin")
-        xyz = Gf.Vec3d(*map(float, origin.get("xyz").split()))
-        r, p, y = map(degrees, map(float, origin.get("rpy", "0 0 0").split()))
-        rot = (Gf.Rotation((1, 0, 0), r)*Gf.Rotation((0, 1, 0), p)*Gf.Rotation((0, 0, 1), y))
-        limit = j.find("limit").attrib
-        joints.append((xyz, rot, {k: float(v) for k, v in limit.items()}))
-    return tree, joints
-
-
-def inertial(link):
-    node = link.find("inertial")
-    values = node.find("inertia").attrib
-    tensor = np.array([[float(values["i"+min(a, b)+max(a, b)]) for b in "xyz"] for a in "xyz"])
-    origin = node.find("origin")
-    center = np.array(list(map(float, origin.get("xyz", "0 0 0").split())))
-    r, p, y = map(degrees, map(float, origin.get("rpy", "0 0 0").split()))
-    rot = Gf.Rotation((1, 0, 0), r)*Gf.Rotation((0, 1, 0), p)*Gf.Rotation((0, 0, 1), y)
-    axes = np.asarray(Gf.Matrix3d(rot)).T
-    return float(node.find("mass").get("value")), center, axes@tensor@axes.T
-
-
-ARMS = {
-    "h2515": ("Doosan H2515", 25., 1.500),
-    "m1509": ("Doosan M1509", 15., .900),
-}
-
-
-def build_arm(src, model, out):
-    title, payload, reach = ARMS[model]
-    root = model.upper()
-    stage, prim = new_stage(out, root)
-    tree, joints = urdf_joints(MAP/"wheel_cell"/"assets"/f"{model}.urdf")
-    UsdPhysics.ArticulationRootAPI.Apply(prim)
-    names = ["base_link"]+[f"link_{i}" for i in range(1, 7)]
-    world = Gf.Matrix4d(1.)
-    links = []
-    for index, name in enumerate(names):
-        if index:
-            xyz, rot, _ = joints[index-1]
-            world = Gf.Matrix4d(rot, xyz)*world
-        link = group(stage, f"/{root}/{name}", world)
-        copy(src, stage, f"{LIBRARY}/{model}_Link_{index}", f"/{root}/{name}/Visuals", keep=None)
-        copy(src, stage, f"{LIBRARY}/{model}_Collision_{index}", f"/{root}/{name}/Collisions", keep=None)
-        links.append(link)
-    finish(src, stage, root)
-    total = 0.
-    for index, (name, link) in enumerate(zip(names, links)):
-        mass, center, tensor = inertial(tree.find(f"./link[@name='{name}']"))
-        total += mass
-        tensor_mass(link, mass, center, tensor)
-        collisions = stage.GetPrimAtPath(f"{link.GetPath()}/Collisions")
-        UsdGeom.Imageable(collisions).CreatePurposeAttr(UsdGeom.Tokens.guide)
-        for part in Usd.PrimRange(collisions):
-            if part.IsA(UsdGeom.Mesh):
-                collide(part, "convexHull")
-    # Fixed to the world at the asset origin; delete root_joint to mount it on a moving carriage.
-    joint(stage, UsdPhysics.FixedJoint, f"/{root}/Joints/root_joint", None, links[0])
-    limits = []
-    for i, (xyz, rot, limit) in enumerate(joints, 1):
-        j = joint(stage, UsdPhysics.RevoluteJoint, f"/{root}/Joints/joint_{i}", links[i-1], links[i],
-                  pos0=xyz, rot0=rot.GetQuat())
-        j.CreateAxisAttr("Z")
-        j.CreateLowerLimitAttr(degrees(limit["lower"]))
-        j.CreateUpperLimitAttr(degrees(limit["upper"]))
-        drive(j, "angular", *ARM_DRIVE, limit["effort"])
-        j.GetPrim().CreateAttribute("cn7:maxVelocityDeg", Sdf.ValueTypeNames.Float).Set(
-            degrees(limit["velocity"]))
-        limits.append((degrees(limit["lower"]), degrees(limit["upper"]),
-                       degrees(limit["velocity"]), limit["effort"]))
-    describe(prim, title, {
-        "model": title, "payloadKg": payload, "reachM": reach, "armMassKg": round(total, 3),
-        "dof": 6, "origin": "base_link (mounting flange centre), zero pose = URDF zero"})
-    stage.GetRootLayer().Save()
-    return links, limits, total
-
-
-TOOLS = {
-    "mount": ("LeftMount", "h2515", ("GuideAdapter", "GuideGripper", "GuideJaw", "D455Assembly"),
-              "Mount robot: H2515 + wheel guide gripper + RealSense D455"),
-    "fasten": ("LeftFasten", "m1509", ("Nutrunner", "DriveFins", "GearHead", "Socket", "D455Assembly"),
-               "Fastening robot: M1509 + 5-spindle nutrunner + RealSense D455"),
-}
-
-
-def build_tooled(src, role, arm_file, out):
-    actor, model, parts, title = TOOLS[role]
-    root = {"mount": "MountRobot", "fasten": "FastenRobot"}[role]
-    stage, prim = new_stage(out, root)
-    prim.GetReferences().AddReference("./"+arm_file)
-    tool_path = f"/{root}/link_6/Tool"
-    group(stage, tool_path)
-    copy(src, stage, f"{ORDER}/{actor}/Joint_6", tool_path,
-         keep=lambda n: n.startswith(parts) and n != "D455Assembly")
-    finish(src, stage, root)
-    camera = group(stage, tool_path+"/D455Assembly",
-                   src.relative(f"{ORDER}/{actor}/Joint_6/D455Assembly", f"{ORDER}/{actor}/Joint_6"))
-    camera.GetReferences().AddReference("../tools/"+CAMERA_FILE)
-    for part in stage.GetPrimAtPath(tool_path).GetChildren():
-        if part.GetName().startswith(parts[:-1]) and part.IsA(UsdGeom.Gprim):
-            collide(part, "convexHull")
-    # Link 6 mass with the camera, as in the live cell; other tool masses are unknown.
-    tree = ET.parse(MAP/"wheel_cell"/"assets"/f"{model}.urdf").getroot()
-    mass, center, tensor = inertial(tree.find("./link[@name='link_6']"))
-    box = UsdGeom.BBoxCache(Usd.TimeCode.Default(), [UsdGeom.Tokens.default_, UsdGeom.Tokens.render])
-    c = np.array(box.ComputeRelativeBound(camera, stage.GetPrimAtPath(f"/{root}/link_6"))
-                 .ComputeAlignedRange().GetMidpoint())
-    cam_tensor = np.diag(box_inertia(CAMERA_MASS, CAMERA_SIZE))
-    total = mass+CAMERA_MASS
-    com = (mass*center+CAMERA_MASS*c)/total
-    combined = np.zeros((3, 3))
-    for m, p, t in ((mass, center, tensor), (CAMERA_MASS, c, cam_tensor)):
-        d = p-com
-        combined += t+m*(np.dot(d, d)*np.eye(3)-np.outer(d, d))
-    tensor_mass(stage.GetPrimAtPath(f"/{root}/link_6"), total, com, combined)
-    describe(prim, title, {"arm": ARMS[model][0], "tool": ", ".join(parts),
-                           "link6MassWithCameraKg": total})
-    stage.GetRootLayer().Save()
-
-
 def build_camera(src, out):
     root = "D455"
     stage, prim = new_stage(out, root)
@@ -465,12 +339,6 @@ def main():
     build_car(src, HERE/"vehicle"/"Hyundai_Avante_CN7_Body.usd", wheel)
     built.append("vehicle/Hyundai_Avante_CN7_Body.usd")
     build_amr(src, HERE/"amr"/"KUKA_KMP1500_AMR.usd"); built.append("amr/KUKA_KMP1500_AMR.usd")
-    for model, role, tooled in (("h2515", "mount", "MountRobot_H2515.usd"),
-                                ("m1509", "fasten", "FastenRobot_M1509.usd")):
-        arm = f"Doosan_{model.upper()}.usd"
-        build_arm(src, model, HERE/"robots"/arm)
-        build_tooled(src, role, arm, HERE/"robots"/tooled)
-        built += ["robots/"+arm, "robots/"+tooled]
     for item in built:
         print("wrote", item, f"{(HERE/item).stat().st_size/1e6:.1f} MB")
 

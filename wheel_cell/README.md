@@ -33,7 +33,7 @@ cd "$HOME/project"
 | 컨베이어 | Interroll EC5000 35 W, 49:1 형식의 Ø50 mm, 튜브 두께 1.5 mm, 정격 2.42 N·m 및 최고 반송 속도 0.37 m/s를 적용했습니다. 롤러는 튜브 질량·관성을 가진 강체로 회전합니다. 속도 제어 이득과 롤러 외피 마찰은 추정값입니다. 가이드 라이너의 동마찰은 UHMW-PE 자료 범위 안에서 0.22를 적용했습니다. [Interroll 데이터시트](https://www.interroll.com/fileadmin/user_upload/Downloads__PDF_/Drives___Controls/DC_Platform/EC5000_Catalog_PDF/EN/EC5000_50mm_IP66_EN.pdf) · [TIVAR 1000 EC 데이터시트](https://www.mcam.com/mam/38052/Nylaplas-PE-TIVAR%C2%AE%201000%20EC%20UHMW-PE_en_US.pdf) |
 | 집는 구역 | V 스토퍼 판은 UHMW, 120°, 완충 스프링 40 N/mm(추정). 구역 롤러 0.32 m/s, S1 이후 0.08 m/s. 센터링 암은 공압 150 N(추정), 리프트 바 0.1 m/s. 상부 카메라는 D455(1.93 mm 렌즈) 기준입니다. |
 | AMR·승강 | KUKA KMP 1500 omniMove의 차대 711 kg, 리프트 144 kg, 정격 적재 1,500 kg, 직진 1 m/s, 횡주행 0.56 m/s, 승강 0.05 m/s를 기준으로 설정했습니다. 차체는 고무 지지 패드와 위치결정 블록 위에 놓여 하중을 전달합니다. 이동은 제한된 등가 추진력으로 계산합니다. 메카넘 롤러별 미끄러짐과 배터리·모터 전달계는 생략했습니다. [KUKA 사양서](https://www.kuka.com/-/media/kuka-downloads/files/87f2706ce77c4318877932fb36f6002d/kuka_kmp1500_en.pdf?hash=90820FB7DA3F2999B45EFC28EF98A626&rev=c434eb6522c4445e8b65c5e1fdde221c) |
-| 두산 로봇·툴 | 장착 H2515 2대와 체결 M1509 2대에 URDF의 질량·무게중심·전체 관성 텐서·관절 한계·속도·토크 제한과 공식 충돌 메시를 적용했습니다. 복수 충돌 메시를 링크별 볼록 형상으로 조리합니다. D455의 116 g과 공칭 치수를 사용했습니다. 로봇 서보 이득과 개별 공구의 하중 데이터는 현장 보정이 필요합니다. [Doosan URDF](https://github.com/DoosanRobotics/doosan-robot2/tree/243af5d1a071f030818bbcd6e9e5ee23d9edacae/dsr_description2) · [RealSense 사양서](https://www.realsenseai.com/wp-content/uploads/2026/03/RealSense-D400-Series-Datasheet-Mar-2026.pdf) |
+| 로봇·툴 | 장착·체결 모두 고정식 Kawasaki RS080N(좌우 각 1대, 가반하중 80 kg)입니다. URDF·링크 메시는 [`map_fasten/assets/`](../map_fasten/assets/)(Kawasaki `khi_robot` `678dd3f`, 링크 질량 합 약 555 kg)를 씁니다. 장착 공구는 SCHUNK PHL-W 63-080-S(18.7 kg, [`wheel_mount_sim/params.py`](../wheel_mount_sim/params.py)), 체결 공구는 QST50-150CT 5축 헤드([`HANDOVER.md`](HANDOVER.md))를 기준으로 합니다. 라이브 물리의 로봇 모델은 아직 RS080N으로 옮기지 않았습니다. |
 
 타이어·현가계·베어링 값은 추정이며 `calibration.json`에 실측 방법과 함께 있습니다. 휠 너트의 현대차 공칭 체결 범위는 107–127 N·m입니다. 너트 체결(5축 멀티 너트러너로 휠당 1회에 5개 동시 런다운·최종 토크)·체결 토크 기록·출차·불량 배출 주문은 키프레임 시연에 포함되며, 나사산 축력이나 공구 반력은 물리 검증 범위 밖입니다.
 
@@ -56,7 +56,7 @@ cd "$HOME/project"
 
 회귀 시험: `python3 map/wheel_cell/regress.py` (전체), `--area cycle|seeds|insertion|supply|rails`, `--changed`(바뀐 파일 기준).
 
-다시 빌드할 때 `ISAAC_SIM_ROOT`와 `--asset-root`, `--tool-usd`로 로컬 설치 및 자산 경로를 지정할 수 있습니다. 링크 라이브러리는 `import_doosan.py`로 공식 COLLADA 시각·충돌 메시를 변환해 다시 생성합니다. [Doosan 자산 라이선스](assets/LICENSE-Doosan.txt)
+다시 빌드할 때 `ISAAC_SIM_ROOT`와 `--asset-root`, `--tool-usd`로 로컬 설치 및 자산 경로를 지정할 수 있습니다. RS080N 링크 메시는 `map_fasten/assets/RS080N.usdc`에서 읽습니다. [Kawasaki 자산 라이선스](../map_fasten/assets/LICENSE-Kawasaki.txt)
 
 현재 실행 환경에서 검증한 물리는 CPU PhysX입니다. RTX 화면과 VRAM 사용량은 별도 장비 측정이 필요합니다.
 

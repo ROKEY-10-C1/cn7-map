@@ -1,4 +1,7 @@
-"""Doosan mount and fasten robots: URDF links and joints, replay following on the rail."""
+"""Mount and fasten robots on the old rail layout: URDF links and joints, replay following on the rail.
+
+Not yet ported to the fixed RS080N cell (build.py places the RS080N arms without rails).
+"""
 
 from math import atan2, degrees
 from pathlib import Path
@@ -115,7 +118,7 @@ class Robot:
     def add_collision(stage,model,index,path,placement=None):
         source=f"/AssetLibrary/{model}_Collision_{index}"
         if not stage.GetPrimAtPath(source):
-            raise ValueError("Rebuild the stage with the Doosan URDF collision meshes.")
+            raise ValueError("Rebuild the stage with the robot URDF collision meshes.")
         root=reference(stage,path,source)
         if placement is not None:
             UsdGeom.Xformable(root).MakeMatrixXform().Set(placement)

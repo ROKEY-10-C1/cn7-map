@@ -1,4 +1,4 @@
-"""Doosan URDF FK and damped least-squares tool-pose IK for the USD preview."""
+"""URDF FK and damped least-squares tool-pose IK for the USD preview (RS080N)."""
 import xml.etree.ElementTree as ET
 
 import numpy as np
@@ -17,8 +17,6 @@ class Arm:
         self.lower = np.array([float(j.find("limit").get("lower")) for j in self.joints])
         self.upper = np.array([float(j.find("limit").get("upper")) for j in self.joints])
         self.speed = np.array([float(j.find("limit").get("velocity")) for j in self.joints])
-        if self.model == "h2515":
-            self.speed = np.minimum(self.speed, np.deg2rad([100,80,100,180,180,180]))
 
     def fk(self, base, q):
         p, rot = np.array(base), np.eye(3)

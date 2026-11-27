@@ -27,7 +27,7 @@ CN7 좌전륜의 5개 너트를 고정식 Kawasaki RS080N으로 정렬하고 체
 | [`scene/fasten_pose_check.usda`](scene/fasten_pose_check.usda) | RS080N·CN7 차체·좌전륜의 시험 배치, 베이스 고정, TCP를 정의한다. |
 | [`scene/fasten_head.usdc`](scene/fasten_head.usdc) | 헤드 생성 결과다. link_6의 어댑터·본체·하우징과 독립 로터·너트·관절을 정의한다. |
 | [`assets/`](assets/) | RS080N의 USD와 IK용 URDF, Kawasaki 라이선스다. |
-| [`images/`](images/) | 체결 시험 그림이다. `previous_` 접두사가 붙은 그림은 이전 M1509 시험 기록이다. |
+| [`images/`](images/) | 체결 시험 그림이다. |
 
 ## 최신 main 인계 사양 반영
 

@@ -6,12 +6,12 @@ Isaac Sim에서 CN7 차체 이송, 휠 장착, 너트 체결을 개발하고 검
 
 | 경로 | 역할 |
 |---|---|
-| [`map_wheel/`](map_wheel/README.md) | 좌전륜을 허브 스터드에 거는 단독 장착 장면 |
+| [`wheel_mount_sim/`](wheel_mount_sim/README.md) | 좌전륜 장착 단독 시험. Kawasaki RS080N과 SCHUNK 트레드 클램프 |
 | [`map_fasten/`](map_fasten/README.md) | 너트 체결 구체화. Kawasaki RS080N과 5축 헤드의 단독 시험 |
 | [`wheel_cell/`](wheel_cell/README.md) | 전체 조립 셀 생성·실행·물리 검증과 공용 제어 코드 |
 | [`wheel_cell/HANDOVER.md`](wheel_cell/HANDOVER.md) | 장착 완료 휠의 허브 기준 상태, 스터드 데이터와 체결기 설계 사양 |
 | [`scene/`](scene/README.md) | 전체 조립 셀의 USD 시작 장면과 공장·재질·주문별 레이어 |
-| [`assets/`](assets/README.md) | 차체, 휠, AMR, 로봇 등 공용 USD 모델 |
+| [`assets/`](assets/README.md) | 차체, 휠, AMR, 카메라 공용 USD 모델 (RS080N은 `map_fasten/assets/`) |
 | [`docs/`](docs/PROGRESS.md) | 공정 검증 기록과 참고 이미지 |
 
 ## Isaac Sim 실행
@@ -22,8 +22,7 @@ Isaac Sim에서 CN7 차체 이송, 휠 장착, 너트 체결을 개발하고 검
 # 전체 조립 셀
 ./wheel_cell/run.sh
 
-# 좌전륜 장착 단독 시험
-./map_wheel/run.sh
+# 좌전륜 장착 단독 시험 (실행 방법은 wheel_mount_sim/README.md)
 
 # 좌전륜 너트 체결 단독 시험
 ~/isaacsim/python.sh -B map_fasten/fasten_pose_check.py
