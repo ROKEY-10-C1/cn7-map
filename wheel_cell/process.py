@@ -34,6 +34,11 @@ AMR_DOCKED = 8.                    # order start (at the gate) -> docked
 AMR_LIFTED = AMR_DOCKED+3.
 DOCK_X, INDEX_X, FINAL_X, EXIT_X = LAYOUT.stops
 AMR_OUT_GATE = max(6., (EXIT_X-FINAL_X)/.8)  # stop C -> forward exit
+# Forward exit -> east return aisle (straight), then crab -y to the outbound lane head as on the
+# west aisle (AMR_AT_GATE). The car no longer backs through the cell to the gate.
+RETURN_X = LAYOUT.return_x
+AMR_TO_RETURN = max(6., (RETURN_X-EXIT_X)/.8)
+AMR_OUT_BUFFER = AMR_AT_GATE
 MOUNT_HUB_X = DOCK_X+AXLE
 FASTEN_HUB_X = MOUNT_HUB_X+WHEELBASE
 MOUNT_BASE_X = MOUNT_HUB_X-1.24
@@ -54,7 +59,8 @@ CELL_Y = 5.25
 AMR_BAY_Y = CELL_Y + .21 + 1.55 + .03 + 2.65
 # Vehicle buffers: three slots per side, cars parked across the bay (yaw -90 inbound, +90 outbound).
 # The cars rest on four stands at the body ends so the AMR+hanger (rails +/-1.80 m) can crab in under
-# the car from the AMR lane; slots are served in order (inbound 1->2->3, outbound 3->2->1).
+# the car from the AMR lane; slots are served in order. Inbound 1->2->3 from the west aisle;
+# outbound cars arrive from the east return aisle and fill the far slot first, 1->2->3.
 BUFFER_SLOT_X = (-3.12, 0., 3.12)
 BUFFER_STAND_X = 2.05             # car-frame stand position along the body, clear of the hanger rails
 BUFFER_STAND_Y = .68
@@ -157,6 +163,7 @@ def schedule(inject, mixed_sizes=False):
         # Fasten leaves PARK 5 s before tighten; it starts after the second stop.
         rear_tighten = final_dock+5.5
         departure = rear_tighten+NUT_CYCLE+8.
-        end = departure+AMR_OUT_GATE
-        yield number, wheel, start, deliveries, reject, front_seat, rear_seat, rear_tighten, front_tighten, second_index, final_dock, departure, end
+        end = departure+AMR_OUT_GATE          # forward exit reached: the cell is free for the next car
+        parked = end+AMR_TO_RETURN+AMR_OUT_BUFFER  # outbound lane head reached via the east aisle
+        yield number, wheel, start, deliveries, reject, front_seat, rear_seat, rear_tighten, front_tighten, second_index, final_dock, departure, end, parked
         start = end+1.

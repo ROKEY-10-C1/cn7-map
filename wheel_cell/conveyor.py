@@ -4,6 +4,7 @@ from math import degrees
 
 from pxr import Gf, PhysxSchema, UsdGeom, UsdPhysics, UsdShade
 
+from layout import LAYOUT
 from physical_data import ROLLER_RATED_SPEED, ROLLER_TORQUE, tube_properties
 from process import PICK_X, FEED_START_X, LINE_Y, REJECT_GATE_HALF, REJECT_X
 
@@ -118,7 +119,7 @@ def setup_factory(stage, root, material, guide_material, branch_side):
                 main.startswith(("Column","EndWall","EndUpright"))):
             collider(prim)
     for side,label in ((1,"Left"),(-1,"Right")):
-        for i,(x0,x1) in ((1,(FEED_START_X,4.71)),):  # feed belt only (index 1 keeps the reject-gate rule)
+        for i,(x0,x1) in ((1,(FEED_START_X,LAYOUT.ramp_bottom_x)),):  # feed belt only (index 1 keeps the reject-gate rule)
             for edge in (-1,1):
                 spans=((x0,REJECT_X-REJECT_GATE_HALF),(REJECT_X+REJECT_GATE_HALF,x1)) if (
                     side==edge==i==1 and stage.GetPrimAtPath(FACTORY+"/LeftFeed_Gate")) else ((x0,x1),)

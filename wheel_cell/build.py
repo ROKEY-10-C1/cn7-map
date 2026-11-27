@@ -52,7 +52,7 @@ from process import (
     REJECT_CRATE_Y, REJECT_GATE_HALF, REJECT_X, STATIONS, schedule,
 )
 from layout import LAYOUT
-from process import EXIT_X, FASTEN_HUB_X, FINAL_X, INDEX_X, belt_height
+from process import AMR_LIFT_CARRY, AMR_TO_RETURN, EXIT_X, FASTEN_HUB_X, FINAL_X, INDEX_X, RETURN_X, belt_height
 from wheel_geometry import barrel, center_web, hub as make_hub, nut as make_nut, wheelhouse
 from robot import Arm
 from cell_motion import (GRIP_AT, GRIP_CENTRE, HEAD_LENGTH, MAGAZINE, NUT_ADVANCE, NUT_PICK_AT, fasten_keys,
@@ -74,8 +74,9 @@ HALL_Y = OUTER_GUARD_Y+.40
 FLOOR_Y = HALL_Y+.40
 # The outbound (-y) side is open (no hall wall); the floor ends as far out as on the inbound side.
 FLOOR_S = FLOOR_Y
-# Floor x range: 1 m extra on the aisle (west) side so the aisle paint keeps 1.05 m to the floor edge.
-FLOOR_X0, FLOOR_X1 = -11., max(10., EXIT_X+2.65, LAYOUT.supply_x+.7)
+# Floor x range: 1 m extra on the aisle (west) side so the aisle paint keeps 1.05 m to the floor edge;
+# the east return aisle (RETURN_X) keeps the same 3.5 m to the east edge.
+FLOOR_X0, FLOOR_X1 = -11., max(10., EXIT_X+2.65, LAYOUT.supply_x+.7, RETURN_X+3.5)
 FLOOR_XMID, FLOOR_W = (FLOOR_X0+FLOOR_X1)/2, FLOOR_X1-FLOOR_X0
 FLOOR_MID, FLOOR_LEN = (FLOOR_Y-FLOOR_S)/2, FLOOR_Y+FLOOR_S
 # AMR travel zones painted on the floor: the car-carrying AMR's swept area (CN7 body 4.71 x 1.825 m
@@ -272,20 +273,32 @@ def amr_zones(stage, path):
         (x0, y0), (x1, y1) = a, b
         size = (abs(x1-x0)+width, width, .003) if y0 == y1 else (width, abs(y1-y0)+width, .003)
         box(stage, path+f"/{name}", ((x0+x1)/2, (y0+y1)/2, .004), size, rgb)
-    gx, far = AMR_GATE_X, BUFFER_SLOT_X[-1]+half_w
-    # Aisle along x = AMR_GATE_X between the two buffer lanes (car lengthwise along x).
-    fill("Aisle", gx-half_l, gx+half_l, -AMR_BAY_Y, AMR_BAY_Y)
+    gx, rx = AMR_GATE_X, RETURN_X
+    # West aisle (inbound only): inbound lane head -> gate, car lengthwise along x.
+    fill("Aisle", gx-half_l, gx+half_l, -half_w, AMR_BAY_Y)
     for k, x in enumerate((gx-half_l, gx+half_l)):
-        line(f"AisleEdge_{k}", (x, -AMR_BAY_Y+cut), (x, AMR_BAY_Y-cut))
-    for side, label in ((1, "In"), (-1, "Out")):
+        line(f"AisleEdge_{k}", (x, -half_w), (x, AMR_BAY_Y-cut))
+    line("AisleEnd", (gx-half_l, -half_w), (gx+half_l, -half_w))
+    # Forward exit -> east return aisle -> outbound lane head (car lengthwise along x).
+    fill("ExitLane", EXIT_X, rx-half_l, -half_w, half_w)
+    for k, e in enumerate((-1, 1)):
+        line(f"ExitLaneEdge_{k}", (EXIT_X, e*half_w), (rx-half_l, e*half_w))
+    fill("ReturnAisle", rx-half_l, rx+half_l, -AMR_BAY_Y, half_w)
+    for k, x in enumerate((rx-half_l, rx+half_l)):
+        line(f"ReturnAisleEdge_{k}", (x, -AMR_BAY_Y+cut), (x, half_w if k else -half_w))
+    line("ReturnAisleEnd", (rx-half_l, half_w), (rx+half_l, half_w))
+    # Buffer lanes: the AMR crabs along the slot row with the car across it, from the west aisle
+    # into the inbound lane and from the east aisle into the outbound lane.
+    for side, label, head, tail in ((1, "In", gx, BUFFER_SLOT_X[-1]+half_w),
+                                    (-1, "Out", rx, BUFFER_SLOT_X[0]-half_w)):
         y = side*AMR_BAY_Y
-        # Buffer lane: the AMR crabs along the slot row with the car across it.
-        fill(f"{label}Lane", gx, far, y-half_l, y+half_l)
+        inward = 1 if tail > head else -1
+        fill(f"{label}Lane", min(head, tail), max(head, tail), y-half_l, y+half_l)
         for k, e in enumerate((-1, 1)):
-            line(f"{label}LaneEdge_{k}", (gx+cut, y+e*half_l), (far, y+e*half_l))
-        line(f"{label}LaneEnd", (far, y-half_l), (far, y+half_l))
-        cylinder(stage, path+f"/{label}Turn", (gx, y, .0018), turn, .0016, ZONE_FILL)
-        ring(stage, path+f"/{label}TurnEdge", (gx, y, .004), turn+.03, turn-.03, .003, AMBER, 96)
+            line(f"{label}LaneEdge_{k}", (head+inward*cut, y+e*half_l), (tail, y+e*half_l))
+        line(f"{label}LaneEnd", (tail, y-half_l), (tail, y+half_l))
+        cylinder(stage, path+f"/{label}Turn", (head, y, .0018), turn, .0016, ZONE_FILL)
+        ring(stage, path+f"/{label}TurnEdge", (head, y, .004), turn+.03, turn-.03, .003, AMBER, 96)
 
 def concrete_floor(stage, path):
     box(stage,path+"/Slab",(FLOOR_XMID,FLOOR_MID,-.108),(FLOOR_W,FLOOR_LEN,.2),CONCRETE)
@@ -378,6 +391,8 @@ def factory(stage, arm):
     for i in range(1,5):
         x = FINAL_X+(EXIT_X-FINAL_X)*i/5
         box(stage,f"{path}/AMR_ExitLine_{i}",(x,0,.004),(.30,.045,.004),TEAL)
+    for i in range(int((RETURN_X-.24-EXIT_X)/.48)+1):      # forward exit -> east return aisle
+        box(stage,f"{path}/AMR_Return_{i}",(EXIT_X+.24+i*.48,0,.005),(.265,.045,.005),(.04,.54,.78))
     for side, name in ((1,"Left"),(-1,"Right")):
         for role, x in (("Mount",MOUNT_HUB_X),("Fasten",FASTEN_HUB_X)):
             xform(stage, f"/World/LayoutDatums/{name}{role}", (x,side*LAYOUT.work_hub_y,LAYOUT.work_hub_z))
@@ -387,15 +402,17 @@ def factory(stage, arm):
                                ("Entry",(-4.52,DOCK_X-2.475,-1.11,1.11)),("Exit",(DOCK_X+2.475+WHEELBASE,5.65,-1.11,1.11))):
         box(stage,path+f"/CellFloor_{name}",((x0+x1)/2,(y0+y1)/2,.0015),(x1-x0,y1-y0,.002),cell_floor)
     for side,label in ((1,"Left"),(-1,"Right")):
+        # Inbound (+y) runs on the west aisle, outbound (-y) on the east return aisle.
+        ax,inward=(AMR_GATE_X,1) if side>0 else (RETURN_X,-1)
         for i in range(int((AMR_BAY_Y-.24)/.48)+1):
-            box(stage,path+f"/AMR_{label}_{i}",(AMR_GATE_X,side*(.24+i*.48),.005),
+            box(stage,path+f"/AMR_{label}_{i}",(ax,side*(.24+i*.48),.005),
                 (.044,.26,.005),(.04,.54,.78))
-        # AMR loop between the buffers and the cell entry, dashed as in the layout image.
+        # AMR loop between the buffer lane and its aisle, dashed as in the layout image.
         for i in range(4):
-            box(stage,path+f"/AMR_{label}Loop_{i}",(AMR_GATE_X+.30+i*.48,side*AMR_BAY_Y,.005),
+            box(stage,path+f"/AMR_{label}Loop_{i}",(ax+inward*(.30+i*.48),side*AMR_BAY_Y,.005),
                 (.26,.044,.005),(.04,.54,.78))
-        tip=[(AMR_GATE_X+2.38,side*AMR_BAY_Y,.006),(AMR_GATE_X+2.02,side*AMR_BAY_Y+.20,.006),
-             (AMR_GATE_X+2.02,side*AMR_BAY_Y-.20,.006)]
+        tip=[(ax+inward*2.38,side*AMR_BAY_Y,.006),(ax+inward*2.02,side*AMR_BAY_Y+.20,.006),
+             (ax+inward*2.02,side*AMR_BAY_Y-.20,.006)]
         mesh(stage,path+f"/AMR_{label}LoopArrow",tip,[3],[0,1,2],(.04,.54,.78),True)
         parking(stage,path+f"/{label}VehicleBuffer",side)
         mount_flange = fixed_robot(stage, f"{path}/{label}MountRobot", arm, MOUNT_BASE_X, side, "mount")
@@ -428,7 +445,9 @@ def factory(stage, arm):
         for k,y in enumerate((CELL_Y+.18,BUFFER_GUARD_Y-.18)):
             box(stage,path+f"/CellFloor_{label}Walkway_{k}",(.215,side*y,.004),(9.47,.06,.003),AMBER)
         fence(stage,path+f"/{label}OuterGuard",(-5.55,side*OUTER_GUARD_Y),(6.10,side*OUTER_GUARD_Y))
-        fence(stage,path+f"/{label}EndGuard",(5.65,side*(CELL_Y+.02)),(5.65,side*OUTER_GUARD_Y))
+        # Outbound side: the end guard stops at the walkway so the outbound lane opens to the east aisle.
+        fence(stage,path+f"/{label}EndGuard",(5.65,side*(CELL_Y+.02)),
+              (5.65,side*(OUTER_GUARD_Y if side>0 else BUFFER_GUARD_Y)))
         if side>0:
             reject_gate=belt(stage,label+"Feed",(FEED_START_X,side*LINE_Y),(LAYOUT.ramp_bottom_x,side*LINE_Y),.67,outlet_x=REJECT_X)
         else:
@@ -492,12 +511,12 @@ def industrial_hall(stage, root):
     width = (y1-y0)/bays
     for i in range(bays):
         y = y0+(i+.5)*width
-        box(stage, root+f"/EndWall_{i}", (9.94, y, 2.45), (.12, width-.02, 4.9), wall)
+        box(stage, root+f"/EndWall_{i}", (FLOOR_X1-.06, y, 2.45), (.12, width-.02, 4.9), wall)
         for j in range(2):
-            box(stage, root+f"/EndWindow_{i}_{j}", (9.86, y+(j-.5)*width*.39, 3.73),
+            box(stage, root+f"/EndWindow_{i}_{j}", (FLOOR_X1-.14, y+(j-.5)*width*.39, 3.73),
                 (.035, width*.37, .86), GLASS)
     for i in range(bays-1):
-        box(stage, root+f"/EndUpright_{i}", (9.82, y0+(i+1)*width, 2.45), (.16, .17, 4.9), BRUSHED)
+        box(stage, root+f"/EndUpright_{i}", (FLOOR_X1-.18, y0+(i+1)*width, 2.45), (.16, .17, 4.9), BRUSHED)
     for i, x in enumerate((FLOOR_X0+.2, *(FLOOR_X0+k*bay for k in (1, 2, 3)), FLOOR_X1-.2)):
         box(stage, root+f"/Column_{i}", (x, HALL_Y-.26, 2.61), (.28, .24, 5.2), BRUSHED)
         box(stage, root+f"/ColumnFoot_{i}", (x, HALL_Y-.26, .10), (.43, .37, .20), ZINC)
@@ -735,14 +754,14 @@ def dock_clamps(stage, root, dock, release, *, base_x=0., prefix="DockClamp"):
 
 
 def order(stage, assets, arm, data, record):
-    number,wheel,start,deliveries,reject,front,rear,rear_tight,front_tight,second_index,final_dock,departure,end=data
+    number,wheel,start,deliveries,reject,front,rear,rear_tight,front_tight,second_index,final_dock,departure,end,parked=data
     vehicle=f"CN7-{number:03}"
     root=f"/World/Orders/CN7_{number:03}"
     cycle,_=xform(stage,root)
     # The next car is staged: its AMR leaves the buffer while the previous car is still
     # in the cell and waits at the gate, so the order starts with only the 7 m straight run.
     staged=max(0.,start-AMR_AT_GATE)
-    visibility(cycle,staged,end)
+    visibility(cycle,staged,parked)
     amr,lift=carrier(stage,assets,root+"/Carrier")
     index_start=front+MOUNT_CLEAR
     redock=index_start+INDEX_TRAVEL
@@ -752,11 +771,13 @@ def order(stage, assets, arm, data, record):
     route=((start-AMR_AT_GATE,AMR_GATE_X,AMR_BAY_Y),(start,AMR_GATE_X,0.),(start+AMR_DOCKED,DOCK_X,0.),
            (index_start,DOCK_X,0.),(redock,INDEX_X,0.),
            (second_index,INDEX_X,0.),(final_dock,FINAL_X,0.),
-           (departure,FINAL_X,0.),(end,EXIT_X,0.))
+           (departure,FINAL_X,0.),(end,EXIT_X,0.),
+           # Straight on past the exit to the east aisle, then crab -y to the outbound lane head.
+           (end+AMR_TO_RETURN,RETURN_X,0.),(parked,RETURN_X,-AMR_BAY_Y))
     for t,x,y in route:
         move(amr,t,(x,y,0.))
     for t,height in ((start-AMR_AT_GATE,-.12),(start+AMR_DOCKED,-.12),(start+AMR_LIFTED,0.),
-                     (end,0.)):
+                     (end+AMR_TO_RETURN,0.),(parked,AMR_LIFT_CARRY)):
         move(lift,t,(0.,0.,height))
     record(start,vehicle,"","order",wheel.name)
     record(start+AMR_LIFTED,vehicle,"","docked","AMR dock and lift complete")
@@ -765,7 +786,8 @@ def order(stage, assets, arm, data, record):
     record(second_index,vehicle,"","second_index","Front fastening and rear mounting complete; arms parked")
     record(final_dock,vehicle,"","final_docked","Stop C: rear hubs at the fastening arms")
     record(departure,vehicle,"","depart","AMR leaving the dock")
-    record(end,vehicle,"","outbound","AMR reached forward exit")
+    record(end,vehicle,"","exit","AMR reached forward exit; cell free")
+    record(parked,vehicle,"","outbound","AMR reached outbound lane head via the east aisle")
     record(staged,vehicle,"","staged","AMR leaves inbound buffer for the gate")
     for name,(x,side) in STATIONS.items():
         wheel_y=side*half_track(x)
@@ -797,7 +819,7 @@ def order(stage, assets, arm, data, record):
         for name_key,value in fit(wheel).items():
             installed.GetPrim().CreateAttribute("cell:clearance_"+name_key,Sdf.ValueTypeNames.Double).Set(value)
         mounted_tilt.Set(-side*90)
-        visibility(installed,seated,end)
+        visibility(installed,seated,parked)
         record(path[-1][0],vehicle,name,"inspect","Simulated wheel inspection")
         record(seated-1,vehicle,name,"aligned",
                f"Nominal static envelope: pilot clearance {fit(wheel)['pilot_m']*1000:.2f} mm radial")
@@ -811,7 +833,7 @@ def order(stage, assets, arm, data, record):
             nut_root=root+f"/Carrier/Hanger/{name}/Nut_{index}"
             nut,nut_pos=xform(stage,nut_root)
             nut_spin=nut.AddRotateZOp()
-            visibility(nut,t,end)
+            visibility(nut,t,parked)
             make_nut(stage,nut_root)
             for seconds,distance,spin_angle in ((t,NUT_ADVANCE,0.),(t+NUT_DRIVE,0.,1800.),
                                                 (t+NUT_DRIVE+NUT_FINAL,0.,1830.)):
