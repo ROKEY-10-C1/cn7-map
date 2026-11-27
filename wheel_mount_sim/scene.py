@@ -322,29 +322,76 @@ def wheel(stage, M, V, rng):
 LINK6_HOME = (np.array([.15, 0., 2.795]), rot((0, 0, 1), -90))   # link6 at all-zero joints (USD probe)
 
 
-def robot(stage, M, V, sync=True):
-    rp = "/World/Robot"
+URDF = (Path.home()/"isaacsim/exts/isaacsim.robot_motion.motion_generation/motion_policy_configs/Kawasaki/rs080n"
+        /"rs080n_onrobot_rg2.urdf")
+
+
+def _rpy(r, p, y):
+    return rot((0, 0, 1), np.degrees(y))@rot((0, 1, 0), np.degrees(p))@rot((1, 0, 0), np.degrees(r))
+
+
+def link_poses(q):
+    """Forward kinematics of the RS080N USD (URDF incl. its world2base -90 deg): {link: (R, p)} in the robot root frame."""
+    import xml.etree.ElementTree as ET
+    root = ET.parse(URDF).getroot()
+    joints = {j.find("child").get("link"): j for j in root.findall("joint")}
+    out, T = {}, np.eye(4)
+    chain = ["base_link", "link1", "link2", "link3", "link4", "link5", "link6"]
+    for i, link in enumerate(chain):
+        j = joints[link]
+        o = j.find("origin")
+        xyz = np.array([float(v) for v in o.get("xyz").split()]) if o is not None else np.zeros(3)
+        rpy = [float(v) for v in o.get("rpy").split()] if o is not None else [0, 0, 0]
+        A = np.eye(4)
+        A[:3, :3], A[:3, 3] = _rpy(*rpy), xyz
+        if j.get("type") == "revolute":
+            ax = np.array([float(v) for v in j.find("axis").get("xyz").split()])
+            B = np.eye(4)
+            B[:3, :3] = rot(ax, np.degrees(q[i-1]))
+            A = A@B
+        T = T@A
+        out[link] = (T[:3, :3].copy(), T[:3, 3].copy())
+    return out
+
+
+def robot(stage, M, V, sync=True, rp="/World/Robot", base=None, yaw=0., prefix="/World", q0=None):
+    """RS080N articulation + PHL-W 63-080-S tool. base/yaw: robot root in the world; q0: start joint angles (rad)."""
+    base = ROBOT_BASE if base is None else np.asarray(base, float)
+    R_base = rot((0, 0, 1), yaw)
     r = stage.DefinePrim(rp, "Xform")
     r.GetReferences().AddReference(str(ROBOT_USD))
-    xform(stage, rp, tuple(ROBOT_BASE), gq(rot((0, 0, 1), 0)))
+    xform(stage, rp, tuple(base), gq(R_base))
     for name in ("onrobot_rg2_base_link", "left_outer_knuckle", "left_inner_finger", "gripper_center",
                  "left_inner_knuckle", "right_inner_knuckle", "right_outer_knuckle", "right_inner_finger",
                  "link6/rs080n2rg2"):
         stage.OverridePrim(f"{rp}/{name}").SetActive(False)
 
+    if q0 is not None:
+        # start pose: links placed by forward kinematics, joint states and drive targets on q0
+        for link, (Rl, pl) in link_poses(q0).items():
+            xform(stage, f"{rp}/{link}", tuple(pl), gq(Rl))
+        jp_ = {1: "base_link/joint1", 2: "link1/joint2", 3: "link2/joint3", 4: "link3/joint4", 5: "link4/joint5",
+               6: "link5/joint6"}
+        for i, path in jp_.items():
+            prim = stage.OverridePrim(f"{rp}/{path}")
+            PhysxSchema.JointStateAPI.Apply(prim, "angular").CreatePositionAttr(float(np.degrees(q0[i-1])))
+            UsdPhysics.DriveAPI.Apply(prim, "angular").CreateTargetPositionAttr(float(np.degrees(q0[i-1])))
+        R6, p6 = link_poses(q0)["link6"]
+        l6R, l6p = R_base@R6, base+R_base@p6
+    else:
+        l6p, l6R = base+R_base@LINK6_HOME[0], R_base@LINK6_HOME[1]
     # tool body (gripper housing + adapter); its frame is the flange frame
     body_mass = P.GRIP["mass"]-2*1.6                     # SCHUNK mass includes the two base jaws (~1.6 kg each, est.)
-    l6p, l6R = ROBOT_BASE+LINK6_HOME[0], LINK6_HOME[1]
-    tool = rigid(stage, "/World/Tool", tuple(l6p), gq(l6R), body_mass+.55)
-    tp = "/World/Tool"
+    tp = prefix+"/Tool"
+    tool = rigid(stage, tp, tuple(l6p), gq(l6R), body_mass+.55)
     c = g2f((0, CHORD_Y, BODY_FRONT+BODY_H/2))
     box(stage, tp+"/Body", tuple(c), (BODY_L, BODY_W, BODY_H), phys=M["steel"], vis=V["blue"])
     box(stage, tp+"/Adapter", tuple(g2f((0, CHORD_Y, FLANGE_Z-ADAPTER_T/2))), (.22, .16, ADAPTER_T),
         phys=M["steel"], vis=V["alu"])
-    j = joint(stage, "/World/ToolMount", "fixed", f"{rp}/link6", tool.GetPath())
+    j = joint(stage, prefix+"/ToolMount", "fixed", f"{rp}/link6", tool.GetPath())
     jaws = []
     for side, name in ((1, "R"), (-1, "L")):    # right first: the left slide mimics it
-        jp = f"/World/Jaw{name}"
+        jp = f"{prefix}/Jaw{name}"
         origin_g = np.array([side*TOUCH_X, CHORD_Y, BODY_FRONT])
         jaw = rigid(stage, jp, tuple(l6p), gq(l6R), None)
         # base jaw block
@@ -374,7 +421,7 @@ def robot(stage, M, V, sync=True):
                   [tuple(g2f((x, y, SHOE["lip"][1]))) for x, y in loop], phys=M["pu"], vis=V["pu"])
         shoe_vol = (rb**2-ri**2)/2*P.SHOE_ARC*(SHOE["z1"]-SHOE["z0"])
         UsdPhysics.MassAPI.Apply(jaw).CreateMassAttr(1.6+finger_mass+shoe_vol*1800.)
-        pj = joint(stage, f"/World/Jaw{name}Slide", "prismatic", tool.GetPath(), jaw.GetPath())
+        pj = joint(stage, f"{prefix}/Jaw{name}Slide", "prismatic", tool.GetPath(), jaw.GetPath())
         pj.CreateAxisAttr("X")
         lo, hi = JAW_Q_RANGE
         pj.CreateLowerLimitAttr(lo if side > 0 else -hi)
@@ -388,7 +435,7 @@ def robot(stage, M, V, sync=True):
             drive(pj, "linear", 0., 0., 1e6, P.GRIP["force"], vel=0.)
         else:
             mimic = PhysxSchema.PhysxMimicJointAPI.Apply(pj.GetPrim(), UsdPhysics.Tokens.rotX)
-            mimic.GetReferenceJointRel().AddTarget("/World/JawRSlide")
+            mimic.GetReferenceJointRel().AddTarget(f"{prefix}/JawRSlide")
             mimic.GetReferenceJointAxisAttr().Set(UsdPhysics.Tokens.rotX)
             mimic.GetGearingAttr().Set(1.)       # q_L = -q_R: symmetric rack-and-pinion synchronisation
             mimic.GetOffsetAttr().Set(0.)

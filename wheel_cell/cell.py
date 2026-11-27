@@ -101,6 +101,15 @@ class Cell:
         self.buffer_stands=buffer_stands(stage)
         rng=Random(seed)
         self.stations=[make_station(stage,car,name,rng.uniform(-180.,180.),sections,mats,seed) for name in STATIONS]
+        # Mount robots and mount physics (hub pins, wheel pad, ring tire) from map/wheel_mount_sim;
+        # the layout stays as built. See wheel_mount_sim/cell_mount.py.
+        import sys
+        from pathlib import Path
+        sys.path.append(str(Path(__file__).resolve().parent.parent/"wheel_mount_sim"))
+        from cell_mount import install as install_mount
+        from process import MOUNT_BASE_X, ROBOT_BASE_Y
+        self.mount_arms=(install_mount(stage,self.stations,MOUNT_BASE_X,ROBOT_BASE_Y,arms=robots)
+                         if os.environ.get("CELL_MOUNT_SIM","1")!="0" else {})
         # Earlier saved stages have rail actors under Orders. Fixed RS080N arms
         # are permanent Factory equipment and already visible in the live stage.
         sources = [REFERENCE + f"/{prefix}Mount" for prefix in ("Left", "Right")]

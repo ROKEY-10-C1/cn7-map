@@ -41,6 +41,7 @@ Isaac Sim에서 **File → Open**으로 열어 형상·충돌체·관절·재질
 | `scene/wheel_mount.usda` | 장면을 내보낸 USD (Isaac Sim에서 열어 보기용, `--export-usd`로 다시 생성) |
 | `tools/` | 에셋 받기, USD 구조 조사 도구 |
 | `docs/troubleshooting/` | 트러블슈팅 기록과 이미지(노션 「트러블슈팅 → 장착로봇팔」 원본) |
+| `cell_mount.py`, `cell_check.py/.sh` | 조립 셀 라이브 물리에 장착로봇·장착 물리를 넣는 모듈과 셀 안 대기 검사 ([`docs/CELL_INTEGRATION.md`](docs/CELL_INTEGRATION.md)) |
 | `docs/GOALS.md` | **목표와 합격 기준** (공정 시간, 단계별 수치 범위와 근거) |
 
 ## 현재 상태 (2026-11-27)
