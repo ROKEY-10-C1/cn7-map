@@ -27,13 +27,29 @@ cd "$HOME/project"
 
 | 대상 | 물리에 반영한 값과 근거 |
 |---|---|
-| 아반떼 차체 | CN7 페이스리프트 G1.6 IVT 16인치를 기준으로 전장 4,710 mm, 전폭 1,825 mm, 축거 2,720 mm, 전후 윤거 1,585 / 1,596 mm를 적용했습니다. 카탈로그 공차중량 1,265 kg에서 아래 휠 네 개를 뺀 약 1,201.5 kg을 초기 차체 질량으로 계산했습니다. [현대차 카탈로그](https://www.hyundai.com/contents/repn-car/catalog/the-new-avante-catalog.pdf) |
-| 휠 | 205/55 R16, 6.5J × 16, 이론 외경 631.9 mm를 적용했습니다. Continental Elantra 적용 품번 `15570360000`의 8.0 kg 타이어와 Konig 동급 주조 16인치 림의 17.38 lb를 합쳐 약 15.9 kg으로 모델링했습니다. 림 무게는 비교품 값입니다. 관성은 타이어와 림의 환형 단면에서 추정해 USD에 명시했습니다. [현대차 매뉴얼](https://ownersmanual.hyundai.com/full_webhelp/CN7/2025/en_GN/idf379ca53e75.html) · [Continental 제품 가이드](https://www.continental-tires.com/content/dam/conti-tires-cms/continental/market-content/ca/download-pdfs/product-guide/CT2024-TireGuide_v6b.pdf.coredownload.pdf) · [Konig Lockout](https://konigwheels.com/products/konig-lockout) |
+| 아반떼 차체 | CN7 페이스리프트 G1.6 IVT 16인치를 기준으로 전장 4,710 mm, 전폭 1,825 mm, 축거 2,720 mm, 전후 윤거 1,585 / 1,596 mm를 적용했습니다. 카탈로그 공차중량 1,265 kg에서 아래 휠 네 개(17.1 kg × 4)를 뺀 1,196.6 kg을 차체 질량으로 계산했습니다(`physical_data.BODY_MASS`). PhysX 설정은 아래 [차체 PhysX 설정](#차체-physx-설정-라이브-셀)에 있습니다. [현대차 카탈로그](https://www.hyundai.com/contents/repn-car/catalog/the-new-avante-catalog.pdf) |
+| 휠 | 205/55 R16, 6.5J × 16, 이론 외경 631.9 mm를 적용했습니다. Continental Elantra 적용 품번 `15570360000`의 8.0 kg 타이어와 CN7 순정 16×6.5J ET46 림(52910-AB200/AA230) 9.1 kg을 합쳐 17.1 kg으로 모델링했습니다. 림 무게는 wheel-size.com 한 곳의 값으로 검증되지 않았고, 이전 비교품(Konig 7.9 kg)보다 무거워 하중 쪽으로 보수적인 값입니다. 관성은 타이어와 림의 환형 단면에서 추정해 USD에 명시했습니다. [현대차 매뉴얼](https://ownersmanual.hyundai.com/full_webhelp/CN7/2025/en_GN/idf379ca53e75.html) · [Continental 제품 가이드](https://www.continental-tires.com/content/dam/conti-tires-cms/continental/market-content/ca/download-pdfs/product-guide/CT2024-TireGuide_v6b.pdf.coredownload.pdf) · [Konig Lockout](https://konigwheels.com/products/konig-lockout) |
 | 허브 | PCD 5×114.3 mm, 센터 보어 Ø67.10 mm, M12×1.5는 설계 기준입니다. 파일럿 Ø66.94 mm, 돌출 12 mm, 휠 오프셋 +46 mm, 스터드 돌출 30 mm, 홀 Ø13.4 mm는 실측 전 가정입니다. 이 치수의 보어–파일럿 반경 여유 0.08 mm를 충돌 형상에 그대로 적용했습니다. |
 | 컨베이어 | Interroll EC5000 35 W, 49:1 형식의 Ø50 mm, 튜브 두께 1.5 mm, 정격 2.42 N·m 및 최고 반송 속도 0.37 m/s를 적용했습니다. 롤러는 튜브 질량·관성을 가진 강체로 회전합니다. 속도 제어 이득과 롤러 외피 마찰은 추정값입니다. 가이드 라이너의 동마찰은 UHMW-PE 자료 범위 안에서 0.22를 적용했습니다. [Interroll 데이터시트](https://www.interroll.com/fileadmin/user_upload/Downloads__PDF_/Drives___Controls/DC_Platform/EC5000_Catalog_PDF/EN/EC5000_50mm_IP66_EN.pdf) · [TIVAR 1000 EC 데이터시트](https://www.mcam.com/mam/38052/Nylaplas-PE-TIVAR%C2%AE%201000%20EC%20UHMW-PE_en_US.pdf) |
 | 집는 구역 | V 스토퍼 판은 UHMW, 120°, 완충 스프링 40 N/mm(추정). 구역 롤러 0.32 m/s, S1 이후 0.08 m/s. 센터링 암은 공압 150 N(추정), 리프트 바 0.1 m/s. 상부 카메라는 D455(1.93 mm 렌즈) 기준입니다. |
 | AMR·승강 | KUKA KMP 1500 omniMove의 차대 711 kg, 리프트 144 kg, 정격 적재 1,500 kg, 직진 1 m/s, 횡주행 0.56 m/s, 승강 0.05 m/s를 기준으로 설정했습니다. 차체는 고무 지지 패드와 위치결정 블록 위에 놓여 하중을 전달합니다. 이동은 제한된 등가 추진력으로 계산합니다. 메카넘 롤러별 미끄러짐과 배터리·모터 전달계는 생략했습니다. [KUKA 사양서](https://www.kuka.com/-/media/kuka-downloads/files/87f2706ce77c4318877932fb36f6002d/kuka_kmp1500_en.pdf?hash=90820FB7DA3F2999B45EFC28EF98A626&rev=c434eb6522c4445e8b65c5e1fdde221c) |
 | 로봇·툴 | 장착·체결 모두 고정식 Kawasaki RS080N(좌우 각 1대, 가반하중 80 kg)입니다. URDF·링크 메시는 [`map_fasten/assets/`](../map_fasten/assets/)(Kawasaki `khi_robot` `678dd3f`, 링크 질량 합 약 555 kg)를 씁니다. 장착 공구는 SCHUNK PHL-W 63-080-S(18.7 kg, [`wheel_mount_sim/params.py`](../wheel_mount_sim/params.py)), 체결 공구는 map_fasten의 컴팩트 5축 헤드(플랜지~소켓 끝 235 mm, [`map_fasten/README.md`](../map_fasten/README.md))이고, 설계 기준 사양은 QST50-150CT 5축([`HANDOVER.md`](HANDOVER.md))입니다. 라이브 물리의 로봇 모델은 아직 RS080N으로 옮기지 않았습니다. |
+
+### 차체 PhysX 설정 (라이브 셀)
+
+`cell.py`가 만드는 `/World/Live/CN7` 기준입니다. 키프레임 장면 `scene/wheel_cell.usda`에는 강체·충돌이 없고 라이브 실행에서만 붙습니다. 에셋 파일 `assets/vehicle/Hyundai_Avante_CN7_Body.usd`의 물리(외판 볼록 껍질)와는 다른 형상입니다.
+
+| 항목 | 값 | 위치·근거 |
+|---|---|---|
+| 강체 | 동적 강체 하나 (kinematic 아님), 1,196.6 kg | `cell.py`, `physical_data.BODY_MASS` |
+| 무게중심·관성 | 지정하지 않음 → PhysX가 충돌 형상에서 계산 (실차 값으로 교정 안 됨) | 실측 필요 |
+| 솔버 | 위치 반복 64, 속도 반복 8, 물리 240 Hz | `cell_config.py` `physics` |
+| 충돌 형상 | `Undertray` 상자 3.70 × 1.16 × 0.23 m (z 1.10, 바닥 판 대용), `Body` 상자 4.56 × 1.57 × 0.36 m (z 1.55), 사이드실·범퍼 모서리 블록(차체 메시를 0.1 m 간격으로 잘라 만든 높이 0.10 m 블록, 휠 아치 구간 제외) | `cell.py`, `vehicle.body_underside` |
+| 접촉 | contact offset 2 mm, rest offset 0. 충돌체는 보이지 않음 | `sim_util.collision` |
+| 재질 | 차체 충돌체에는 물리 재질 없음 → PhysX 기본 마찰. 차를 받치는 행거 패드 4개는 Rubber(0.82) | `cell.py` |
+| 접촉 보고 | 켜짐 (받침대·행거 간섭 기록) | `cell.py`, `vehicle.BufferRun.observe` |
+| 코너 4곳 | 너클 11 kg이 서스펜션 조인트로 차체에 연결: 상하 22 N/mm, 감쇠 1,800 N·s/m, 처짐 0~90 mm, 예압 6 mm(리바운드 스토퍼에 걸린 상태), 차축 방향 900 N/mm·±4 mm. 허브 6.5 kg은 베어링 조인트로 자유 회전(끌림 1.2 N·m, 반경 유격 0.03 mm) | `corner.py`, `cell_config.py` `suspension`·`hub` (모두 추정) |
+| 휠 | 림과 트레드 링이 별도 강체, 반경·횡·비틀림 스프링으로 연결. 컨베이어 집는 구역까지 물리로 이동하며, 로봇 제어가 없어 허브 장착은 아직 물리로 일어나지 않음 | `station.py` |
 
 타이어·현가계·베어링 값은 추정이며 `calibration.json`에 실측 방법과 함께 있습니다. 휠 너트의 현대차 공칭 체결 범위는 107–127 N·m입니다. 너트 체결(5축 멀티 너트러너로 휠당 1회에 5개 동시 런다운·최종 토크)·체결 토크 기록·출차·불량 배출 주문은 키프레임 시연에 포함되며, 나사산 축력이나 공구 반력은 물리 검증 범위 밖입니다.
 
