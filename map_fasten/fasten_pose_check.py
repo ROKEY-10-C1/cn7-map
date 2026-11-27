@@ -4,7 +4,7 @@ import argparse
 import json
 from enum import Enum
 import sys
-from math import cos, degrees, sin, tau
+from math import cos, degrees, isfinite, sin, tau
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
@@ -1311,7 +1311,7 @@ def validate_head(stage, flange):
 class ThreadContactView:
     """접촉 시험의 카메라와 표시만 관리하고, 물리 제어는 시험 루프에 맡긴다."""
 
-    def __init__(self, app, sim, ctx, stage, hub_frame, bodies):
+    def __init__(self, app, sim, ctx, stage, hub_frame, bodies, camera_state):
         import carb.settings
         import omni.timeline
         import omni.ui as ui
@@ -1329,6 +1329,7 @@ class ThreadContactView:
         self.show_colliders = False
         self.finished = False
         self.restart_requested = False
+        self.camera_state = camera_state
         # 확대 시 외피만 숨겨 실제 PhysX 콜라이더를 드러낸다.
         self.shells = [
             UsdGeom.Imageable(prim) for prim in bodies[0].GetChild("Geometry").GetChildren()
@@ -1358,7 +1359,28 @@ class ThreadContactView:
                 ui.Button("Hub view", clicked_fn=lambda: self.set_view(False))
                 ui.Button("Thread zoom", clicked_fn=lambda: self.set_view(True))
                 self.collider_button = ui.Button("Colliders: Off", clicked_fn=self.toggle_colliders)
-        self.set_view(False)
+        if self.camera_state:
+            for path, viewpoint in self.camera_state["cameras"].items():
+                UsdGeom.Camera.Define(stage, path).SetFromCamera(viewpoint)
+            self.viewport.camera_path = self.camera_state["active"]
+            self.zoomed = self.camera_state["zoomed"]
+            self.show_colliders = self.camera_state["colliders"]
+            self.update_colliders()
+        else:
+            self.set_view(False)
+
+    def remember_camera(self):
+        from pxr import UsdGeom
+
+        active = self.viewport.camera_path
+        paths = ("/World/ContactViews/Hub", "/World/ContactViews/Thread", active)
+        cameras = {}
+        for path in paths:
+            camera = UsdGeom.Camera.Get(self.stage, path)
+            if camera:
+                cameras[path] = camera.GetCamera()
+        self.camera_state.update(active=active, cameras=cameras,
+                                 zoomed=self.zoomed, colliders=self.show_colliders)
 
     def set_view(self, zoomed):
         from pxr import Sdf
@@ -1423,14 +1445,15 @@ class ThreadContactView:
         self.window.destroy()
 
 
-def check_thread_contact(app, gui=False, approach=False):
+def check_thread_contact(app, gui=False, approach=False, push_force_n=2., spin_torque_nm=.02):
+    camera_state = {}
     while True:
-        result = run_thread_contact(app, gui, approach)
+        result = run_thread_contact(app, gui, approach, push_force_n, spin_torque_nm, camera_state)
         if result is not None:
             return result
 
 
-def run_thread_contact(app, gui, approach):
+def run_thread_contact(app, gui, approach, push_force_n, spin_torque_nm, camera_state):
     """맞물린 스터드와 너트를 회전시켜 나사면 접촉만으로 생기는 전진량을 검사한다."""
     import omni.usd
     from isaacsim.core.api import SimulationContext
@@ -1464,7 +1487,7 @@ def run_thread_contact(app, gui, approach):
 
     bodies = []
     hinges = []
-    pushers = []
+    loads = []
     approach_offset = .012 if approach else 0.
     for i, root in enumerate(SPINDLES):
         stud = stage.GetPrimAtPath(f"{hub.GetPath()}/Stud_{i}")
@@ -1489,6 +1512,14 @@ def run_thread_contact(app, gui, approach):
         geometry = stage.DefinePrim(path+"/Geometry","Xform")
         geometry.GetReferences().AddInternalReference(f"{root}/Nut/Visual")
         UsdGeom.Xformable(geometry).ClearXformOpOrder()
+        if approach:
+            # 원뿔 시트와 만나는 단면을 유지하며 육각 외형의 축 방향 높이만 반으로 줄인다.
+            hex_mesh = UsdGeom.Mesh.Get(stage, path + "/Geometry/Hex")
+            points = hex_mesh.GetPointsAttr()
+            vertices = points.Get()
+            base_z = min(point[2] for point in vertices)
+            points.Set([Gf.Vec3f(x, y, base_z + .5 * (z - base_z)) for x, y, z in vertices])
+            hex_mesh.GetExtentAttr().Set(UsdGeom.PointBased.ComputeExtent(points.Get()))
         for part in Usd.PrimRange(geometry):
             if part.HasAPI(UsdPhysics.CollisionAPI):
                 collider(part,"convexHull")
@@ -1501,18 +1532,20 @@ def run_thread_contact(app, gui, approach):
             limit = UsdPhysics.LimitAPI.Apply(joint.GetPrim(),dof)
             limit.CreateLowAttr(1.)
             limit.CreateHighAttr(-1.)
-        drive = UsdPhysics.DriveAPI.Apply(joint.GetPrim(),"rotZ")
-        drive.CreateDampingAttr(.001)
-        drive.CreateMaxForceAttr(.12)
-        hinges.append(drive.CreateTargetVelocityAttr(0.))
         if approach:
-            # 로봇팔의 축 방향 밀기를 힘 제한 속도 드라이브로 모사한다.
-            # 위치 목표를 주지 않으므로 나사면에 걸리면 실제 이동은 느려지거나 멈춘다.
-            pusher = UsdPhysics.DriveAPI.Apply(joint.GetPrim(), "transZ")
-            pusher.CreateDampingAttr(1000.)
-            pusher.CreateMaxForceAttr(2.)
-            pusher.CreateTargetVelocityAttr(0.)
-            pushers.append(pusher)
+            # 월드 기준 스터드 축을 따라 힘과 토크를 직접 가한다. 속도 상한만 설정한다.
+            rigid = PhysxSchema.PhysxRigidBodyAPI.Apply(prim)
+            rigid.CreateMaxLinearVelocityAttr(.010)
+            rigid.CreateMaxAngularVelocityAttr(360.)
+            load = PhysxSchema.PhysxForceAPI.Apply(prim)
+            load.CreateModeAttr("force")
+            load.CreateWorldFrameEnabledAttr(True)
+            loads.append((load.CreateForceAttr(Gf.Vec3f(0)), load.CreateTorqueAttr(Gf.Vec3f(0))))
+        else:
+            drive = UsdPhysics.DriveAPI.Apply(joint.GetPrim(),"rotZ")
+            drive.CreateDampingAttr(.001)
+            drive.CreateMaxForceAttr(.12)
+            hinges.append(drive.CreateTargetVelocityAttr(0.))
         bodies.append(prim)
 
     stage.GetPrimAtPath("/World/Head").SetActive(False)
@@ -1539,7 +1572,7 @@ def run_thread_contact(app, gui, approach):
         directions = [m.TransformDir(Gf.Vec3d(1,0,0)) for m in local]
         return xyz@axis,np.array([np.arctan2(v[1],v[0]) for v in directions])
 
-    view = ThreadContactView(app, sim, ctx, stage, hub_frame, bodies) if gui else None
+    view = ThreadContactView(app, sim, ctx, stage, hub_frame, bodies, camera_state) if gui else None
 
     def step(frame):
         if view is None:
@@ -1554,8 +1587,14 @@ def run_thread_contact(app, gui, approach):
         for speed in hinges:
             speed.Set(-360.)
         if approach:
-            for pusher in pushers:
-                pusher.GetTargetVelocityAttr().Set(.003)
+            push = Gf.Vec3f(*(-axis * push_force_n).tolist())
+            torque = Gf.Vec3f(*(-axis * spin_torque_nm).tolist())
+            print(f"LOAD per nut: push_n={push_force_n:g} spin_nm={spin_torque_nm:g}", flush=True)
+            if view is not None:
+                view.status.text = f"너트당 추력 {push_force_n:g} N · 회전 토크 {spin_torque_nm:g} N·m"
+            for force_attr, torque_attr in loads:
+                force_attr.Set(push)
+                torque_attr.Set(torque)
             initial, _ = measure()
             for frame in range(480 * 12):
                 step(frame)
@@ -1565,6 +1604,8 @@ def run_thread_contact(app, gui, approach):
                         break
             advance_mm = (initial - reached) * 1000
             print(f"PUSH advance_mm={advance_mm}", flush=True)
+            for force_attr, _ in loads:
+                force_attr.Set(Gf.Vec3f(0))
             if not np.all(advance_mm >= approach_offset * 1000):
                 print("FAIL push: one or more nuts did not reach the engagement depth", flush=True)
                 if view is not None:
@@ -1573,10 +1614,8 @@ def run_thread_contact(app, gui, approach):
                         reset_thread_contact(sim, view, ctx)
                         return None
                 return False
-            # 이후 전진은 나사면 접촉으로만 일어나야 한다.
-            for pusher in pushers:
-                pusher.GetDampingAttr().Set(0.)
-                pusher.GetMaxForceAttr().Set(0.)
+            # 축힘을 끈 뒤 회전 토크만 유지해 나사 피치와 실제 전진량을 비교한다.
+            print("LOAD axial push off; spin torque retained", flush=True)
             start, last = measure()
         turns = np.zeros(5)
         for frame in range(480*12):
@@ -1604,6 +1643,10 @@ def run_thread_contact(app, gui, approach):
         print("Contact test interrupted", flush=True)
         return False
     finally:
+        for force_attr, torque_attr in loads:
+            if force_attr and torque_attr:
+                force_attr.Set(Gf.Vec3f(0))
+                torque_attr.Set(Gf.Vec3f(0))
         if view is not None:
             view.close()
 
@@ -1611,6 +1654,7 @@ def run_thread_contact(app, gui, approach):
 def reset_thread_contact(sim, view, ctx):
     from isaacsim.core.api import SimulationContext
 
+    view.remember_camera()
     sim.stop()
     view.timeline.commit()
     SimulationContext.clear_instance()
@@ -1626,6 +1670,8 @@ def main():
     parser.add_argument("--gui", action="store_true", help="나사면 접촉 시험을 GUI에서 관찰")
     parser.add_argument("--physical-threads", action="store_true", help="전체 공정에서 나사산 접촉으로 체결 검증")
     parser.add_argument("--push-to-engage", action="store_true", help="간격을 두고 축 방향으로 밀어 물림을 시험")
+    parser.add_argument("--push-force-n", type=float, help="초기 물림 시험의 너트당 축 방향 힘 (기본 2 N)")
+    parser.add_argument("--spin-torque-nm", type=float, help="초기 물림 시험의 너트당 회전 토크 (기본 0.02 N·m)")
     parser.add_argument("--headless", action="store_true", help="Check motion and exit")
     parser.add_argument("--captures", type=Path, help="Save loaded and seated close-ups")
     modes = parser.add_mutually_exclusive_group()
@@ -1639,6 +1685,9 @@ def main():
         parser.error("--gui requires --check-thread-contact and cannot be used with --headless")
     if args.push_to_engage and not args.check_thread_contact:
         parser.error("--push-to-engage requires --check-thread-contact")
+    for value in (args.push_force_n, args.spin_torque_nm):
+        if value is not None and (not args.push_to_engage or not isfinite(value) or value <= 0.):
+            parser.error("Force and torque must be positive, finite values and require --push-to-engage")
     if args.physical_threads and (args.check_thread_contact or args.build_head or args.build_robot):
         parser.error("--physical-threads runs the full robot cycle")
     headless = args.headless or args.build_robot is not None or args.build_head or (
@@ -1654,7 +1703,11 @@ def main():
             build_head()
             return 0
         if args.check_thread_contact:
-            return 0 if check_thread_contact(app, gui=args.gui, approach=args.push_to_engage) else 1
+            return 0 if check_thread_contact(
+                app, gui=args.gui, approach=args.push_to_engage,
+                push_force_n=args.push_force_n if args.push_force_n is not None else 2.,
+                spin_torque_nm=args.spin_torque_nm if args.spin_torque_nm is not None else .02,
+            ) else 1
         return run(app, args.headless, args.captures, json_log=args.json_log, wheel_order=args.wheel_order,
                    physical_threads=args.physical_threads)
     finally:

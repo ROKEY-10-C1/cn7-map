@@ -19,11 +19,17 @@
 # 나사면 확대 관찰
 ~/isaacsim/python.sh -B map_fasten/fasten_pose_check.py --check-thread-contact --gui
 
+# 분리 상태의 너트에 축 방향 힘과 회전 토크를 직접 가한다.
+~/isaacsim/python.sh -B map_fasten/fasten_pose_check.py \
+  --check-thread-contact --push-to-engage --gui --push-force-n 2 --spin-torque-nm 0.02
+
 # 전체 로봇 시퀀스의 좌전륜 나사산 접촉 실험
 ~/isaacsim/python.sh -B map_fasten/fasten_pose_check.py --physical-threads --wheel-order FL
 ```
 
 **CN7 Fastening** 창에서 **Pause**로 멈추고, **Play**로 이어간다. **Restart**는 너트 5개가 소켓에 장착된 초기 상태로 돌아가 다시 실행한다. 기본 타임라인의 **Stop → Play**도 사용할 수 있다.
+
+`--push-to-engage`는 너트마다 스터드 방향 힘과 조이는 방향 토크를 적용한다. 기본값은 2 N과 0.02 N·m이며, 최대 선속도 10 mm/s와 최대 회전 속도 60 rpm을 둔다. 너트 5개가 목표 진입 깊이에 도달하면 축힘을 끄고, 회전 토크만 유지하면서 실제 전진량을 나사 피치와 비교한다. 이 값은 분리 상태 접촉 시험대 조건이다.
 
 ## 체결 로봇 내부 STEP
 
