@@ -56,5 +56,5 @@
 | hub_pin_contact_offset | 0.0008 | m | model | cell value on the hub studs (validated insertion bench) |
 | hub_face_contact_offset | 0.0002 | m | derived | ~5 x travel per step at 10 mm/s; 0.8 mm brought hundreds of pad triangles into contact at once and the seat blew up (dbg40) |
 | stud_contact_offset | 0.0003 | m | derived | > 3 x travel per step at 20 mm/s (0.083 mm) and stud+pad offsets (0.345 mm) < stud-hole clearance 0.7 mm; 0.8 mm created false axial contacts at the hole edges (sim dbg27) |
-| pilot_contact_offset | 2e-05 | m | derived | pilot+pad offsets (0.065 mm) < polygon bore-pilot clearance (0.072 mm): no contact until the pilot really touches; 0.8 mm (cell value) made the lead-in rim kick the wheel at the chamfer edge (dbg39) |
+| pilot_contact_offset | 0.0002 | m | derived | must catch the bore wall when the hanging wheel tilts on release (0.87 deg x 12 mm = 0.18 mm per few steps): 0.02 mm tunnelled (dbg47). Safe now that the pilot is a polygon prism: the false edge contacts at 0.8 mm came from the native cylinder (dbg39/45) |
 | pad_contact_offset | 4.5e-05 | m | model | cell value on the wheel pad: below the 0.08 mm pilot clearance |

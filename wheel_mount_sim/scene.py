@@ -179,9 +179,11 @@ def corner(stage, M, V, rng):
     # pilot and studs as in the validated cell: native cylinders with convex lead-in cones, 0.8 mm contact offset
     r_out, L = P.PILOT/2, P.PILOT_LEN
     po = P.PILOT_CONTACT_OFFSET
-    cylinder(stage, hp+"/Pilot", (0, 0), P.OFFSET, P.OFFSET+L-.0015, r_out, phys=M["steel"], vis=V["steel"], offset=po)
-    prism(stage, hp+"/PilotTip", [(x, y, P.OFFSET+L-.0015) for x, y in circle(0, 0, r_out, 48)],
-          [(x, y, P.OFFSET+L) for x, y in circle(0, 0, r_out-.001, 48)], phys=M["steel"], vis=V["steel"], offset=po)
+    # 144-gon prism (inscribed, 33.462 mm): the native cylinder kicked the wheel against the pad triangles (dbg45)
+    extrude(stage, hp+"/Pilot", circle(0, 0, r_out, 144), P.OFFSET, P.OFFSET+L-.0015, phys=M["steel"], vis=V["steel"],
+            offset=po)
+    prism(stage, hp+"/PilotTip", [(x, y, P.OFFSET+L-.0015) for x, y in circle(0, 0, r_out, 144)],
+          [(x, y, P.OFFSET+L) for x, y in circle(0, 0, r_out-.001, 144)], phys=M["steel"], vis=V["steel"], offset=po)
     for i in range(5):
         a = i*tau/5
         cx, cy = P.PCD/2*cos(a), P.PCD/2*sin(a)

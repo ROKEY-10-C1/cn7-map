@@ -115,9 +115,10 @@ FACE_CONTACT_OFFSET = p("hub_face_contact_offset", .0002, "m", "derived",
 STUD_CONTACT_OFFSET = p("stud_contact_offset", .0003, "m", "derived",
                         "> 3 x travel per step at 20 mm/s (0.083 mm) and stud+pad offsets (0.345 mm) < stud-hole clearance 0.7 mm; "
                         "0.8 mm created false axial contacts at the hole edges (sim dbg27)")
-PILOT_CONTACT_OFFSET = p("pilot_contact_offset", .00002, "m", "derived",
-                         "pilot+pad offsets (0.065 mm) < polygon bore-pilot clearance (0.072 mm): no contact until the pilot "
-                         "really touches; 0.8 mm (cell value) made the lead-in rim kick the wheel at the chamfer edge (dbg39)")
+PILOT_CONTACT_OFFSET = p("pilot_contact_offset", .0002, "m", "derived",
+                         "must catch the bore wall when the hanging wheel tilts on release (0.87 deg x 12 mm = 0.18 mm per "
+                         "few steps): 0.02 mm tunnelled (dbg47). Safe now that the pilot is a polygon prism: the false "
+                         "edge contacts at 0.8 mm came from the native cylinder (dbg39/45)")
 PAD_CONTACT_OFFSET = p("pad_contact_offset", .000045, "m", "model", "cell value on the wheel pad: below the 0.08 mm pilot clearance")
 
 
@@ -139,3 +140,9 @@ PRESS_FORCE = p("press_force_setpoint", 145., "N", "model", "cell press force li
 LATERAL_COMPLIANCE = p("lateral_compliance", 25e3, "N/m", "catalogue",
                        "SCHUNK AGE-F 080 XY compensation spring rate 25 N/mm (+-5 mm); emulated by force control "
                        "because the gripper+wheel (~40 kg) exceeds the unit's 32 kg rating")
+SEAT_FORCE_RATIO = p("seat_force_ratio", .9, "-", "estimate", "seated when the axial force holds >= 90 % of the set point ...")
+SEAT_STILL = p("seat_still", (.3, .00002), "s, m", "estimate", "... and the wheel moves < 0.02 mm in 0.3 s (force-displacement window)")
+RELEASE_FORCE = p("release_hold_force", 20., "N", "estimate", "press force is ramped down to this before the jaws open")
+MOUNTED = p("mounted_criteria", (.002, 2.), "m, deg", "derived",
+            "after release the wheel hangs on pilot + studs: gap < 2 mm keeps the pilot (12 mm) engaged, lean < 2 deg; "
+            "the fastening robot's nuts then draw it flat (11/26 release test: 1.45 deg lean)")

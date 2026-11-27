@@ -26,12 +26,15 @@ RECORDS = [
     dict(key="D_transfer_path", title="D. 허브까지 이동 경로", cam="wide", window=(11.0, 15.5),
          before=("joint_transfer", "관절 공간 한 번에 이동: 휠하우스 쪽을 지나며 바퀴 27° 비틀림"),
          after=("nominal", "허브 축 바깥 경유점 → 축 따라 직선 진입: 충돌 0")),
-    dict(key="E_vision_align", title="E. 허브 앞 비전 정렬", cam="hub", window=(16.5, 20.5),
-         before=("novision", "보정 없음: 구멍-스터드 어긋남 0.35~0.48 mm"),
-         after=("nominal", "비전 보정 2회: 0.03 mm, 기울기 0.009°, 위상 0.0°")),
-    dict(key="F_insertion", title="F. 삽입: 위치 제어 vs 힘 제어", cam="hub", window=(23.5, 29.0),
-         before=("position_insert", "위치 제어: 간격 9.6 mm에서 3.5° 기울어 걸림"),
-         after=("nominal", "힘 제어(F/T 145 N): 안착 판정 도달, 직후 기울기 6° — 진행 중")),
+    dict(key="E_vision_align", title="E. 허브 앞 비전 정렬", cam="hub", window=(16.5, 27.0),
+         before=("novision", "보정 없음: 구멍 0.35~0.48 mm 어긋남, 삽입 중 접촉력 최대 519 N"),
+         after=("nominal", "비전 보정: 0.03 mm, 삽입 중 접촉력 최대 146 N")),
+    dict(key="F_insertion", title="F. 삽입·놓기: 위치 제어 vs 힘 제어", cam="hub", window=(26.5, 34.0),
+         before=("position_insert", "위치 제어로 1 mm 더 밀고 놓음: 바퀴 튕겨 이탈(간격 21.7 mm, 18.8°)"),
+         after=("nominal", "F/T 힘 제어 145 N → 안착 0.32 mm → 18 N으로 빼고 놓음: 장착 유지")),
+    dict(key="G_mounted", title="G. 최종: 집기부터 장착까지", cam="wide", window=(5.0, 35.5),
+         before=("position_insert", "(비교) 위치 제어: 놓는 순간 이탈"),
+         after=("nominal", "장착 성공: 간격 1.4 mm, 기울기 1.1° (체결 전 걸림 상태)")),
 ]
 
 
@@ -74,11 +77,13 @@ def strip(rec):
 
 def gif(rec, which):
     name, text = rec[which]
-    fr = frames(name, rec["cam"], rec["window"])
+    long = rec["window"][1]-rec["window"][0] > 10
+    fr = frames(name, rec["cam"], rec["window"], step=3 if long else 1)
     if not fr:
         return
-    fr = [label(im.resize((400, 225)), text[:34], (255, 110, 90) if which == "before" else (120, 230, 140)) for im in fr]
-    fr[0].save(DST/f"{rec['key']}_{which}.gif", save_all=True, append_images=fr[1:], duration=int(1000/GIF_FPS), loop=0,
+    fr = [label(im.resize((320, 180) if long else (400, 225)), text[:34], (255, 110, 90) if which == "before" else (120, 230, 140)) for im in fr]
+    fr[0].save(DST/f"{rec['key']}_{which}.gif", save_all=True, append_images=fr[1:],
+               duration=int(1000/GIF_FPS)*(3 if long else 1), loop=0,
                optimize=True)
 
 

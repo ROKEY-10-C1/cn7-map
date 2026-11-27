@@ -110,14 +110,15 @@ def on_contact(headers, data):
         imp = np.zeros(3)
         for i in range(h.contact_data_offset, h.contact_data_offset+h.num_contact_data):
             imp += np.array([data[i].impulse[0], data[i].impulse[1], data[i].impulse[2]])
-        if DEBUG and phase[0] == "insert" and "Hub" in a0+a1 and h.num_contact_data:
+        if DEBUG and phase[0] == "insert" and ("/World/Wheel" in a0+a1 or "/World/Tire" in a0+a1) and h.num_contact_data:
             tot = sum(np.linalg.norm([data[i].impulse[0], data[i].impulse[1], data[i].impulse[2]])
                       for i in range(h.contact_data_offset, h.contact_data_offset+h.num_contact_data))/DT
-            if tot > 30:
+            if tot > 30 and not ("Jaw" in a0+a1 and "Tire" in a0+a1):
                 d = data[h.contact_data_offset]
                 Rh_, oh_ = pose("/World/Car/Hub")
                 pl = Rh_.T@(np.array([d.position[0], d.position[1], d.position[2]])-oh_)
-                print("BIG", round(t_sim[0], 4), c0.split("/")[-1], c1.split("/")[-1], round(tot, 1), "p_hub_mm", np.round(pl*1000, 2), flush=True)
+                print("BIG", round(t_sim[0], 4), a0.split("/")[-1], c0.split("/")[-1], a1.split("/")[-1], c1.split("/")[-1],
+                      round(tot, 1), "p_hub_mm", np.round(pl*1000, 2), flush=True)
         if False:
             d = data[h.contact_data_offset]
             Rh_, oh_ = pose("/World/Car/Hub")
@@ -340,8 +341,9 @@ def move_line(R_G, o0, o1, speed, stop=None):
 
 
 def force_insert(R_G, o_start, axis, v=.010, t_max=15.):
-    """Admittance insertion: advance along -axis at v while the filtered axial force is under the set point,
-    lateral compliance K (F/T sensor at the flange in the real cell; contact force here)."""
+    """Admittance insertion with the flange F/T sensor: advance along -axis while the filtered axial force is under
+    the set point (145 N), lateral compliance 25 N/mm. Seated when the force holds >= 90 % of the set point and the
+    wheel stops (< 0.02 mm in 0.3 s). Then the press force is ramped down before the jaws open."""
     K, Fset = P.LATERAL_COMPLIANCE, P.PRESS_FORCE
     s, lat = 0., np.zeros(3)
     Ff = np.zeros(3)
@@ -353,20 +355,23 @@ def force_insert(R_G, o_start, axis, v=.010, t_max=15.):
         w6 = robot.get_measured_joint_forces()[ti]
         Rt, _ = pose("/World/Tool")
         return Rt@np.asarray(w6[:3], float)
-    tare = np.mean([ft_world() for _ in range(1)], axis=0)
-    print("FT bodies", bodies, "tool index", ti, "tare", np.round(tare, 1), flush=True)
+    tare = ft_world()
     q_prev = q_cmd[ARM].copy()
     sub_n = int(1/60/DT)
-    for _ in range(int(t_max*60)):
+    gaps, seated, f_ax = [], False, 0.
+    still_n = int(P.SEAT_STILL[0]*60)
+
+    def cycle(setpoint):
+        nonlocal s, lat, Ff, q_prev, f_ax
         F = -(ft_world()-tare)                            # contact force acting on the wheel (+axis = outboard)
-        Ff = Ff+(F-Ff)*.15                                   # ~100 ms low-pass at 60 Hz (force-control bandwidth)
+        Ff = Ff+(F-Ff)*.15                                # ~100 ms low-pass at 60 Hz (force-control bandwidth)
         f_ax = float(Ff@axis)
         f_lat = Ff-f_ax*axis
         n_lat = np.linalg.norm(f_lat)
         f_lat = f_lat*max(n_lat-10., 0.)/n_lat if n_lat > 1e-9 else f_lat   # 10 N dead band
-        s += v/60*float(np.clip(1-f_ax/Fset, -.5, 1.))
+        s += v/60*float(np.clip(1-f_ax/setpoint, -.5, 1.))
         goal = np.clip(f_lat/K, -.005, .005)
-        lat = lat+np.clip(goal-lat, -.0005/60, .0005/60)       # lateral correction rate <= 0.5 mm/s
+        lat = lat+np.clip(goal-lat, -.0005/60, .0005/60)  # lateral correction rate <= 0.5 mm/s
         o = o_start-axis*s+lat
         q_next = solve(R_G, o, q_prev)
         for j in range(1, sub_n+1):
@@ -374,10 +379,21 @@ def force_insert(R_G, o_start, axis, v=.010, t_max=15.):
             command()
             step()
         q_prev = q_next
-        if seat()[0][2] < .0002:
+        return o
+
+    for _ in range(int(t_max*60)):
+        o = cycle(Fset)
+        gaps.append(seat()[0][2])
+        if (f_ax >= P.SEAT_FORCE_RATIO*Fset and len(gaps) > still_n
+                and max(gaps[-still_n:])-min(gaps[-still_n:]) < P.SEAT_STILL[1]):
+            seated = True
             break
-    event("force_insert_end", travel_mm=round(s*1000, 2), lateral_mm=[round(float(v)*1000, 3) for v in lat],
+    event("force_insert_end", seated=seated, travel_mm=round(s*1000, 2), lateral_mm=[round(float(v)*1000, 3) for v in lat],
           f_axial_N=round(f_ax, 1))
+    if seated:
+        for _ in range(int(.6*60)):                       # ramp the press force down before opening the jaws
+            o = cycle(P.RELEASE_FORCE)
+        event("press_relieved", f_axial_N=round(f_ax, 1))
     return o
 
 
@@ -538,7 +554,8 @@ try:
     phase[0] = "observe"
     wait(2.0)
     rel, tilt = seat()
-    result = "seated" if rel[2] < .0005 and tilt < .5 else "not_seated"
+    gap_ok, tilt_ok = rel[2] < P.MOUNTED[0], tilt < P.MOUNTED[1]
+    result = "mounted" if gap_ok and tilt_ok and np.hypot(rel[0], rel[1]) < .002 else "not_mounted"
     event("final", result=result, radial_mm=round(float(np.hypot(rel[0], rel[1]))*1000, 3))
 except StopRun as exc:
     result = f"stopped after {exc}"

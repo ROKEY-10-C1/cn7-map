@@ -1,4 +1,311 @@
 {
+ "novision": {
+  "result": "mounted",
+  "events": [
+   {
+    "t": 1.0,
+    "event": "settled",
+    "gap_mm": 1700.0,
+    "tilt_deg": 90.0,
+    "phase_err_deg": 35.149,
+    "wheel_height_mm": 101.52
+   },
+   {
+    "t": 1.0,
+    "event": "measured",
+    "gap_mm": 1700.0,
+    "tilt_deg": 90.0,
+    "phase_err_deg": 35.149,
+    "wheel_spin_deg": -17.823,
+    "hub_deg": 36.812,
+    "grip_yaw_deg": 71.188
+   },
+   {
+    "t": 6.679,
+    "event": "descended",
+    "gap_mm": 1700.0,
+    "tilt_deg": 90.0,
+    "phase_err_deg": 35.149,
+    "wheel_in_G_mm": [
+     0.0,
+     0.0,
+     -0.8
+    ],
+    "link6_vs_fk_mm": 0.82,
+    "tool_vs_link6_mm": 0.0,
+    "link6_z_world": [
+     -0.0,
+     -0.0,
+     -1.0
+    ]
+   },
+   {
+    "t": 8.367,
+    "event": "gripped",
+    "gap_mm": 1700.152,
+    "tilt_deg": 90.012,
+    "phase_err_deg": 35.144,
+    "jaw_mm": [
+     0.25,
+     -0.25
+    ],
+    "jaw_force_N": [
+     "-1767.8",
+     "2862.2"
+    ]
+   },
+   {
+    "t": 11.167,
+    "event": "lifted",
+    "gap_mm": 1700.188,
+    "tilt_deg": 90.014,
+    "phase_err_deg": 35.142,
+    "slip_mm": 0.003
+   },
+   {
+    "t": 17.121,
+    "event": "at_hub",
+    "gap_mm": 122.51,
+    "tilt_deg": 0.038,
+    "phase_err_deg": -0.07
+   },
+   {
+    "t": 17.621,
+    "event": "hole_check",
+    "gap_mm": 121.353,
+    "tilt_deg": 0.038,
+    "phase_err_deg": -0.07,
+    "hole_to_stud_mm": [
+     0.367,
+     0.351,
+     0.429,
+     0.482,
+     0.449
+    ],
+    "stud_r_mm": [
+     57.15,
+     57.15,
+     57.15,
+     57.15,
+     57.15
+    ],
+    "hole_r_mm": [
+     56.86,
+     57.34,
+     57.56,
+     57.22,
+     56.78
+    ]
+   },
+   {
+    "t": 26.237,
+    "event": "force_insert_end",
+    "gap_mm": 0.321,
+    "tilt_deg": 0.001,
+    "phase_err_deg": 0.101,
+    "seated": true,
+    "travel_mm": 35.72,
+    "lateral_mm": [
+     0.124,
+     0.0,
+     -0.182
+    ],
+    "f_axial_N": 130.8
+   },
+   {
+    "t": 26.837,
+    "event": "press_relieved",
+    "gap_mm": 0.34,
+    "tilt_deg": 0.04,
+    "phase_err_deg": 0.161,
+    "f_axial_N": 12.5
+   },
+   {
+    "t": 27.137,
+    "event": "inserted",
+    "gap_mm": 0.337,
+    "tilt_deg": 0.04,
+    "phase_err_deg": 0.197,
+    "stop_mm_from_seat": -1.19
+   },
+   {
+    "t": 34.158,
+    "event": "final",
+    "gap_mm": 1.453,
+    "tilt_deg": 1.184,
+    "phase_err_deg": 0.104,
+    "result": "mounted",
+    "radial_mm": 1.051
+   }
+  ],
+  "peak_forces_N": {
+   "shoe": [
+    1414.7,
+    "close"
+   ],
+   "hub": [
+    3213.7,
+    "insert"
+   ]
+  }
+ },
+ "position_insert": {
+  "result": "not_mounted",
+  "events": [
+   {
+    "t": 1.0,
+    "event": "settled",
+    "gap_mm": 1700.0,
+    "tilt_deg": 90.0,
+    "phase_err_deg": 35.149,
+    "wheel_height_mm": 101.52
+   },
+   {
+    "t": 1.0,
+    "event": "measured",
+    "gap_mm": 1700.0,
+    "tilt_deg": 90.0,
+    "phase_err_deg": 35.149,
+    "wheel_spin_deg": -17.823,
+    "hub_deg": 36.812,
+    "grip_yaw_deg": 71.188
+   },
+   {
+    "t": 6.679,
+    "event": "descended",
+    "gap_mm": 1700.0,
+    "tilt_deg": 90.0,
+    "phase_err_deg": 35.149,
+    "wheel_in_G_mm": [
+     0.0,
+     0.0,
+     -0.8
+    ],
+    "link6_vs_fk_mm": 0.82,
+    "tool_vs_link6_mm": 0.0,
+    "link6_z_world": [
+     -0.0,
+     -0.0,
+     -1.0
+    ]
+   },
+   {
+    "t": 8.367,
+    "event": "gripped",
+    "gap_mm": 1700.152,
+    "tilt_deg": 90.012,
+    "phase_err_deg": 35.144,
+    "jaw_mm": [
+     0.25,
+     -0.25
+    ],
+    "jaw_force_N": [
+     "-1767.8",
+     "2862.2"
+    ]
+   },
+   {
+    "t": 11.167,
+    "event": "lifted",
+    "gap_mm": 1700.188,
+    "tilt_deg": 90.014,
+    "phase_err_deg": 35.142,
+    "slip_mm": 0.003
+   },
+   {
+    "t": 17.121,
+    "event": "at_hub",
+    "gap_mm": 122.51,
+    "tilt_deg": 0.038,
+    "phase_err_deg": -0.07
+   },
+   {
+    "t": 18.771,
+    "event": "aligned_0",
+    "gap_mm": 119.943,
+    "tilt_deg": 0.001,
+    "phase_err_deg": -0.0,
+    "wheel_in_G_mm": [
+     -0.1,
+     0.4,
+     1.4
+    ],
+    "radial_mm": 0.05
+   },
+   {
+    "t": 19.921,
+    "event": "aligned_1",
+    "gap_mm": 120.037,
+    "tilt_deg": 0.009,
+    "phase_err_deg": 0.0,
+    "wheel_in_G_mm": [
+     -0.0,
+     0.4,
+     1.3
+    ],
+    "radial_mm": 0.029
+   },
+   {
+    "t": 19.921,
+    "event": "hole_check",
+    "gap_mm": 120.037,
+    "tilt_deg": 0.009,
+    "phase_err_deg": 0.0,
+    "hole_to_stud_mm": [
+     0.03,
+     0.03,
+     0.029,
+     0.029,
+     0.03
+    ],
+    "stud_r_mm": [
+     57.15,
+     57.15,
+     57.15,
+     57.15,
+     57.15
+    ],
+    "hole_r_mm": [
+     57.15,
+     57.18,
+     57.17,
+     57.13,
+     57.12
+    ]
+   },
+   {
+    "t": 31.187,
+    "event": "inserted",
+    "gap_mm": 0.321,
+    "tilt_deg": 0.001,
+    "phase_err_deg": -0.025,
+    "stop_mm_from_seat": -1.0
+   },
+   {
+    "t": 38.208,
+    "event": "final",
+    "gap_mm": 21.693,
+    "tilt_deg": 18.792,
+    "phase_err_deg": 1.985,
+    "result": "not_mounted",
+    "radial_mm": 9.958
+   }
+  ],
+  "peak_forces_N": {
+   "shoe": [
+    2848.9,
+    "release"
+   ],
+   "hub": [
+    4964217.0,
+    "release"
+   ],
+   "caliper": [
+    66460.4,
+    "release"
+   ]
+  }
+ },
  "shoe45": {
   "result": "stopped after lifted",
   "events": [
@@ -161,216 +468,6 @@
    ]
   }
  },
- "joint_transfer": {
-  "result": "stopped after at_hub",
-  "events": [
-   {
-    "t": 1.0,
-    "event": "settled",
-    "gap_mm": 1700.0,
-    "tilt_deg": 90.0,
-    "phase_err_deg": 35.149,
-    "wheel_height_mm": 101.52
-   },
-   {
-    "t": 1.0,
-    "event": "measured",
-    "gap_mm": 1700.0,
-    "tilt_deg": 90.0,
-    "phase_err_deg": 35.149,
-    "wheel_spin_deg": -17.823,
-    "hub_deg": 36.812,
-    "grip_yaw_deg": 71.188
-   },
-   {
-    "t": 6.679,
-    "event": "descended",
-    "gap_mm": 1700.0,
-    "tilt_deg": 90.0,
-    "phase_err_deg": 35.149,
-    "wheel_in_G_mm": [
-     0.0,
-     0.0,
-     -0.8
-    ],
-    "link6_vs_fk_mm": 0.82,
-    "tool_vs_link6_mm": 0.0,
-    "link6_z_world": [
-     -0.0,
-     -0.0,
-     -1.0
-    ]
-   },
-   {
-    "t": 8.367,
-    "event": "gripped",
-    "gap_mm": 1700.152,
-    "tilt_deg": 90.012,
-    "phase_err_deg": 35.144,
-    "jaw_mm": [
-     0.25,
-     -0.25
-    ],
-    "jaw_force_N": [
-     "-1767.8",
-     "2862.2"
-    ]
-   },
-   {
-    "t": 11.167,
-    "event": "lifted",
-    "gap_mm": 1700.188,
-    "tilt_deg": 90.014,
-    "phase_err_deg": 35.142,
-    "slip_mm": 0.003
-   },
-   {
-    "t": 14.854,
-    "event": "at_hub",
-    "gap_mm": 343.07,
-    "tilt_deg": 27.083,
-    "phase_err_deg": -1.832
-   }
-  ],
-  "peak_forces_N": {
-   "shoe": [
-    9188.2,
-    "transfer"
-   ]
-  }
- },
- "novision": {
-  "result": "stopped after inserted",
-  "events": [
-   {
-    "t": 1.0,
-    "event": "settled",
-    "gap_mm": 1700.0,
-    "tilt_deg": 90.0,
-    "phase_err_deg": 35.149,
-    "wheel_height_mm": 101.52
-   },
-   {
-    "t": 1.0,
-    "event": "measured",
-    "gap_mm": 1700.0,
-    "tilt_deg": 90.0,
-    "phase_err_deg": 35.149,
-    "wheel_spin_deg": -17.823,
-    "hub_deg": 36.812,
-    "grip_yaw_deg": 71.188
-   },
-   {
-    "t": 6.679,
-    "event": "descended",
-    "gap_mm": 1700.0,
-    "tilt_deg": 90.0,
-    "phase_err_deg": 35.149,
-    "wheel_in_G_mm": [
-     0.0,
-     0.0,
-     -0.8
-    ],
-    "link6_vs_fk_mm": 0.82,
-    "tool_vs_link6_mm": 0.0,
-    "link6_z_world": [
-     -0.0,
-     -0.0,
-     -1.0
-    ]
-   },
-   {
-    "t": 8.367,
-    "event": "gripped",
-    "gap_mm": 1700.152,
-    "tilt_deg": 90.012,
-    "phase_err_deg": 35.144,
-    "jaw_mm": [
-     0.25,
-     -0.25
-    ],
-    "jaw_force_N": [
-     "-1767.8",
-     "2862.2"
-    ]
-   },
-   {
-    "t": 11.167,
-    "event": "lifted",
-    "gap_mm": 1700.188,
-    "tilt_deg": 90.014,
-    "phase_err_deg": 35.142,
-    "slip_mm": 0.003
-   },
-   {
-    "t": 17.121,
-    "event": "at_hub",
-    "gap_mm": 122.51,
-    "tilt_deg": 0.038,
-    "phase_err_deg": -0.07
-   },
-   {
-    "t": 17.621,
-    "event": "hole_check",
-    "gap_mm": 121.353,
-    "tilt_deg": 0.038,
-    "phase_err_deg": -0.07,
-    "hole_to_stud_mm": [
-     0.367,
-     0.351,
-     0.429,
-     0.482,
-     0.449
-    ],
-    "stud_r_mm": [
-     57.15,
-     57.15,
-     57.15,
-     57.15,
-     57.15
-    ],
-    "hole_r_mm": [
-     56.86,
-     57.34,
-     57.56,
-     57.22,
-     56.78
-    ]
-   },
-   {
-    "t": 35.921,
-    "event": "force_insert_end",
-    "gap_mm": -0.706,
-    "tilt_deg": 4.918,
-    "phase_err_deg": -0.013,
-    "travel_mm": 32.65,
-    "lateral_mm": [
-     0.135,
-     0.0,
-     -0.817
-    ],
-    "f_axial_N": 8.9
-   },
-   {
-    "t": 36.221,
-    "event": "inserted",
-    "gap_mm": 0.603,
-    "tilt_deg": 0.942,
-    "phase_err_deg": 0.067,
-    "stop_mm_from_seat": -0.65
-   }
-  ],
-  "peak_forces_N": {
-   "shoe": [
-    1414.7,
-    "close"
-   ],
-   "hub": [
-    3498140.4,
-    "insert"
-   ]
-  }
- },
  "shoe20": {
   "result": "error: IK failed at [2.00559297 0.40459369 2.0028273 ] (align)",
   "events": [
@@ -450,7 +547,7 @@
   }
  },
  "nominal": {
-  "result": "not_seated",
+  "result": "mounted",
   "events": [
    {
     "t": 1.0,
@@ -574,35 +671,44 @@
     ]
    },
    {
-    "t": 27.687,
+    "t": 27.971,
     "event": "force_insert_end",
-    "gap_mm": -0.243,
-    "tilt_deg": 5.953,
-    "phase_err_deg": 0.156,
-    "travel_mm": 32.03,
+    "gap_mm": 0.321,
+    "tilt_deg": 0.001,
+    "phase_err_deg": -0.013,
+    "seated": true,
+    "travel_mm": 34.15,
     "lateral_mm": [
-     -0.017,
      0.0,
-     -0.017
+     0.0,
+     -0.038
     ],
-    "f_axial_N": 17.8
+    "f_axial_N": 130.6
    },
    {
-    "t": 27.987,
+    "t": 28.571,
+    "event": "press_relieved",
+    "gap_mm": 0.554,
+    "tilt_deg": 0.01,
+    "phase_err_deg": -0.014,
+    "f_axial_N": 17.6
+   },
+   {
+    "t": 28.871,
     "event": "inserted",
-    "gap_mm": 1.319,
-    "tilt_deg": 1.006,
-    "phase_err_deg": 0.095,
-    "stop_mm_from_seat": -0.03
+    "gap_mm": 0.561,
+    "tilt_deg": 0.009,
+    "phase_err_deg": -0.015,
+    "stop_mm_from_seat": 0.52
    },
    {
-    "t": 35.008,
+    "t": 35.892,
     "event": "final",
-    "gap_mm": 2.829,
-    "tilt_deg": 1.958,
-    "phase_err_deg": -0.08,
-    "result": "not_seated",
-    "radial_mm": 1.685
+    "gap_mm": 1.378,
+    "tilt_deg": 1.138,
+    "phase_err_deg": -0.016,
+    "result": "mounted",
+    "radial_mm": 1.014
    }
   ],
   "peak_forces_N": {
@@ -611,13 +717,13 @@
     "close"
    ],
    "hub": [
-    4678930.4,
-    "insert"
+    531.0,
+    "release"
    ]
   }
  },
- "position_insert": {
-  "result": "not_seated",
+ "joint_transfer": {
+  "result": "stopped after at_hub",
   "events": [
    {
     "t": 1.0,
@@ -680,92 +786,17 @@
     "slip_mm": 0.003
    },
    {
-    "t": 17.121,
+    "t": 14.854,
     "event": "at_hub",
-    "gap_mm": 122.51,
-    "tilt_deg": 0.038,
-    "phase_err_deg": -0.07
-   },
-   {
-    "t": 18.771,
-    "event": "aligned_0",
-    "gap_mm": 119.943,
-    "tilt_deg": 0.001,
-    "phase_err_deg": -0.0,
-    "wheel_in_G_mm": [
-     -0.1,
-     0.4,
-     1.4
-    ],
-    "radial_mm": 0.05
-   },
-   {
-    "t": 19.921,
-    "event": "aligned_1",
-    "gap_mm": 120.037,
-    "tilt_deg": 0.009,
-    "phase_err_deg": 0.0,
-    "wheel_in_G_mm": [
-     -0.0,
-     0.4,
-     1.3
-    ],
-    "radial_mm": 0.029
-   },
-   {
-    "t": 19.921,
-    "event": "hole_check",
-    "gap_mm": 120.037,
-    "tilt_deg": 0.009,
-    "phase_err_deg": 0.0,
-    "hole_to_stud_mm": [
-     0.03,
-     0.03,
-     0.029,
-     0.029,
-     0.03
-    ],
-    "stud_r_mm": [
-     57.15,
-     57.15,
-     57.15,
-     57.15,
-     57.15
-    ],
-    "hole_r_mm": [
-     57.15,
-     57.18,
-     57.17,
-     57.13,
-     57.12
-    ]
-   },
-   {
-    "t": 29.383,
-    "event": "inserted",
-    "gap_mm": 9.557,
-    "tilt_deg": 3.511,
-    "phase_err_deg": -0.063,
-    "stop_mm_from_seat": 8.02
-   },
-   {
-    "t": 36.404,
-    "event": "final",
-    "gap_mm": 9.427,
-    "tilt_deg": 3.596,
-    "phase_err_deg": -0.064,
-    "result": "not_seated",
-    "radial_mm": 2.985
+    "gap_mm": 343.07,
+    "tilt_deg": 27.083,
+    "phase_err_deg": -1.832
    }
   ],
   "peak_forces_N": {
    "shoe": [
-    1414.7,
-    "close"
-   ],
-   "hub": [
-    92449.9,
-    "release"
+    9188.2,
+    "transfer"
    ]
   }
  }
