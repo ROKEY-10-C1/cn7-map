@@ -3,6 +3,8 @@
 Isaac Sim에서 **`wheel_cell.usda`**를 여세요. 이 루트 파일이 아래 레이어를 모두 불러옵니다.
 레이어 하나만 따로 열면 공용 메시(`/AssetLibrary`)와 재질 참조가 풀리지 않으니, 항상 루트로 여세요.
 
+리플레이를 재생하면 입고 차량 3대가 차례로 셀을 통과해 빈 출고 칸을 채웁니다. 출고된 차량은 장착한 휠과 너트를 단 채 받침대에 남습니다. `run.sh --replay`는 마지막 상태에서 멈춥니다.
+
 ```
 scene/
 ├── wheel_cell.usda            # 루트 (빌드가 다시 씀)
@@ -14,7 +16,7 @@ scene/
 ├── shared/                    # 🔁 생성됨: asset_library.usdc, materials.usdc
 ├── environment/               # 🔁 생성됨: lighting_cameras.usdc
 ├── factory/                   # 🔁 생성됨: building, floor, conveyor, mount_robots, fasten_robots, safety, vehicle_buffers, truck
-├── orders/                    # 🔁 생성됨: CN7_001 … CN7_004
+├── orders/                    # 🔁 생성됨: CN7_001 … CN7_003
 ├── concrete.png
 └── production.sqlite3         # 시연 이벤트 로그
 ```

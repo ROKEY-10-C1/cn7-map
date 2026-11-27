@@ -46,13 +46,13 @@ from fitment import (
 from physical_data import AMR_SIZE, AMR_WHEEL_RADIUS, DOCK_CLAMP_CLOSED, DOCK_CLAMP_OPEN, ROLLER_RADIUS
 from kmp1500_urdf import SCANNER_X, SCANNER_Y, SCANNER_Z, S300_SIZE
 from process import (
-    AMR_AT_GATE, AMR_BAY_Y, AMR_DOCKED, AMR_GATE_X, AMR_LIFTED, AMR_OUT_GATE, AXLE, BELT_Z, BUFFER_CAR_Z,
+    AMR_BAY_Y, AMR_DOCKED, AMR_GATE_LIFT, AMR_GATE_X, AMR_LIFTED, AXLE, BELT_Z, BUFFER_CAR_Z,
     BUFFER_SLOT_X, BUFFER_STAND_X, BUFFER_STAND_Y, CELL_Y, CN7_R16, DOCK_X, FASTEN_BASE_X, FEED_START_X, MOUNT_BASE_X, MOUNT_HUB_X, MOUNT_CLEAR, ROBOT_BASE_Y, FPS,
     HUB_Z, INDEX_TRAVEL, LINE_Y, NUT_CYCLE, NUT_DRIVE, NUT_ENGAGE, NUT_FINAL,
-    REJECT_CRATE_Y, REJECT_GATE_HALF, REJECT_X, STATIONS, schedule,
+    REJECT_CRATE_Y, REJECT_GATE_HALF, REJECT_X, STATIONS, inbound_pickup, outbound_dropoff, schedule,
 )
 from layout import LAYOUT
-from process import AMR_LIFT_CARRY, AMR_TO_RETURN, EXIT_X, FASTEN_HUB_X, FINAL_X, INDEX_X, RETURN_X, belt_height
+from process import AMR_TO_RETURN, EXIT_X, FASTEN_HUB_X, FINAL_X, INDEX_X, RETURN_X, belt_height
 from wheel_geometry import barrel, center_web, hub as make_hub, nut as make_nut, wheelhouse
 from robot import Arm
 from cell_motion import (GRIP_AT, GRIP_CENTRE, HEAD_LENGTH, MAGAZINE, NUT_ADVANCE, NUT_PICK_AT, fasten_keys,
@@ -161,11 +161,12 @@ def ring(stage, path, pos, outer, inner, width, rgb, segments=32):
     color(mesh, rgb)
 
 
-def visibility(item, start, end):
+def visibility(item, start, end=None):
     attr = UsdGeom.Imageable(item.GetPrim()).CreateVisibilityAttr("invisible")
     attr.Set("invisible", 0)
     attr.Set("inherited", frame(start))
-    attr.Set("invisible", frame(end))
+    if end is not None:
+        attr.Set("invisible", frame(end))
 
 
 def belt(stage, name, a, b, width=.8, outlet_x=None):
@@ -234,20 +235,18 @@ def fence(stage, path, a, b, height=1.46):
 def parking(stage, root, side):
     bay_y=side*AMR_BAY_Y
     marker=(.06,.53,.74)
-    for i,x in enumerate((-3.12,0.,3.12)):
+    for i,x in enumerate(BUFFER_SLOT_X):
         box(stage,root+f"/Line_{i}_a",(x-.99,bay_y,.004),(.032,4.98,.004),marker)
         box(stage,root+f"/Line_{i}_b",(x+.99,bay_y,.004),(.032,4.98,.004),marker)
-        # Same height on both sides: the AMR lifts a car off these stands and sets a finished one down.
-        pos,_=xform(stage,root+f"/Vehicle_{i}",(x,bay_y,BUFFER_CAR_Z))
-        pos.AddRotateZOp().Set(-side*90)
-        car=str(pos.GetPath())
-        add_instance(stage,car+"/Body",LIB+"/Body")
-        for name,(axle,sign) in STATIONS.items():
-            y=sign*half_track(axle)
-            if side<0:
-                cylinder(stage,car+f"/Tire_{name}",(axle,y,HUB_Z),CN7_R16.radius,.20,RUBBER,"Y")
-                cylinder(stage,car+f"/WheelFace_{name}",(axle,y+sign*.102,HUB_Z),.199,.015,ALLOY,"Y")
-            else:
+        if side>0:
+            # Live PhysX and the ROS bridge drive these waiting cars with replay disabled.
+            pos,_=xform(stage,root+f"/Vehicle_{i}",(x,bay_y,BUFFER_CAR_Z))
+            pos.AddRotateZOp().Set(-90.)
+            pos.CreateVisibilityAttr("invisible")
+            car=str(pos.GetPath())
+            add_instance(stage,car+"/Body",LIB+"/Body")
+            for name,(axle,sign) in STATIONS.items():
+                y=sign*half_track(axle)
                 cylinder(stage,car+f"/Hub_{name}",(axle,y,HUB_Z),.132,.065,ALLOY,"Y")
         # Stands under the body ends (not under the hubs), leaving the lane for the hanger free.
         # Tops touch the lowest body point over each 0.2 m stand (AssetLibrary Body, measured 2026-11-26:
@@ -571,7 +570,9 @@ def amr_housing(stage, root):
 
 
 def carrier(stage, assets, root):
-    _, position = xform(stage, root)
+    model, position = xform(stage, root)
+    yaw = model.AddRotateZOp()
+    yaw.Set(0.)
     amr = root+"/AMR"
     if assets.has_amr:
         add_instance(stage,amr,LIB+"/AMR")
@@ -587,6 +588,10 @@ def carrier(stage, assets, root):
         for side in (-1, 1):
             box(stage, h+f"/ChassisPad_{i}_{side+1}", (x, side*.40, .927),
                 (.16, .10, .116), RUBBER)
+    return model, position, yaw, lift
+
+
+def vehicle_body(stage, h):
     add_instance(stage, h+"/SedanShell", LIB+"/Body")
     box(stage, h+"/Undertray", (0, 0, 1.035), (3.43, 1.02, .115), DARK)
     beam_x=-AXLE+.14
@@ -613,7 +618,6 @@ def carrier(stage, assets, root):
         link.GetPrim().GetReferences().AddInternalReference(prototype)
         # The per-vehicle nuts remain separately animated children of this frame.
         wheelhouse(stage,h+f"/Wheelhouse_{name}",x,side,HUB_Z,y)
-    return position, lift
 
 
 def make_wheel(stage, assets, path, wheel, damaged=False):
@@ -754,31 +758,46 @@ def dock_clamps(stage, root, dock, release, *, base_x=0., prefix="DockClamp"):
 
 
 def order(stage, assets, arm, data, record):
-    number,wheel,start,deliveries,reject,front,rear,rear_tight,front_tight,second_index,final_dock,departure,end,parked=data
+    number,wheel,start,deliveries,reject,front,rear,rear_tight,front_tight,second_index,final_dock,departure,end,lane_head=data
     vehicle=f"CN7-{number:03}"
     root=f"/World/Orders/CN7_{number:03}"
     cycle,_=xform(stage,root)
-    # The next car is staged: its AMR leaves the buffer while the previous car is still
-    # in the cell and waits at the gate, so the order starts with only the 7 m straight run.
-    staged=max(0.,start-AMR_AT_GATE)
-    visibility(cycle,staged,parked)
-    amr,lift=carrier(stage,assets,root+"/Carrier")
+    cycle.GetPrim().CreateAttribute("cell:gateTimeS",Sdf.ValueTypeNames.Double).Set(start)
+    slot_x=BUFFER_SLOT_X[number-1]
+    staged=start-inbound_pickup(slot_x)[-1][0]
+    pickup=inbound_pickup(slot_x,staged)
+    dropoff=outbound_dropoff(slot_x,lane_head)
+    lift_off=pickup[2][0]
+    parked=dropoff[3][0]
+    cleared=dropoff[-1][0]
+    amr_model,amr,amr_yaw,lift=carrier(stage,assets,root+"/Carrier")
+    visibility(amr_model,staged,cleared)
+    car_path=root+"/Vehicle"
+    car,car_pos=xform(stage,car_path,(slot_x,AMR_BAY_Y,BUFFER_CAR_Z))
+    car_yaw=car.AddRotateZOp()
+    car_yaw.Set(-90.)
+    move(car_pos,0.,(slot_x,AMR_BAY_Y,BUFFER_CAR_Z))
+    car_yaw.Set(-90.,0.)
+    vehicle_body(stage,car_path)
     index_start=front+MOUNT_CLEAR
     redock=index_start+INDEX_TRAVEL
     dock_clamps(stage,root,start+AMR_DOCKED,index_start,base_x=DOCK_X)
     dock_clamps(stage,root,redock,second_index,base_x=INDEX_X,prefix="RearDockClamp")
     dock_clamps(stage,root,final_dock,departure,base_x=FINAL_X,prefix="FinalDockClamp")
-    route=((start-AMR_AT_GATE,AMR_GATE_X,AMR_BAY_Y),(start,AMR_GATE_X,0.),(start+AMR_DOCKED,DOCK_X,0.),
-           (index_start,DOCK_X,0.),(redock,INDEX_X,0.),
-           (second_index,INDEX_X,0.),(final_dock,FINAL_X,0.),
-           (departure,FINAL_X,0.),(end,EXIT_X,0.),
-           # Straight on past the exit to the east aisle, then crab -y to the outbound lane head.
-           (end+AMR_TO_RETURN,RETURN_X,0.),(parked,RETURN_X,-AMR_BAY_Y))
-    for t,x,y in route:
+    cell_route=((start+AMR_DOCKED,DOCK_X,0.,0.,AMR_GATE_LIFT),
+                (start+AMR_LIFTED,DOCK_X,0.,0.,0.),
+                (index_start,DOCK_X,0.,0.,0.),(redock,INDEX_X,0.,0.,0.),
+                (second_index,INDEX_X,0.,0.,0.),(final_dock,FINAL_X,0.,0.,0.),
+                (departure,FINAL_X,0.,0.,0.),(end,EXIT_X,0.,0.,0.),
+                (end+AMR_TO_RETURN,RETURN_X,0.,0.,0.))
+    for t,x,y,yaw,height in (*pickup,*cell_route,*dropoff):
         move(amr,t,(x,y,0.))
-    for t,height in ((start-AMR_AT_GATE,-.12),(start+AMR_DOCKED,-.12),(start+AMR_LIFTED,0.),
-                     (end+AMR_TO_RETURN,0.),(parked,AMR_LIFT_CARRY)):
+        amr_yaw.Set(yaw,frame(t))
         move(lift,t,(0.,0.,height))
+        # The vehicle stays on its stands until contact, then follows the lift until set-down.
+        if lift_off<=t<=parked:
+            move(car_pos,t,(x,y,height))
+            car_yaw.Set(yaw,frame(t))
     record(start,vehicle,"","order",wheel.name)
     record(start+AMR_LIFTED,vehicle,"","docked","AMR dock and lift complete")
     record(index_start,vehicle,"","index_start","Front wheels hung, mount arms parked; moving to stop B")
@@ -787,8 +806,8 @@ def order(stage, assets, arm, data, record):
     record(final_dock,vehicle,"","final_docked","Stop C: rear hubs at the fastening arms")
     record(departure,vehicle,"","depart","AMR leaving the dock")
     record(end,vehicle,"","exit","AMR reached forward exit; cell free")
-    record(parked,vehicle,"","outbound","AMR reached outbound lane head via the east aisle")
-    record(staged,vehicle,"","staged","AMR leaves inbound buffer for the gate")
+    record(parked,vehicle,"","outbound",f"Vehicle placed on outbound stands in slot {number}")
+    record(staged,vehicle,"","staged",f"AMR approaches inbound slot {number}")
     for name,(x,side) in STATIONS.items():
         wheel_y=side*half_track(x)
         seated,tight=(front,front_tight) if x>0 else (rear,rear_tight)
@@ -814,12 +833,12 @@ def order(stage, assets, arm, data, record):
             carried.AddRotateXOp().Set(180.)
             make_nut(stage,carried_root)
             visibility(carried,tight+NUT_PICK_AT,tight+NUT_ENGAGE)
-        installed,mounted,mounted_tilt,_=make_wheel(stage,assets,root+f"/Carrier/Hanger/Wheel_{name}",wheel)
+        installed,mounted,mounted_tilt,_=make_wheel(stage,assets,car_path+f"/Wheel_{name}",wheel)
         mounted.Set(vector((x,wheel_y,HUB_Z)))
         for name_key,value in fit(wheel).items():
             installed.GetPrim().CreateAttribute("cell:clearance_"+name_key,Sdf.ValueTypeNames.Double).Set(value)
         mounted_tilt.Set(-side*90)
-        visibility(installed,seated,parked)
+        visibility(installed,seated)
         record(path[-1][0],vehicle,name,"inspect","Simulated wheel inspection")
         record(seated-1,vehicle,name,"aligned",
                f"Nominal static envelope: pilot clearance {fit(wheel)['pilot_m']*1000:.2f} mm radial")
@@ -830,10 +849,10 @@ def order(stage, assets, arm, data, record):
         record(tight+NUT_ENGAGE+NUT_DRIVE+NUT_FINAL+.1,vehicle,name,"released","Socket retention released, nuts stay seated")
         t=tight+NUT_ENGAGE
         for index,(bx,by) in enumerate(BOLT_CENTERS):
-            nut_root=root+f"/Carrier/Hanger/{name}/Nut_{index}"
+            nut_root=car_path+f"/{name}/Nut_{index}"
             nut,nut_pos=xform(stage,nut_root)
             nut_spin=nut.AddRotateZOp()
-            visibility(nut,t,parked)
+            visibility(nut,t)
             make_nut(stage,nut_root)
             for seconds,distance,spin_angle in ((t,NUT_ADVANCE,0.),(t+NUT_DRIVE,0.,1800.),
                                                 (t+NUT_DRIVE+NUT_FINAL,0.,1830.)):
@@ -841,11 +860,11 @@ def order(stage, assets, arm, data, record):
                 nut_spin.Set(spin_angle,frame(seconds))
             record(t+NUT_DRIVE+NUT_FINAL,vehicle,name,"tightened",f"Nut {index+1}; virtual {DEMO_TORQUE:.0f} N m (accept {NUT_TORQUE[0]}–{NUT_TORQUE[1]})")
         record(tight+NUT_CYCLE+2,vehicle,name,"complete","Five nuts in one multi-spindle cycle, head withdrawn")
-    # Only the staged AMR and its car are shown before the order starts; the cell
-    # equipment of this order would otherwise overlap the previous order's.
+    # Order-specific tooling is visible only while this order occupies the cell.
     for child in cycle.GetPrim().GetChildren():
-        if child.GetName()!="Carrier" and not UsdGeom.Imageable(child).GetVisibilityAttr().HasAuthoredValue():
+        if child.GetName()!="Vehicle" and not UsdGeom.Imageable(child).GetVisibilityAttr().HasAuthoredValue():
             visibility(UsdGeom.Xformable(child),start,end)
+    return cleared
 
 
 def main():
@@ -888,11 +907,12 @@ def main():
     def record(seconds, vehicle, station, code, detail):
         events.append((round(seconds, 3), vehicle, station, code, detail))
 
-    for data in schedule(args.inject_defect, args.mixed_wheel_sizes):
+    first_gate=inbound_pickup(BUFFER_SLOT_X[0])[-1][0]
+    for data in schedule(args.inject_defect, args.mixed_wheel_sizes, start=first_gate):
         margins=fit(data[1])
         if min(margins.values())<=0:
             raise ValueError(f"Nominal wheel interference for {data[1].name}: {margins}")
-        order(stage, assets, fasten_arm, data, record)
+        end_time=order(stage, assets, fasten_arm, data, record)
         reject=data[4]
         if reject:
             closed=reject_gate.Get()
@@ -902,7 +922,7 @@ def main():
             for time,position in ((0.,closed),(turn-1.,closed),(turn-.2,opened),
                                   (clear,opened),(clear+.8,closed)):
                 move(reject_gate,time,position)
-    stage.SetEndTimeCode(frame(data[-1]))
+    stage.SetEndTimeCode(frame(end_time))
     args.output.mkdir(parents=True, exist_ok=True)
     write_concrete(args.output/"concrete.png")
     usd = args.output/"wheel_cell.usdc"
@@ -919,7 +939,7 @@ def main():
                            "sim_s REAL, vehicle TEXT, station TEXT, code TEXT, detail TEXT)")
         connection.execute("DELETE FROM events")
         connection.executemany("INSERT INTO events VALUES (?, ?, ?, ?, ?)", sorted(events))
-    print(f"{usd_root} ({len(parts)} layers, {data[-1]:.1f}s), {db} ({len(events)} events)")
+    print(f"{usd_root} ({len(parts)} layers, {end_time:.1f}s), {db} ({len(events)} events)")
 
 
 if __name__ == "__main__":

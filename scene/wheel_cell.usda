@@ -1,7 +1,7 @@
 #usda 1.0
 (
     defaultPrim = "World"
-    endTimeCode = 9727.2064398105
+    endTimeCode = 9742.873877476923
     framesPerSecond = 24
     metersPerUnit = 1
     startTimeCode = 0
@@ -22,8 +22,7 @@
         @./factory/vehicle_buffers.usdc@,
         @./orders/CN7_001.usdc@,
         @./orders/CN7_002.usdc@,
-        @./orders/CN7_003.usdc@,
-        @./orders/CN7_004.usdc@
+        @./orders/CN7_003.usdc@
     ]
     timeCodesPerSecond = 24
     upAxis = "Z"

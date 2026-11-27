@@ -63,14 +63,17 @@ def check_clearance(stage):
                  REAR_TRACK/2 + max(wheel.width for wheel in WHEELS)/2 + .02)
     # Upper bound for the carried vehicle and hanger above the B1 floor.
     height = 2.25
-    turn = (half_x**2+half_y**2)**.5   # in-place turn at the outbound lane head
-    lane_end = BUFFER_SLOT_X[0]
-    # (start, end, half sizes): yaw 0 along x, the lane leg with the car across (yaw +90).
-    paths = (((AMR_GATE_X,AMR_BAY_Y), (AMR_GATE_X,0.), (half_x,half_y)),
+    turn = (half_x**2+half_y**2)**.5
+    inbound = (AMR_GATE_X,AMR_BAY_Y)
+    outbound = (LAYOUT.return_x,-AMR_BAY_Y)
+    # (start, end, half sizes): the car is across each buffer lane and along X through the cell.
+    paths = (((BUFFER_SLOT_X[-1],AMR_BAY_Y), inbound, (half_y,half_x)),
+             (inbound, inbound, (turn,turn)),
+             (inbound, (AMR_GATE_X,0.), (half_x,half_y)),
              ((AMR_GATE_X,0.), (LAYOUT.return_x,0.), (half_x,half_y)),
-             ((LAYOUT.return_x,0.), (LAYOUT.return_x,-AMR_BAY_Y), (half_x,half_y)),
-             ((LAYOUT.return_x,-AMR_BAY_Y), (LAYOUT.return_x,-AMR_BAY_Y), (turn,turn)),
-             ((LAYOUT.return_x,-AMR_BAY_Y), (lane_end,-AMR_BAY_Y), (half_y,half_x)))
+             ((LAYOUT.return_x,0.), outbound, (half_x,half_y)),
+             (outbound, outbound, (turn,turn)),
+             (outbound, (BUFFER_SLOT_X[0],-AMR_BAY_Y), (half_y,half_x)))
     cache=UsdGeom.BBoxCache(Usd.TimeCode.Default(), [UsdGeom.Tokens.default_])
     closest={}
     conflicts=[]

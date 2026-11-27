@@ -11,7 +11,7 @@ from physical_data import BODY_MASS, PAD_DYNAMIC_FRICTION, PAD_STATIC_FRICTION
 from physical_data import box_inertia
 from physical_data import GUIDE_DYNAMIC_FRICTION, GUIDE_STATIC_FRICTION
 from physical_data import AMR_LIFT_MASS, AMR_MASS, AMR_SIZE
-from process import AMR_BAY_Y, STATIONS
+from process import AMR_BAY_Y, BUFFER_SLOT_X, STATIONS
 from layout import LAYOUT
 from sim_util import body, cube, mass_properties, material, pose, reference, transform
 from live_params import HZ, INTERLOCK_FAULTS, MIN_RAIL_SPACING, REFERENCE, ROOT, TERMINAL_PHASES
@@ -59,8 +59,10 @@ class Cell:
         # Keep the first car on the AMR at its low inbound datum until the dock closes.
         source_amr=REFERENCE+"/Carrier"
         source_lift=source_amr+"/Hanger"
-        deck_start,_=pose(stage,source_amr,0.)
-        car_start,_=pose(stage,source_lift,0.)
+        source_car=stage.GetPrimAtPath(REFERENCE+"/Vehicle") or stage.GetPrimAtPath(source_lift)
+        gate_time=stage.GetPrimAtPath(REFERENCE).GetAttribute("cell:gateTimeS").Get() or 0.
+        deck_start,_=pose(stage,source_amr,gate_time)
+        car_start,_=pose(stage,source_lift,gate_time)
         deck=body(stage,ROOT+"/DockedAMR",deck_start,None,AMR_MASS)
         mass_properties(deck,(0.,0.,.23),box_inertia(AMR_MASS,AMR_SIZE))
         lift=body(stage,ROOT+"/DockLift",car_start,None,AMR_LIFT_MASS)
@@ -79,7 +81,8 @@ class Cell:
         for child in stage.GetPrimAtPath(source_lift).GetChildren():
             if child.GetName().startswith(("Support_","Crossmember_","ChassisPad_","SaddleRail_")):
                 reference(stage,ROOT+"/DockLift/"+child.GetName(),str(child.GetPath()))
-            elif not child.GetName().startswith("Wheel_"):
+        for child in source_car.GetChildren():
+            if not child.GetName().startswith(("Wheel_","Support_","Crossmember_","ChassisPad_","SaddleRail_")):
                 target=str(visual.GetPath())+"/"+child.GetName()
                 reference(stage,target,str(child.GetPath()))
                 if child.GetName() in STATIONS:
@@ -144,12 +147,19 @@ class Cell:
         self.buffer_run=None
         if start=="buffer":
             from vehicle import BufferRun, place_at_buffer
-            from process import BUFFER_SLOT_X
             stands,self.parked_z=place_at_buffer(stage,self,slot)
             self.buffer_run=BufferRun(self.carrier,BUFFER_SLOT_X[slot],stands)
             self.pending.append((0.,"AMR",f"buffer_slot_{slot+1}"))
-        elif start!="gate":
+        elif start=="gate":
+            waiting=stage.GetPrimAtPath(f"/World/Factory/LeftVehicleBuffer/Vehicle_{slot}")
+            if waiting:
+                waiting.SetActive(False)
+        else:
             raise ValueError(f"start must be 'buffer' or 'gate', not {start!r}")
+        for k in range(len(BUFFER_SLOT_X)):
+            waiting=stage.GetPrimAtPath(f"/World/Factory/LeftVehicleBuffer/Vehicle_{k}")
+            if waiting and waiting.IsActive():
+                UsdGeom.Imageable(waiting).MakeVisible()
         self.stage_id=None
         if manual:
             self.stage_id=UsdUtils.StageCache.Get().Insert(stage)

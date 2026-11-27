@@ -4,6 +4,7 @@ from math import hypot
 
 from fitment import WHEELBASE
 from layout import LAYOUT
+from physical_data import AMR_LIFT_SPEED, AMR_SPEED_Y
 
 FPS = 24
 HUB_Z = 0.94
@@ -30,6 +31,7 @@ AMR_GATE_X = -7.5
 # AMR legs timed to KUKA KMP 1500 limits (crab 0.56 m/s, straight 1.0 m/s) with ~10 % margin,
 # plus the 0.05 m/s lift: buffer -> gate (crab), gate -> dock (straight), lift 0.12 m.
 AMR_AT_GATE = 20.                 # lateral transfer from the outer buffer
+AMR_GATE_LIFT = -.12
 AMR_DOCKED = 8.                    # order start (at the gate) -> docked
 AMR_LIFTED = AMR_DOCKED+3.
 DOCK_X, INDEX_X, FINAL_X, EXIT_X = LAYOUT.stops
@@ -72,6 +74,8 @@ BUFFER_STAND_Y = .68
 AMR_LIFT_ENTRY = -.16
 BUFFER_CAR_Z = -.09
 AMR_LIFT_CARRY = -.04
+BUFFER_CRAB_SPEED = .9 * AMR_SPEED_Y
+BUFFER_TURN_TIME = 6.              # 90 degrees at 15 degrees/s
 MOUNT_PARK = 3.15
 FASTEN_PARK = -3.15
 
@@ -101,7 +105,39 @@ class Wheel:
 
 
 CN7_R16 = Wheel(.205, .55, 16, 6.5)
-WHEELS = (CN7_R16, Wheel(.225, .45, 17, 7.), Wheel(.195, .65, 15, 6.), CN7_R16)
+WHEELS = (CN7_R16, Wheel(.225, .45, 17, 7.), Wheel(.195, .65, 15, 6.))
+
+
+def inbound_pickup(slot_x, start=0.):
+    """Carrier keys (seconds, X, Y, yaw, lift) from the inbound aisle to the gate."""
+    lane = (AMR_GATE_X, AMR_BAY_Y)
+    slot = (slot_x, AMR_BAY_Y)
+    crab = (slot_x-AMR_GATE_X)/BUFFER_CRAB_SPEED
+    arrived = start+crab
+    contact = arrived+(BUFFER_CAR_Z-AMR_LIFT_ENTRY)/AMR_LIFT_SPEED
+    lifted = contact+(AMR_LIFT_CARRY-BUFFER_CAR_Z)/AMR_LIFT_SPEED
+    returned = lifted+crab
+    turned = returned+BUFFER_TURN_TIME
+    at_gate = turned+AMR_AT_GATE
+    return ((start,*lane,-90.,AMR_LIFT_ENTRY), (arrived,*slot,-90.,AMR_LIFT_ENTRY),
+            (contact,*slot,-90.,BUFFER_CAR_Z), (lifted,*slot,-90.,AMR_LIFT_CARRY),
+            (returned,*lane,-90.,AMR_LIFT_CARRY), (turned,*lane,0.,AMR_LIFT_CARRY),
+            (at_gate,AMR_GATE_X,0.,0.,AMR_LIFT_CARRY),
+            (at_gate+(AMR_LIFT_CARRY-AMR_GATE_LIFT)/AMR_LIFT_SPEED,AMR_GATE_X,0.,0.,AMR_GATE_LIFT))
+
+
+def outbound_dropoff(slot_x, lane_head):
+    """Carrier keys from the east aisle to the stands and back out empty."""
+    lane = (RETURN_X, -AMR_BAY_Y)
+    slot = (slot_x, -AMR_BAY_Y)
+    crab = (RETURN_X-slot_x)/BUFFER_CRAB_SPEED
+    turned = lane_head+BUFFER_TURN_TIME
+    arrived = turned+crab
+    parked = arrived+(AMR_LIFT_CARRY-BUFFER_CAR_Z)/AMR_LIFT_SPEED
+    lowered = parked+(BUFFER_CAR_Z-AMR_LIFT_ENTRY)/AMR_LIFT_SPEED
+    return ((lane_head,*lane,0.,AMR_LIFT_CARRY), (turned,*lane,90.,AMR_LIFT_CARRY),
+            (arrived,*slot,90.,AMR_LIFT_CARRY), (parked,*slot,90.,BUFFER_CAR_Z),
+            (lowered,*slot,90.,AMR_LIFT_ENTRY), (lowered+crab,*lane,90.,AMR_LIFT_ENTRY))
 
 
 def belt_height(x):
@@ -122,9 +158,8 @@ def motion(points, start, speed=SPEED):
         yield time, b
 
 
-def schedule(inject, mixed_sizes=False):
-    start = 0.
-    for number, wheel in enumerate(WHEELS if mixed_sizes else (CN7_R16,)*4, 1):
+def schedule(inject, mixed_sizes=False, *, start=0.):
+    for number, wheel in enumerate(WHEELS if mixed_sizes else (CN7_R16,)*len(BUFFER_SLOT_X), 1):
         def delivery(name, launch):
             return list(motion(route(PICK_X, STATIONS[name][1]), launch))
 
@@ -164,6 +199,6 @@ def schedule(inject, mixed_sizes=False):
         rear_tighten = final_dock+5.5
         departure = rear_tighten+NUT_CYCLE+8.
         end = departure+AMR_OUT_GATE          # forward exit reached: the cell is free for the next car
-        parked = end+AMR_TO_RETURN+AMR_OUT_BUFFER  # outbound lane head reached via the east aisle
-        yield number, wheel, start, deliveries, reject, front_seat, rear_seat, rear_tighten, front_tighten, second_index, final_dock, departure, end, parked
+        lane_head = end+AMR_TO_RETURN+AMR_OUT_BUFFER
+        yield number, wheel, start, deliveries, reject, front_seat, rear_seat, rear_tighten, front_tighten, second_index, final_dock, departure, end, lane_head
         start = end+1.

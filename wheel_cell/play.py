@@ -145,7 +145,7 @@ def play(app, args):
     timeline.set_end_time(end)
     if not 0 <= args.start_at < end:
         raise ValueError(f"Start time must be within [0, {end:.1f}) seconds")
-    timeline.set_looping(not physics_setup)
+    timeline.set_looping(False)
 
     events, labels = [], {}
     window = None

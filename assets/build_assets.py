@@ -263,12 +263,6 @@ CAR_PARTS = ("SedanShell", "Undertray", "TorsionBeam", "FrontSubframe", "DoorHan
              "Wheelhouse_", "FL", "FR", "RL", "RR")
 
 
-def car_anchor(src):
-    hanger = ORDER+"/Carrier/Hanger"
-    ground = Gf.Matrix4d().SetTranslate(Gf.Vec3d(0, 0, HUB_Z-CN7_R16.radius))
-    return ground*src.world(hanger)
-
-
 def build_wheel(src, out):
     root = "Wheel_205_55R16"
     stage, prim = new_stage(out, root)
@@ -288,10 +282,13 @@ def build_wheel(src, out):
 def build_car(src, out, wheel_file):
     root = "CN7_Body"
     stage, prim = new_stage(out, root)
-    hanger = ORDER+"/Carrier/Hanger"
-    anchor = car_anchor(src)
-    group(stage, f"/{root}/Visuals", src.world(hanger)*anchor.GetInverse())
-    copy(src, stage, hanger, f"/{root}/Visuals",
+    vehicle = ORDER+"/Vehicle"
+    if not src.stage.GetPrimAtPath(vehicle):
+        vehicle = ORDER+"/Carrier/Hanger"
+    ground = Gf.Matrix4d().SetTranslate(Gf.Vec3d(0, 0, HUB_Z-CN7_R16.radius))
+    anchor = ground*src.world(vehicle)
+    group(stage, f"/{root}/Visuals", src.world(vehicle)*anchor.GetInverse())
+    copy(src, stage, vehicle, f"/{root}/Visuals",
          keep=lambda n: n.startswith(CAR_PARTS) and not n.startswith("Wheel_"))
     finish(src, stage, root)
     rigid(prim, BODY_MASS)
@@ -309,7 +306,7 @@ def build_car(src, out, wheel_file):
             # Only the wheel's geometry: its colliders join the body, its own rigid body does not.
             w = stage.DefinePrim(f"/{root}/Wheels/Wheel_{corner}", "Xform")
             w.GetReferences().AddReference("./"+wheel_file, "/Wheel_205_55R16/Visuals")
-            place(w, src.world(f"{hanger}/Wheel_{corner}")*anchor.GetInverse())
+            place(w, src.world(f"{vehicle}/Wheel_{corner}")*anchor.GetInverse())
     variants.SetVariantSelection("none")
     describe(prim, "Hyundai Avante CN7 body-in-white (no wheels)", {
         "model": "Hyundai Avante (Elantra) CN7 facelift G1.6 IVT", "lengthM": 4.710,

@@ -14,7 +14,7 @@ from conveyor import collider, quaternion
 from physical_data import AMR_ACCELERATION, AMR_LIFT_MASS, AMR_LIFT_SPEED, AMR_MASS, AMR_SPEED_Y
 from physical_data import AMR_TRACTION_COEFFICIENT, BODY_MASS
 from fitment import ARCH_RADIUS
-from process import AMR_BAY_Y, AMR_GATE_X, AMR_LIFT_CARRY, AMR_LIFT_ENTRY, STATIONS
+from process import AMR_BAY_Y, AMR_GATE_LIFT, AMR_GATE_X, AMR_LIFT_CARRY, AMR_LIFT_ENTRY, STATIONS
 from sim_util import cube, vec
 
 SILL_INNER = .65          # car y where the sill starts (inboard of it the shell is at 1.5-1.6 m)
@@ -24,7 +24,7 @@ SLICE_START = -2.35       # slice edges at ..., -2.15, -2.05, -1.95, ... = the s
 BLOCK_HEIGHT = .10
 BLOCK_GAP = .003
 AISLE_X = -7.             # AMR lane beside the buffers
-LIFT_DATUM = -.12         # hanger offset at lift joint position 0 (the car's height at the gate)
+LIFT_DATUM = AMR_GATE_LIFT # hanger offset at lift joint position 0 (the car's height at the gate)
 
 
 def body_points(stage):
