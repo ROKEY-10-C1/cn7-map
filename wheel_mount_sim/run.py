@@ -17,6 +17,10 @@ ap.add_argument("--mu-hub", type=float, nargs=2, default=None, help="alloy-steel
 ap.add_argument("--out", default=None)
 ap.add_argument("--no-video", action="store_true")
 ap.add_argument("--debug-stop", default=None)
+ap.add_argument("--scenario", default="nominal",
+                choices=["nominal", "shoe45", "shoe20", "nosync", "joint_transfer", "novision", "position_insert"],
+                help="replay one earlier failure: only that one cause is put back")
+ap.add_argument("--stop-after", default=None, help="end the run after this event (e.g. lifted, aligned_1)")
 ap.add_argument("--speed", type=float, default=.35, help="fraction of the RS080N joint speed limits")
 args = ap.parse_args()
 
@@ -51,7 +55,10 @@ NOISE_DEG = .03                        # vision angle noise 1 sigma (estimate, a
 world = World(stage_units_in_meters=1., physics_dt=DT, rendering_dt=DT, physics_prim_path="/World/PhysicsScene")
 stage = omni.usd.get_context().get_stage()
 rng = np.random.default_rng(args.seed)
-info = S.build(stage, rng, tuple(args.mu_shoe) if args.mu_shoe else None, tuple(args.mu_hub) if args.mu_hub else None)
+SC = args.scenario
+S.configure({"shoe45": 45., "shoe20": 70.}.get(SC))          # angle from the bottom: 45 / 70 / (80 default)
+info = S.build(stage, rng, tuple(args.mu_shoe) if args.mu_shoe else None, tuple(args.mu_hub) if args.mu_hub else None,
+               sync=SC != "nosync")
 
 # cameras
 def camera(path, eye, target, focal=24.):
@@ -64,14 +71,16 @@ def camera(path, eye, target, focal=24.):
 
 
 cams = {"wide": camera("/World/CamWide", (3.1, 3.3, 2.0), (.45, .85, .75)),
-        "hub": camera("/World/CamHub", (.95, .95, .62), tuple(S.H), focal=28.)}
+        "hub": camera("/World/CamHub", (.95, .95, .62), tuple(S.H), focal=28.),
+        "pick": camera("/World/CamPick", (S.TABLE_C[0]+.95, S.TABLE_C[1]-.85, 1.15), (S.TABLE_C[0], S.TABLE_C[1], .62),
+                       focal=24.)}
 
 robot = world.scene.add(SingleArticulation(prim_path="/World/Robot", name="rs080n"))
 world.reset()
 names = robot.dof_names
 ARM = [names.index(f"joint{i}") for i in range(1, 7)]
 JAW = [names.index("JawRSlide"), names.index("JawLSlide")]
-JAW_DRIVEN = [JAW[0]]
+JAW_DRIVEN = [JAW[0]] if SC != "nosync" else JAW
 print("DOFS", names, flush=True)
 
 K = Path.home()/"isaacsim/exts/isaacsim.robot_motion.motion_generation/motion_policy_configs/Kawasaki/rs080n"
@@ -217,7 +226,7 @@ def step():
 
 
 q_cmd = np.zeros(len(names))
-jaw_vel = np.zeros(1)
+jaw_vel = np.zeros(len(JAW_DRIVEN))
 
 
 def command():
@@ -374,7 +383,12 @@ def force_insert(R_G, o_start, axis, v=.010, t_max=15.):
 
 def grip(close):
     v_close, v_open = P.GRIP["stroke"]/P.GRIP["t_close"], P.GRIP["stroke"]/P.GRIP["t_open"]
-    jaw_vel[:] = (-v_close,) if close else (v_open,)
+    v = -v_close if close else v_open
+    jaw_vel[:] = (v,) if len(jaw_vel) == 1 else (v, -v)
+
+
+class StopRun(Exception):
+    pass
 
 
 def event(name, **kv):
@@ -383,6 +397,9 @@ def event(name, **kv):
              phase_err_deg=round(float(phase_error()), 3), **kv)
     events.append(e)
     print("EVENT", json.dumps(e, default=float), flush=True)
+    if args.stop_after and name == args.stop_after:
+        wait(1.0)                                          # one more second of footage
+        raise StopRun(name)
 
 
 # ---------------------------------------------------------------- sequence
@@ -443,9 +460,13 @@ try:
     phase[0] = "transfer"
     R_m = S.R_MOUNT
     pre = S.H+np.array([0, .12, 0])
-    via = S.H+np.array([0, .45, 0])                       # on the hub axis, well outboard of the fender
-    move_joints(solve(R_m, via, q_cmd[ARM]))
-    move_line(R_m, via, pre, .15)
+    if SC == "joint_transfer":
+        move_joints(solve(R_m, pre, q_cmd[ARM]))           # earlier design: one joint-space move to the hub
+    else:
+        via = S.H+np.array([0, .45, 0])                   # on the hub axis, well outboard of the fender
+        move_joints(solve(R_m, via, q_cmd[ARM]))
+        move_line(R_m, via, pre, .15)
+    event("at_hub")
     wait(.5)
 
     phase[0] = "align"
@@ -453,7 +474,7 @@ try:
     # the robot knows its own flange pose from the encoders. Re-target the grip frame so the measured wheel
     # lands on the hub axis, parallel, with the holes on the studs. Two passes.
     gap_pre = .12
-    for it in range(2):
+    for it in range(0 if SC == "novision" else 2):
         Rh, oh = pose("/World/Car/Hub")
         Rw, ow = pose("/World/Wheel")
         ow = ow+rng.normal(0, CENTER_NOISE, 3)
@@ -477,6 +498,8 @@ try:
         rel, tilt = seat()
         event(f"aligned_{it}", wheel_in_G_mm=[round(float(v)*1000, 1) for v in p_GW],
               radial_mm=round(float(np.hypot(rel[0], rel[1]))*1000, 3))
+    if SC == "novision":
+        RG_t, oG_t = R_m, pre                              # trust the grip: no measurement at the hub
     Rh, oh = pose("/World/Car/Hub")
     Rw, ow = pose("/World/Wheel")
     from math import cos as _c, sin as _s, tau as _t
@@ -495,7 +518,11 @@ try:
     near = oG_t-axis*(gap_pre-.032)
     halt = lambda f: filtered(f) > F_STOP
     stop_at = move_line(RG_t, oG_t, near, .020, stop=halt)
-    stop_at = force_insert(RG_t, np.asarray(stop_at), axis)
+    if SC == "position_insert":
+        stop_at = move_line(RG_t, np.asarray(stop_at), seated, .005,
+                            stop=lambda f: filtered(f) > F_STOP or seat()[0][2] < .0002)
+    else:
+        stop_at = force_insert(RG_t, np.asarray(stop_at), axis)
     wait(.3)
     if args.debug_stop == "inserted":
         raise RuntimeError("debug stop")
@@ -513,6 +540,8 @@ try:
     rel, tilt = seat()
     result = "seated" if rel[2] < .0005 and tilt < .5 else "not_seated"
     event("final", result=result, radial_mm=round(float(np.hypot(rel[0], rel[1]))*1000, 3))
+except StopRun as exc:
+    result = f"stopped after {exc}"
 except Exception as exc:                                   # keep whatever was recorded
     result = f"error: {exc}"
     print("ERROR", exc, flush=True)
@@ -522,7 +551,7 @@ with open(OUT/"log.csv", "w", newline="") as f:
     w = csv.DictWriter(f, fieldnames=list(log_rows[0].keys()) if log_rows else ["t"])
     w.writeheader()
     w.writerows(log_rows)
-summary = dict(result=result, seed=args.seed, mu_shoe=args.mu_shoe or P.MU_SHOE_TREAD, scene=info, events=events,
+summary = dict(result=result, scenario=SC, seed=args.seed, mu_shoe=args.mu_shoe or P.MU_SHOE_TREAD, scene=info, events=events,
                peak_forces_N={k: [round(v, 1), ph] for k, (v, ph) in peaks.items()}, sim_time_s=round(t_sim[0], 2),
                params={k: v["value"] for k, v in P.P.items()})
 (OUT/"summary.json").write_text(json.dumps(summary, indent=1, default=str))

@@ -74,6 +74,15 @@ R_FG = np.diag([1., -1., -1.])              # flange axes in G
 T_GF = np.array([0., CHORD_Y, FLANGE_Z])    # flange origin in G
 
 
+def configure(shoe_deg=None):
+    """Re-derive the grip geometry for another shoe angle (scenario replays of earlier designs)."""
+    global SHOE_A, CHORD_Y, TOUCH_X, T_GF
+    SHOE_A = radians(shoe_deg) if shoe_deg is not None else P.SHOE_ANGLE
+    CHORD_Y = -P.TIRE_R*cos(SHOE_A)
+    TOUCH_X = P.TIRE_R*sin(SHOE_A)
+    T_GF = np.array([0., CHORD_Y, FLANGE_Z])
+
+
 def g2f(p):
     """Point in grip frame -> flange frame."""
     return R_FG.T@(np.asarray(p, float)-T_GF)
@@ -87,7 +96,7 @@ def flange_pose(R_G, o_G):
 # ----------------------------------------------------------------------------- build
 
 
-def build(stage, seed_rng, mu_shoe=None, mu_hub=None):
+def build(stage, seed_rng, mu_shoe=None, mu_hub=None, sync=True):
     UsdGeom.SetStageUpAxis(stage, UsdGeom.Tokens.z)
     UsdGeom.SetStageMetersPerUnit(stage, 1.)
     scene = UsdPhysics.Scene.Define(stage, "/World/PhysicsScene")
@@ -132,7 +141,7 @@ def build(stage, seed_rng, mu_shoe=None, mu_hub=None):
 
     hub_angle = corner(stage, M, V, seed_rng)
     spin = wheel(stage, M, V, seed_rng)
-    robot(stage, M, V)
+    robot(stage, M, V, sync)
     return dict(hub_angle=hub_angle, wheel_spin=spin)
 
 
@@ -311,7 +320,7 @@ def wheel(stage, M, V, rng):
 LINK6_HOME = (np.array([.15, 0., 2.795]), rot((0, 0, 1), -90))   # link6 at all-zero joints (USD probe)
 
 
-def robot(stage, M, V):
+def robot(stage, M, V, sync=True):
     rp = "/World/Robot"
     r = stage.DefinePrim(rp, "Xform")
     r.GetReferences().AddReference(str(ROBOT_USD))
@@ -368,7 +377,10 @@ def robot(stage, M, V):
         lo, hi = JAW_Q_RANGE
         pj.CreateLowerLimitAttr(lo if side > 0 else -hi)
         pj.CreateUpperLimitAttr(hi if side > 0 else -lo)
-        if side > 0:
+        if not sync:
+            # scenario 'nosync': each jaw on its own piston (half the catalogue force), no rack and pinion
+            drive(pj, "linear", 0., 0., 1e6, P.GRIP["force"]/2, vel=0.)
+        elif side > 0:
             # pneumatic piston on the right jaw; the rack and pinion carries the left jaw (mimic below), so
             # the drive limit is the catalogue gripping force (sum of both jaws)
             drive(pj, "linear", 0., 0., 1e6, P.GRIP["force"], vel=0.)
