@@ -46,13 +46,14 @@ from fitment import (
 from physical_data import AMR_SIZE, AMR_WHEEL_RADIUS, DOCK_CLAMP_CLOSED, DOCK_CLAMP_OPEN, ROLLER_RADIUS
 from process import (
     AMR_AT_GATE, AMR_BAY_Y, AMR_DOCKED, AMR_GATE_X, AMR_LIFTED, AMR_OUT_GATE, AXLE, BELT_Z, BUFFER_CAR_Z,
-    BUFFER_SLOT_X, BUFFER_STAND_X, BUFFER_STAND_Y, CN7_R16, FASTEN_PARK, FEED, FPS,
-    HUB_Z, LINE_Y, MOUNT_PARK, NUT_CYCLE, NUT_DRIVE, NUT_ENGAGE, NUT_FINAL, NUT_PICKUP,
-    RAIL_Y, REJECT_GATE_HALF, REJECT_X, STATIONS, bend, schedule,
+    BUFFER_SLOT_X, BUFFER_STAND_X, BUFFER_STAND_Y, CELL_Y, CN7_R16, FASTEN_BASE_X, MOUNT_BASE_X, ROBOT_BASE_Y, FEED, FPS,
+    HUB_Z, INDEX_TRAVEL, LINE_Y, NUT_CYCLE, NUT_DRIVE, NUT_ENGAGE, NUT_FINAL, NUT_PICKUP,
+    REJECT_CRATE_Y, REJECT_GATE_HALF, REJECT_X, STATIONS, bend, schedule,
 )
 from wheel_geometry import barrel, center_web, hub as make_hub, nut as make_nut, wheelhouse
 from robot import Arm
-from visuals import ALLOY, BRUSHED, CONCRETE, GLASS, LIB, PANEL, RUBBER, ZINC, VisualAssets, add_instance, finish, mesh
+from visuals import (ALLOY, BRUSHED, CONCRETE, GLASS, LIB, PANEL, RUBBER, ZINC, VisualAssets, add_instance,
+                     copy_mesh, finish, mesh)
 
 BLUE = (.10, .34, .55)
 STEEL = (.38, .45, .49)
@@ -62,8 +63,7 @@ WHITE = (.72, .77, .79)
 RED = (.73, .10, .08)
 TEAL = (.08, .58, .43)
 TOOL = .20
-# Plant layout outside the cell: fence at CELL_Y, walkway, buffer guard, buffers, outer guard, wall.
-CELL_Y = 2.36
+# Plant layout outside the cell: fence at CELL_Y (process.py), walkway, buffer guard, buffers, outer guard, wall.
 BUFFER_GUARD_Y = AMR_BAY_Y-2.65
 OUTER_GUARD_Y = AMR_BAY_Y+2.65
 HALL_Y = OUTER_GUARD_Y+.40
@@ -76,7 +76,16 @@ FLOOR_MID, FLOOR_LEN = (FLOOR_Y-FLOOR_S)/2, FLOOR_Y+FLOOR_S
 CAR_HALF = (4.71/2, 1.825/2)
 ZONE_MARGIN = .10
 ZONE_FILL = (.78, .70, .44)
-DOOSAN_ASSETS = Path(__file__).parent/"assets"
+# Fixed fastening robot: Kawasaki RS080N from the fastening team (map_fasten/, main 1fc0e9c).
+RS080N_ASSETS = Path(__file__).resolve().parent.parent/"map_fasten"/"assets"
+KAWASAKI_GRAY = (.84, .85, .86)    # displayColor of map_fasten/assets/RS080N.usdc
+# Static park posture (no fastening motion in the cell yet): wrist over the base front, sockets
+# facing down. In the robot frame (+y = toward the car) every joint origin and the socket tips stay
+# within y -0.30..+0.50 m and below z 2.32 m in the parked pose.
+RS080N_PARK = np.deg2rad([0, -30, -65, 0, -130, 0])
+# Five-spindle head (map_fasten/README.md): QST50-150CT spindles, OD 51 mm, flange to socket tip 464 mm.
+HEAD_LENGTH = .464
+SPINDLE_RADIUS = .0255
 NUT_ADVANCE = 5*PITCH
 # Flange frame of the fastening tool (see Arm.solve): x = world x, y = world z * side, so
 # stud k at hub angle a sits at (PCD/2 cos a, -PCD/2 sin a) on either side of the car.
@@ -213,7 +222,7 @@ def curved_belt(stage, path, points):
                 box(stage, sub+f"/Leg_{j+1}", (0,j*.25,.217), (.064,.064,.432), STEEL)
 
 
-def fence(stage, path, a, b):
+def fence(stage, path, a, b, height=1.46):
     dx,dy=b[0]-a[0],b[1]-a[1]
     for i in range(ceil(hypot(dx,dy)/1.40)):
         count=ceil(hypot(dx,dy)/1.40)
@@ -223,32 +232,17 @@ def fence(stage, path, a, b):
         node.AddRotateZOp().Set(degrees(atan2(dy,dx)))
         panel=str(node.GetPath())
         for j in (-1,1):
-            box(stage,panel+f"/Stile_{j+1}",(j*length/2,0,.73),(.045,.06,1.46),AMBER)
-            box(stage,panel+f"/Header_{j+1}",(0,0,.79+j*.57),(length,.04,.036),AMBER)
+            box(stage,panel+f"/Stile_{j+1}",(j*length/2,0,height/2),(.045,.06,height),AMBER)
+            box(stage,panel+f"/Header_{j+1}",(0,0,.10 if j<0 else height-.018),(length,.04,.036),AMBER)
         # One batched mesh for the thin wire faces.
         points=[]
         for j in range(1,ceil(length/.084)):
             x=-length/2+j*.084
-            points.extend(((x,-.005,.23),(x+.008,-.005,.23),(x+.008,-.005,1.36),(x,-.005,1.36)))
-        for j in range(14):
-            z=.25+j*.081
+            points.extend(((x,-.005,.10),(x+.008,-.005,.10),(x+.008,-.005,height-.018),(x,-.005,height-.018)))
+        for j in range(ceil((height-.14)/.081)):
+            z=.10+j*.081
             points.extend(((-length/2,-.005,z),(length/2,-.005,z),(length/2,-.005,z+.008),(-length/2,-.005,z+.008)))
         mesh(stage,panel+"/SafetyMesh",points,[4]*(len(points)//4),list(range(len(points))),BRUSHED,True)
-
-
-def rail(stage, root, side):
-    y=side*RAIL_Y
-    box(stage,root+"/Base",(0,y+side*.11,.13),(7.65,.51,.22),BRUSHED)
-    for j in (-1,1):
-        box(stage,root+f"/Guide_{j+1}",(0,y+side*.11+j*.17,.268),(7.55,.061,.060),ALLOY)
-    box(stage,root+"/Rack",(0,y+side*.11,.253),(7.42,.074,.040),RUBBER)
-    for i in range(18):
-        x=(i-8.5)*.43
-        box(stage,root+f"/Sleeper_{i}",(x,y+side*.11,.045),(.16,.68,.075),STEEL)
-        for j in (-1,1):
-            cylinder(stage,root+f"/Bolt_{i}_{j+1}",(x,y+side*.11+j*.29,.091),.012,.016,ZINC)
-    for j in (-1,1):
-        box(stage,root+f"/EndStop_{j+1}",(j*3.72,y+side*.11,.34),(.16,.40,.14),AMBER)
 
 
 def parking(stage, root, side):
@@ -343,7 +337,7 @@ def write_concrete(path):
     Image.fromarray(np.clip(rgb,0,255).astype(np.uint8)).save(path,optimize=True)
 
 
-def factory(stage):
+def factory(stage, arm):
     path="/World/Factory"
     concrete_floor(stage,path)
     for i in range(1,8):
@@ -351,7 +345,7 @@ def factory(stage):
     joints,south=int(FLOOR_Y//2.5),int(FLOOR_S//2.5)
     for j in range(-south,joints+1):
         box(stage,path+f"/TransverseJoint_{j+south}",(0,j*2.5,.001),(19.96,.007,.002),(.17,.19,.20))
-    box(stage,path+"/DockPlate",(0,0,-.012),(4.95,2.22,.024),(.15,.18,.20))
+    box(stage,path+"/DockPlate",(WHEELBASE/2,0,-.012),(4.95+WHEELBASE,2.22,.024),(.15,.18,.20))
     for i in range(9):
         box(stage,path+f"/AMR_Center_{i}",(-6.53+i*.48,0,.003),(.265,.045,.005),(.04,.54,.78))
     arrow_points=[(-2.62,0.,.004),(-3.06,.20,.004),(-3.06,.071,.004),
@@ -359,8 +353,8 @@ def factory(stage):
     mesh(stage,path+"/DockDirection",arrow_points,[3,4],[0,1,6,2,3,4,5],(.04,.54,.78),True)
     amr_zones(stage,path+"/AMRZone")
     cell_floor=(.36,.43,.52)  # inside-cell tint from the layout legend; the dock plate stays dark
-    for name,(x0,x1,y0,y1) in (("Left",(-4.52,5.65,1.11,2.36)),("Right",(-4.52,5.65,-2.36,-1.11)),
-                               ("Entry",(-4.52,-2.475,-1.11,1.11)),("Exit",(2.475,5.65,-1.11,1.11))):
+    for name,(x0,x1,y0,y1) in (("Left",(-4.52,6.65,1.11,CELL_Y)),("Right",(-4.52,6.65,-CELL_Y,-1.11)),
+                               ("Entry",(-4.52,-2.475,-1.11,1.11)),("Exit",(2.475+WHEELBASE,5.65,-1.11,1.11))):
         box(stage,path+f"/CellFloor_{name}",((x0+x1)/2,(y0+y1)/2,.0015),(x1-x0,y1-y0,.002),cell_floor)
     for side,label in ((1,"Left"),(-1,"Right")):
         for i in range(int((AMR_BAY_Y-.24)/.48)+1):
@@ -373,17 +367,32 @@ def factory(stage):
         tip=[(-4.62,side*AMR_BAY_Y,.006),(-4.98,side*AMR_BAY_Y+.20,.006),(-4.98,side*AMR_BAY_Y-.20,.006)]
         mesh(stage,path+f"/AMR_{label}LoopArrow",tip,[3],[0,1,2],(.04,.54,.78),True)
         parking(stage,path+f"/{label}VehicleBuffer",side)
-        rail(stage,path+f"/{label}Rail",side)
-        guard_end=REJECT_X-.40 if side>0 else 4.95
-        fence(stage,path+f"/{label}InnerGuard",(-4.52,side*2.36),(guard_end,side*2.36))
-        if side>0:
-            fence(stage,path+"/RejectGuard",(REJECT_X+.40,2.36),(4.95,2.36))
+        mount_flange = fixed_robot(stage, f"{path}/{label}MountRobot", arm, MOUNT_BASE_X, side, "mount")
+        mount_gripper(stage, mount_flange+"/PHL_W_63_080_S")
+        fasten_flange = fixed_robot(stage, f"{path}/{label}FastenRobot", arm, FASTEN_BASE_X, side, "tighten")
+        fasten_head(stage, fasten_flange+"/FastenHead")
+        # Enclose the outboard conveyors. Maintenance doors open onto the walkway.
+        fy = side*CELL_Y
+        fence(stage,path+f"/{label}InnerGuard",(-2.70,fy),(6.65,fy),1.80)
+        fence(stage,path+f"/{label}ServiceGuard",(-4.52,fy),(-3.80,fy),1.80)
+        door = path+f"/{label}MaintenanceGuard"
+        fence(stage,door,(-3.79,fy),(-2.71,fy),1.80)
+        box(stage,door+"/Interlock",(-2.74,fy+side*.05,1.42),(.10,.07,.13),AMBER)
+        box(stage,door+"/Handle",(-2.83,fy+side*.07,1.05),(.045,.06,.20),DARK)
+        for x,tag,opening in ((-4.52,"AMR",1.50),(6.65,"Infeed",1.06)):
+            fence(stage,path+f"/{label}{tag}Guard",(x,side*opening),(x,fy),1.80)
+            box(stage,path+f"/{label}{tag}Guard/LightCurtainPost",(x,side*opening,.90),(.065,.065,1.80),AMBER)
+        for x,tag in ((-3.94,"Service"),(6.44,"Supply")):
+            station = path+f"/{label}{tag}GuardControl"
+            box(stage,station+"/Post",(x,fy+side*.09,.62),(.07,.08,1.24),BRUSHED)
+            box(stage,station+"/Plate",(x,fy+side*.14,1.15),(.12,.06,.16),AMBER)
+            cylinder(stage,station+"/EmergencyStop",(x,fy+side*.19,1.18),.034,.04,RED,"Y")
         # Walkway between the cell fence and the vehicle buffer, as in the layout image.
         fence(stage,path+f"/{label}BufferGuard",(-4.52,side*BUFFER_GUARD_Y),(4.95,side*BUFFER_GUARD_Y))
         for k,y in enumerate((CELL_Y+.18,BUFFER_GUARD_Y-.18)):
             box(stage,path+f"/CellFloor_{label}Walkway_{k}",(.215,side*y,.004),(9.47,.06,.003),AMBER)
         fence(stage,path+f"/{label}OuterGuard",(-5.55,side*OUTER_GUARD_Y),(6.10,side*OUTER_GUARD_Y))
-        fence(stage,path+f"/{label}EndGuard",(5.65,side*2.38),(5.65,side*OUTER_GUARD_Y))
+        fence(stage,path+f"/{label}EndGuard",(5.65,side*(CELL_Y+.02)),(5.65,side*OUTER_GUARD_Y))
         belt(stage,label+"AxleTransfer",(-1.04,side*LINE_Y),(1.04,side*LINE_Y),.67)
         if side>0:
             reject_gate=belt(stage,label+"Feed",(1.68,side*LINE_Y),bend(side)[-1],.67,outlet_x=REJECT_X)
@@ -391,7 +400,7 @@ def factory(stage):
             belt(stage,label+"Feed",(1.68,side*LINE_Y),bend(side)[-1],.67)
         curved_belt(stage,path+f"/{label}ConveyorBend",bend(side)[8:])
         for j in (-1,1):
-            beacon(stage,path+f"/{label}Signal_{j+1}",(j*4.65,side*2.36))
+            beacon(stage,path+f"/{label}Signal_{j+1}",(j*4.65,side*CELL_Y))
     belt(stage,"TruckUnload",FEED,bend(1)[0],.77)
     box(stage,path+"/PoweredDiverter",(6.272,0,.405),(1.16,1.87,.071),BRUSHED)
     # End the straight roller bank ahead of the first angled branch rollers.
@@ -401,8 +410,8 @@ def factory(stage):
             y=(lane-4.5)*.162
             cylinder(stage,path+f"/DiverterRoll_{row}_{lane}",(x,y,BELT_Z-ROLLER_RADIUS),
                      ROLLER_RADIUS,.10,ZINC,"Y")
-    belt(stage,"QA_Reject",(REJECT_X,LINE_Y+.38),(REJECT_X,2.02),.67)
-    box(stage,path+"/RejectCrate",(REJECT_X,2.24,.255),(.72,.42,.48),RED)
+    belt(stage,"QA_Reject",(REJECT_X,LINE_Y+.38),(REJECT_X,REJECT_CRATE_Y-.22),.67)
+    box(stage,path+"/RejectCrate",(REJECT_X,REJECT_CRATE_Y,.255),(.72,.42,.48),RED)
     truck_setback=.30
     box(stage,path+"/TruckCargo",(7.91,2.28+truck_setback,1.50),(2.07,4.00,1.77),(.61,.63,.65))
     box(stage,path+"/TruckCab",(7.91,4.93+truck_setback,1.02),(2.06,1.31,1.73),(.16,.22,.29))
@@ -485,7 +494,7 @@ def industrial_hall(stage, root):
             rect.CreateHeightAttr(.19)
             rect.CreateIntensityAttr(650 if i in (1, 2, 3) else 380)
     box(stage,root+"/RoofEdge",(0.,HALL_Y-.39,5.16),(19.75,.16,.23),BRUSHED)
-    for i, x in enumerate((5.90, 6.62, 7.34, 8.05)):
+    for i, x in enumerate((7.20, 7.92, 8.64, 9.36)):
         cabinet = root+f"/Panel_{i}"
         box(stage, cabinet+"/Housing", (x, -4.88, .96), (.66, .52, 1.86), PANEL)
         box(stage, cabinet+"/Door", (x, -4.606, .97), (.611, .026, 1.69), (.49, .53, .53))
@@ -640,36 +649,56 @@ def jig(stage, root, x, side, roller):
     return carriage
 
 
-def robot_model(stage, root, side, arm, mounting):
-    y=side*RAIL_Y
-    box(stage,root+"/Carriage",(0,y+side*.20,.35),(.66,.28,.11),BRUSHED)
-    box(stage,root+"/Drive",(0,y+side*.30,.38),(.34,.16,.15),RUBBER)
-    box(stage,root+"/Pedestal",(0,y+side*.16,.525),(.28,.22,.298),AMBER)
-    base_y=y+side*.11 if mounting else y
-    add_instance(stage,root+"/Base",f"{LIB}/{arm.model}_Link_0").AddTranslateOp().Set(vector((0,base_y,.68)))
-    groups=[]
-    for i in range(6):
-        item,position=xform(stage,root+f"/Joint_{i+1}")
-        groups.append((position,item.AddOrientOp()))
-        add_instance(stage,str(item.GetPath())+"/Housing",f"{LIB}/{arm.model}_Link_{i+1}")
-    flange=root+"/Joint_6"
-    add_instance(stage,flange+"/D455Assembly",LIB+"/D455")
-    if mounting:
-        cylinder(stage,flange+"/GuideAdapter",(0,0,.029),.052,.058,BRUSHED)
-        box(stage,flange+"/GuideGripper",(0,0,.088),(.11,.081,.067),PANEL)
-        for j in (-1,1):
-            box(stage,flange+f"/GuideJaw_{j+1}",(j*.025,0,.142),(.024,.037,.070),ALLOY)
-    else:
-        # Five-spindle head on the PCD: socket tips at TOOL, laid out in the flange frame so
-        # that with the fixed approach orientation each socket lands on its own stud.
-        cylinder(stage,flange+"/Nutrunner",(0,0,.060),.037,.12,BRUSHED)
-        for i in range(4):
-            ring(stage,flange+f"/DriveFins_{i}",(0,0,.022+i*.014),.041,.033,.003,ALLOY)
-        cylinder(stage,flange+"/GearHead",(0,0,.132),.088,.024,BRUSHED)
-        for i,(sx,sy) in enumerate(SOCKET_LAYOUT):
-            cylinder(stage,flange+f"/Nutrunner_Spindle_{i}",(sx,sy,.152),.011,.018,ALLOY)
-            cylinder(stage,flange+f"/Socket_{i}",(sx,sy,.180),.016,.040,AMBER)
-    return groups
+def rs080n_library(stage):
+    """RS080N link meshes (link frames, zero pose) as visual-only prototypes, no physics APIs."""
+    source=Usd.Stage.Open(str(RS080N_ASSETS/"RS080N.usdc"))
+    for i,name in enumerate(["base_link"]+[f"link_{k}" for k in range(1,7)]):
+        housing=source.GetPrimAtPath(f"/RS080N/{name}/Housing")
+        if not housing:
+            raise FileNotFoundError(f"RS080N.usdc has no /RS080N/{name}/Housing")
+        UsdGeom.Xform.Define(stage,f"{LIB}/rs080n_Link_{i}")
+        copy_mesh(stage,f"{LIB}/rs080n_Link_{i}/Housing",housing,Gf.Matrix4d(1),KAWASAKI_GRAY)
+
+
+def fixed_robot(stage, path, arm, base_x, side, role):
+    """Place the six RS080N links at their parked joint angles, facing the car."""
+    node,_=xform(stage,path,(base_x,side*ROBOT_BASE_Y,0.))
+    node.AddRotateZOp().Set(180. if side>0 else 0.)
+    prim=node.GetPrim()
+    prim.CreateAttribute("cell:role",Sdf.ValueTypeNames.String).Set(role)
+    prim.CreateAttribute("cell:model",Sdf.ValueTypeNames.String).Set("RS080N")
+    prim.CreateAttribute("cell:fixedBase",Sdf.ValueTypeNames.Bool).Set(True)
+    add_instance(stage,path+"/Base/Housing",f"{LIB}/rs080n_Link_0")
+    for i,(p,rot,_) in enumerate(arm.fk((0.,0.,0.),RS080N_PARK),1):
+        link,_=xform(stage,path+f"/Link_{i}",p)
+        qx,qy,qz,qw=Rotation.from_matrix(rot).as_quat()
+        link.AddOrientOp().Set(Gf.Quatf(qw,qx,qy,qz))
+        add_instance(stage,path+f"/Link_{i}/Housing",f"{LIB}/rs080n_Link_{i}")
+    return path+"/Link_6"
+
+
+def mount_gripper(stage, path):
+    """Parked visual of the PHL-W 63-080-S, with the two shoes at the tread diameter."""
+    box(stage, path+"/Adapter", (0,0,.010), (.22,.16,.020), ALLOY)
+    box(stage, path+"/Housing", (0,0,.08435), (.541,.164,.1287), BLUE)
+    for side, name in ((-1, "Left"), (1, "Right")):
+        jaw = path+"/"+name
+        box(stage, jaw+"/Slide", (side*.267,0,.1612), (.10,.12,.025), BRUSHED)
+        box(stage, jaw+"/Finger", (side*.324,0,.276), (.025,.10,.22), ALLOY)
+        box(stage, jaw+"/Shoe", (side*.31,0,.32), (.012,.090,.155), RUBBER)
+
+
+def fasten_head(stage, head):
+    """Five-spindle head in the flange frame, with +Z pointing to the sockets."""
+    cylinder(stage,head+"/AdapterPlate",(0,0,.015),.11,.03,BRUSHED)
+    cylinder(stage,head+"/FloatingPlate",(0,0,.050),.125,.024,ALLOY)
+    for i,(sx,sy) in enumerate(SOCKET_LAYOUT):
+        cylinder(stage,head+f"/Spindle_{i}",(sx,sy,.062+.17),SPINDLE_RADIUS,.34,BRUSHED)
+        cylinder(stage,head+f"/Socket_{i}",(sx,sy,HEAD_LENGTH-.03),.016,.06,DARK)
+    for j in (-1,1):
+        # Anti-rotation pins between the spindles, outside the PCD.
+        cylinder(stage,head+f"/ReactionPin_{j+1}",(0,j*.095,.062+.20),.009,.40,AMBER)
+    box(stage,head+"/D405",(0,0,.34),(.042,.042,.023),DARK)
 
 
 def magazine(stage, path, side):
@@ -683,116 +712,23 @@ def magazine(stage, path, side):
     return np.array(pocket)+(0.,side*TOOL,0.)
 
 
-def key_robot(stage, arm, groups, side, waypoints, root):
-    base=(0.,side*(RAIL_Y+.11 if arm.model=="h2515" else RAIL_Y),.68)
-
-    def pose(seconds,q):
-        for i, angle in enumerate(q):
-            joint = stage.GetPrimAtPath(root+f"/Joint_{i+1}")
-            joint.CreateAttribute("cell:jointTargetDeg", Sdf.ValueTypeNames.Double).Set(
-                degrees(angle), frame(seconds))
-        for (pos,orient),(p,rot,_) in zip(groups,arm.fk(base,q)):
-            move(pos,seconds,p)
-            qx,qy,qz,qw=Rotation.from_matrix(rot).as_quat()
-            orient.Set(Gf.Quatf(qw,qx,qy,qz),frame(seconds))
-
-    previous_t,first=waypoints[0]
-    # Start H2515 on the same folded-elbow branch as the insertion targets.
-    seed=np.deg2rad([17,0,-143,-76,80,-54]) if arm.model=="h2515" else None
-    left_base=(base[0],abs(base[1]),base[2])
-    mirrored=lambda p:(p[0],-p[1],p[2])
-
-    def solve(target,previous,reference):
-        # Solve the left arm, then give the right arm the mirror image of that posture so
-        # both sides sweep the same envelope past the parked tip fixtures.
-        left=arm.solve(left_base,mirrored(target) if side<0 else target,1,reference)
-        if side>0:
-            return left,left
-        return left,arm.solve_mirrored(base,target,left,previous)
-
-    reference,previous=solve(first,None,seed)
-    pose(previous_t,previous)
-    for seconds,target in waypoints[1:]:
-        reference,q=solve(target,previous,reference)
-        duration=seconds-previous_t
-        if np.any(abs(q-previous)>arm.speed*duration):
-            raise ValueError(f"Joint speed limit exceeded at {root}, {seconds:.2f}s; required {max(abs(q-previous)/arm.speed):.2f}s, planned {duration:.2f}s")
-        samples=min(48,ceil(duration*12)) if np.linalg.norm(q-previous)>1e-6 else 1
-        for i in range(1,samples+1):
-            ratio=i/samples
-            pose(previous_t+duration*ratio,previous+(q-previous)*ratio)
-        previous_t,previous=seconds,q
-
-
-def rail_robot(stage, root, arm, side, start, front, rear, rear_tight, front_tight, departure, mounting):
-    node,slide=xform(stage,root)
-    node.GetPrim().CreateAttribute("cell:role",Sdf.ValueTypeNames.String).Set("mount" if mounting else "tighten")
-    node.GetPrim().CreateAttribute("cell:model",Sdf.ValueTypeNames.String).Set(arm.model.upper())
-    node.GetPrim().CreateAttribute("cell:payloadKg",Sdf.ValueTypeNames.Float).Set(25. if mounting else 15.)
-    groups=robot_model(stage,root,side,arm,mounting)
-    safe=(.05,side*1.54,HUB_Z+.36)
-    if mounting:
-        safe=(-.36,side*1.35,HUB_Z+.35)
-        offset=.53
-        rail_samples=((start,MOUNT_PARK),(front-13,MOUNT_PARK),(front-7,AXLE+offset),
-                      (front+1.4,AXLE+offset),(rear-4,-AXLE+offset),
-                      (rear+1.4,-AXLE+offset),(rear+5,MOUNT_PARK))
-        # Wheel-side standby between the parked tip fixture's upper jaw head (x <= axle+0.003,
-        # z 1.14-1.22) and its upright guide beam (axle+0.28..0.33, top z 1.32). Tool parts
-        # span +-0.062 m and the live arm trails its target by ~+0.06 m in x, so the target
-        # sits at axle+0.06 (at the axle the arm grazed the jaw pad by ~1 mm).
-        movement_target=(-offset+.06,side*(LINE_Y+.30),HUB_Z+.11)
-        poses=[(start,safe)]
-        for t,approach,axle in ((front,6.7,AXLE),(rear,3.8,-AXLE)):
-            seated_target=(-offset,side*(half_track(axle)+.30),HUB_Z+.10)
-            poses.extend(((t-approach,safe),(t-2.2,movement_target),(t,seated_target),
-                          (t+1.35,safe)))
-    else:
-        offset=-.53
-        rail_samples=((start,FASTEN_PARK),(rear_tight-3,FASTEN_PARK),(rear_tight,-AXLE+offset),
-                      (rear_tight+NUT_CYCLE+1,-AXLE+offset),
-                      (front_tight-1,AXLE+offset),
-                      (front_tight+NUT_CYCLE+1,AXLE+offset),(departure,FASTEN_PARK))
-        pickup=magazine(stage,root+"/NutMagazine",side)
-        poses=[(start,safe)]
-        for first,axle in ((rear_tight,-AXLE),(front_tight,AXLE)):
-            # The head is centred on the hub axis; all five sockets engage and run down together.
-            px,pz=-offset,HUB_Z
-            outside=half_track(axle)+NUT_SEAT+NUT_LENGTH+NUT_ADVANCE+TOOL
-            waypoint=(px,side*(outside+.08),pz)
-            run_down=(px,side*(outside-NUT_ADVANCE),pz)
-            poses.extend(((first,safe),(first+NUT_PICKUP,pickup),(first+1.94,waypoint),
-                          (first+NUT_ENGAGE,(px,side*outside,pz)),
-                          (first+NUT_ENGAGE+NUT_DRIVE,run_down),
-                          (first+NUT_ENGAGE+NUT_DRIVE+NUT_FINAL,run_down),
-                          (first+NUT_CYCLE,waypoint),(first+NUT_CYCLE+1,safe)))
-            for k,(sx,sy) in enumerate(SOCKET_LAYOUT):
-                held_root=root+f"/Joint_6/CarriedNut_{round(first*1000)}_{k}"
-                held,_=xform(stage,held_root,(sx,sy,TOOL+NUT_LENGTH))
-                held.AddRotateXOp().Set(180.)
-                make_nut(stage,held_root)
-                visibility(held,first+NUT_PICKUP,first+NUT_ENGAGE)
-    for t,x in rail_samples:
-        move(slide,t,(x,0,0))
-    key_robot(stage,arm,groups,side,poses,root)
-
-
-def dock_clamps(stage, root, start, departure):
+def dock_clamps(stage, root, dock, release, *, base_x=0., prefix="DockClamp"):
     """Animate lateral locating contacts on the cell floor, clear before travel."""
     for i,x in enumerate((-.40,.40)):
         for side in (-1,1):
-            path=root+f"/DockClamp_{i}_{side+1}"
-            box(stage,path+"/Base",(x,side*.70,.08),(.35,.19,.148),BRUSHED)
+            path=root+f"/{prefix}_{i}_{side+1}"
+            clamp_x=base_x+x
+            box(stage,path+"/Base",(clamp_x,side*.70,.08),(.35,.19,.148),BRUSHED)
             _,slide=xform(stage,path+"/Slide")
             box(stage,path+"/Slide/Jaw",(0,0,.22),(.13,.057,.105),AMBER)
             box(stage,path+"/Slide/Pad",(0,-side*.032,.22),(.09,.016,.074),ALLOY)
             cylinder(stage,path+"/Slide/Pin",(0,side*.055,.22),.020,.086,ZINC,"Y")
-            for t,y in ((start,DOCK_CLAMP_OPEN),(start+AMR_DOCKED,DOCK_CLAMP_OPEN),(start+AMR_DOCKED+2,DOCK_CLAMP_CLOSED),
-                        (departure-2,DOCK_CLAMP_CLOSED),(departure,DOCK_CLAMP_OPEN)):
-                move(slide,t,(x,side*y,0))
+            for t,y in ((0.,DOCK_CLAMP_OPEN),(dock,DOCK_CLAMP_OPEN),(dock+2.,DOCK_CLAMP_CLOSED),
+                        (release-2.,DOCK_CLAMP_CLOSED),(release,DOCK_CLAMP_OPEN)):
+                move(slide,t,(clamp_x,side*y,0))
 
 
-def order(stage, assets, mount_arm, fasten_arm, data, record):
+def order(stage, assets, data, record):
     number,wheel,start,deliveries,reject,front,rear,rear_tight,front_tight,departure,end=data
     vehicle=f"CN7-{number:03}"
     root=f"/World/Orders/CN7_{number:03}"
@@ -802,9 +738,13 @@ def order(stage, assets, mount_arm, fasten_arm, data, record):
     staged=max(0.,start-AMR_AT_GATE)
     visibility(cycle,staged,end)
     amr,lift=carrier(stage,assets,root+"/Carrier")
-    dock_clamps(stage,root,start,departure)
+    index_start=front_tight+NUT_CYCLE+4.
+    redock=index_start+INDEX_TRAVEL
+    dock_clamps(stage,root,start+AMR_DOCKED,index_start)
+    dock_clamps(stage,root,redock,departure,base_x=WHEELBASE,prefix="RearDockClamp")
     route=((start-AMR_AT_GATE,AMR_GATE_X,AMR_BAY_Y),(start,AMR_GATE_X,0.),(start+AMR_DOCKED,0.,0.),
-           (departure,0.,0.),(departure+AMR_OUT_GATE,AMR_GATE_X,0.),(end,AMR_GATE_X,-AMR_BAY_Y))
+           (index_start,0.,0.),(redock,WHEELBASE,0.),
+           (departure,WHEELBASE,0.),(departure+AMR_OUT_GATE,AMR_GATE_X,0.),(end,AMR_GATE_X,-AMR_BAY_Y))
     for t,x,y in route:
         move(amr,t,(x,y,0.))
     for t,height in ((start-AMR_AT_GATE,-.12),(start+AMR_DOCKED,-.12),(start+AMR_LIFTED,0.),
@@ -812,12 +752,12 @@ def order(stage, assets, mount_arm, fasten_arm, data, record):
         move(lift,t,(0.,0.,height))
     record(start,vehicle,"","order",wheel.name)
     record(start+AMR_LIFTED,vehicle,"","docked","AMR dock and lift complete")
-    record(departure,vehicle,"","depart","Both rails parked")
+    record(index_start,vehicle,"","index_start","Front tools withdrawn and first dock released")
+    record(redock+2.,vehicle,"","rear_docked","Rear axle at common assembly position")
+    record(departure,vehicle,"","depart","AMR leaving the dock")
     record(end,vehicle,"","outbound","AMR reached outbound apron")
     record(staged,vehicle,"","staged","AMR leaves inbound buffer for the gate")
-    for side,name in ((1,"Left"),(-1,"Right")):
-        rail_robot(stage,root+f"/{name}Mount",mount_arm,side,start,front,rear,rear_tight,front_tight,departure,True)
-        rail_robot(stage,root+f"/{name}Fasten",fasten_arm,side,start,front,rear,rear_tight,front_tight,departure,False)
+    shared_supports={}
     if reject:
         item,pos,_,_=make_wheel(stage,assets,root+"/RejectedWheel",wheel,damaged=True)
         visibility(item,reject[0][0],reject[-1][0]+.65)
@@ -840,7 +780,7 @@ def order(stage, assets, mount_arm, fasten_arm, data, record):
                              (seated-4.,0.,y,upright),(seated-3.,0.,y,upright),
                              (seated-2.,.012,y,HUB_Z+.01),(seated-1.,0.,y,HUB_Z),
                              (seated,0.,wheel_y,HUB_Z)):
-            move(pos,t,(x+offset,wy,z))
+            move(pos,t,(AXLE+offset,wy,z))
         for t,angle in ((seated-4.,0.),(seated-3.,-side*90)):
             tilt.Set(angle,frame(t))
         for t,angle in ((seated-4.,11.),(seated-2.,11.),(seated-1.,0.)):
@@ -851,16 +791,19 @@ def order(stage, assets, mount_arm, fasten_arm, data, record):
             installed.GetPrim().CreateAttribute("cell:clearance_"+name_key,Sdf.ValueTypeNames.Double).Set(value)
         mounted_tilt.Set(-side*90)
         visibility(installed,seated,end)
-        carriage=jig(stage,root+f"/LoadSupport_{name}",x,side,roller)
-        for t,cx,cy,z in ((start,x,y,.467),(seated-5.,x,y,.467),
-                         (seated-4.,x,y,upright-wheel.width/2-.033),
-                         (seated-3.,x,y,upright-roller),
-                         (seated-2.,x+.012,y,HUB_Z+.01-roller),
-                         (seated-1.,x,y,HUB_Z-roller),
-                         (seated,x,wheel_y,HUB_Z-roller),
-                         (tight+NUT_CYCLE,x,wheel_y,HUB_Z-roller),
-                         (tight+NUT_CYCLE+1,x,wheel_y,.45),
-                         (tight+NUT_CYCLE+2,x,y,.45)):
+        if side not in shared_supports:
+            shared_supports[side]=jig(stage,root+f"/LoadSupport_{name}",AXLE,side,roller)
+            move(shared_supports[side],start,(AXLE,y,.467))
+        carriage=shared_supports[side]
+        for t,cx,cy,z in ((seated-5.,AXLE,y,.467),
+                         (seated-4.,AXLE,y,upright-wheel.width/2-.033),
+                         (seated-3.,AXLE,y,upright-roller),
+                         (seated-2.,AXLE+.012,y,HUB_Z+.01-roller),
+                         (seated-1.,AXLE,y,HUB_Z-roller),
+                         (seated,AXLE,wheel_y,HUB_Z-roller),
+                         (tight+NUT_CYCLE,AXLE,wheel_y,HUB_Z-roller),
+                         (tight+NUT_CYCLE+1,AXLE,wheel_y,.45),
+                         (tight+NUT_CYCLE+2,AXLE,y,.45)):
             move(carriage,t,(cx,cy,z))
         record(path[-1][0],vehicle,name,"inspect","Simulated wheel inspection")
         record(seated-1,vehicle,name,"aligned",
@@ -893,8 +836,7 @@ def main():
     parser.add_argument("--scene", type=Path, default=Path(__file__).resolve().parent.parent/"scene",
                         help="Layered scene folder; overrides/ inside it is never overwritten")
     parser.add_argument("--inject-defect", action="store_true", help="Reject and replace first FL wheel")
-    parser.add_argument("--mount-urdf", type=Path, default=DOOSAN_ASSETS/"h2515.urdf")
-    parser.add_argument("--fasten-urdf", "--urdf", type=Path, default=DOOSAN_ASSETS/"m1509.urdf")
+    parser.add_argument("--fasten-urdf", "--urdf", type=Path, default=RS080N_ASSETS/"rs080n.urdf")
     parser.add_argument("--mixed-wheel-sizes", action="store_true", help="Include R15 and R17 demo orders")
     parser.add_argument("--asset-root", type=Path,
                         default=Path.home()/"cobot3_ws/isaacpjt")
@@ -902,9 +844,9 @@ def main():
                         help="Assembled local USD used as the D455 tool reference")
     parser.add_argument("--amr-usd", type=Path, help="Replacement AMR render asset")
     args = parser.parse_args()
-    mount_arm, fasten_arm = Arm(args.mount_urdf), Arm(args.fasten_urdf)
-    if (mount_arm.model,fasten_arm.model)!=("h2515","m1509"):
-        parser.error("The selected URDFs must match the bundled H2515 and M1509 link meshes.")
+    fasten_arm = Arm(args.fasten_urdf)
+    if fasten_arm.model != "khi_rs080n":
+        parser.error("The robot URDF must match the bundled RS080N link meshes.")
     stage = Usd.Stage.CreateInMemory()
     world, _ = xform(stage, "/World")
     stage.SetDefaultPrim(world.GetPrim())
@@ -914,13 +856,14 @@ def main():
     stage.SetFramesPerSecond(FPS)
     stage.SetStartTimeCode(0)
     UsdGeom.Scope.Define(stage,"/World/Orders")
-    assets = VisualAssets(stage, args.asset_root, DOOSAN_ASSETS/"doosan_links.usdc", args.tool_usd, args.amr_usd)
+    assets = VisualAssets(stage, args.asset_root, args.tool_usd, args.amr_usd)
     for key,value in {"bodyLengthM":BODY_LENGTH,"bodyWidthM":BODY_WIDTH,"wheelbaseM":WHEELBASE,
                       "hubPilotDiameterM":PILOT,"studDiameterM":STUD_DIAMETER,"studPitchM":PITCH,
                       "studProjectionM":STUD_PROJECTION,"lugThroatM":LUG_HOLE,
                       "minNutTorqueNm":NUT_TORQUE[0],"maxNutTorqueNm":NUT_TORQUE[1]}.items():
         world.GetPrim().CreateAttribute("cell:"+key,Sdf.ValueTypeNames.Double).Set(value)
-    reject_gate=factory(stage)
+    rs080n_library(stage)
+    reject_gate=factory(stage,fasten_arm)
     events = []
 
     def record(seconds, vehicle, station, code, detail):
@@ -930,7 +873,7 @@ def main():
         margins=fit(data[1])
         if min(margins.values())<=0:
             raise ValueError(f"Nominal wheel interference for {data[1].name}: {margins}")
-        order(stage, assets, mount_arm, fasten_arm, data, record)
+        order(stage, assets, data, record)
         reject=data[4]
         if reject:
             closed=reject_gate.Get()

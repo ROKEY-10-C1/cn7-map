@@ -65,7 +65,8 @@ def check_actors(stage, robots, exported=False):
         print("Unexpected animated car parts",duplicates,flush=True)
         return False
     carriages=[str(prim.GetPath()) for prim in live if prim.GetName()=="RailCarriage" and prim.HasAPI(UsdPhysics.RigidBodyAPI)]
-    if len(carriages)!=(4 if robots else 0):
+    fixed_layout = bool(stage.GetPrimAtPath("/World/Factory/LeftFastenRobot")) and not stage.GetPrimAtPath("/World/Factory/LeftRail")
+    if len(carriages) != (2 if robots and not fixed_layout else 0):
         print("Unexpected robot carriages",carriages,flush=True)
         return False
     return True
@@ -81,7 +82,8 @@ def check_supply(stage,seed,side):
         for prim in (wheel,tire):
             UsdGeom.Xformable(prim).GetOrderedXformOps()[0].Set(Gf.Vec3d(7.57,0.,BELT_Z+.125))
         constrain(UsdPhysics.FixedJoint.Define(stage,test_path+"Mount"),wheel,tire)
-        for i in range(18*HZ):
+        # The rear conveyor adds a lateral leg between the splitter and the feed.
+        for i in range(30*HZ):
             cell.step()
             p=cell.api.get_rigidbody_transformation(test_path)["position"]
             if i%HZ==0:
@@ -316,6 +318,10 @@ def main():
     args.add_argument("--buffer-probe",type=int,choices=(0,1,2),help="Only fetch the car from this inbound buffer slot")
     args.add_argument("--entry",type=float,help="Hanger entry height for --buffer-probe (default process.AMR_LIFT_ENTRY)")
     config=args.parse_args()
+    if config.interference_probe:
+        # The probe drove the mount and fasten carriages of one rail into each other; the fastening
+        # robots are fixed RS080N now, so a rail carries only one robot.
+        args.error("--interference-probe is retired: each rail carries only the mount robot")
     if config.interference_probe and config.without_robots:
         args.error("--interference-probe requires robots")
     if config.buffer_probe is not None:

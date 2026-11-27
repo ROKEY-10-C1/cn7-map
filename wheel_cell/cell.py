@@ -11,7 +11,7 @@ from physical_data import BODY_MASS, PAD_DYNAMIC_FRICTION, PAD_STATIC_FRICTION
 from physical_data import box_inertia
 from physical_data import GUIDE_DYNAMIC_FRICTION, GUIDE_STATIC_FRICTION
 from physical_data import AMR_LIFT_MASS, AMR_MASS, AMR_SIZE
-from process import STATIONS
+from process import AMR_BAY_Y, STATIONS
 from sim_util import body, cube, mass_properties, material, pose, reference, transform
 from live_params import HZ, INTERLOCK_FAULTS, MIN_RAIL_SPACING, REFERENCE, ROOT, TERMINAL_PHASES
 from carrier import Carrier
@@ -48,7 +48,7 @@ class Cell:
         options.CreateBroadphaseTypeAttr("MBP")
         options.CreateTimeStepsPerSecondAttr(HZ)
         options.CreateEnableCCDAttr(True)
-        cube(stage,ROOT+"/Floor",(0,0,-.055),(20,15,.11))
+        cube(stage,ROOT+"/Floor",(0,0,-.055),(20,2*(AMR_BAY_Y+3.),.11))
         # Keep the first car on the AMR at its low inbound datum until the dock closes.
         source_amr=REFERENCE+"/Carrier"
         source_lift=source_amr+"/Hanger"
@@ -101,10 +101,12 @@ class Cell:
         self.buffer_stands=buffer_stands(stage)
         rng=Random(seed)
         self.stations=[make_station(stage,car,name,rng.uniform(-180.,180.),sections,mats,seed) for name in STATIONS]
-        self.robots=[Robot(stage,REFERENCE+"/"+prefix+role)
-                for prefix in ("Left","Right") for role in ("Mount","Fasten")] if robots else []
+        # Earlier saved stages have rail actors under Orders. Fixed RS080N arms
+        # are permanent Factory equipment and already visible in the live stage.
+        sources = [REFERENCE + f"/{prefix}Mount" for prefix in ("Left", "Right")]
+        self.robots = [Robot(stage, path) for path in sources if stage.GetPrimAtPath(path)] if robots else []
         self.robots_by_path={robot.path:robot for robot in self.robots}
-        self.rail_pairs=list(zip(self.robots[::2],self.robots[1::2]))
+        self.rail_pairs=[(robot,) for robot in self.robots]
         self.pair_by_robot={robot.path:pair for pair in self.rail_pairs for robot in pair}
         self.by_contact_face={station.face_path:station for station in self.stations}
         self.by_wheel={station.wheel:station for station in self.stations}
@@ -146,7 +148,10 @@ class Cell:
         return compiled.GetRootLayer().Export(str(path))
 
     def robot_clearance(self):
-        for mount,fasten in self.rail_pairs:
+        for pair in self.rail_pairs:
+            if len(pair)<2:
+                continue
+            mount,fasten=pair
             paths=[r.path+"/RailCarriage" for r in (mount,fasten)]
             poses=[self.api.get_rigidbody_transformation(p) for p in paths]
             if mount.rail.Get()-fasten.rail.Get()<MIN_RAIL_SPACING:
@@ -158,15 +163,17 @@ class Cell:
             if spacing<MIN_RAIL_SPACING:
                 self.stop_pair(mount,fasten,"rail_clearance")
 
-    def stop_pair(self,mount,fasten,reason):
-        if mount.paused_targets and fasten.paused_targets:
+    def stop_pair(self,*args):
+        """Hold the robots sharing a rail (now one per rail) and fail that side's stations."""
+        *robots,reason=args
+        if all(robot.paused_targets for robot in robots):
             return
-        self.interference.append((self.seconds,mount.path,fasten.path,reason))
-        self.pending.append((self.seconds,mount.path.rsplit("/",1)[1],reason))
-        for robot in (mount,fasten):
+        self.interference.append((self.seconds,*(robot.path for robot in robots),reason))
+        self.pending.append((self.seconds,robots[0].path.rsplit("/",1)[1],reason))
+        for robot in robots:
             robot.hold(self.api)
         for station in self.stations:
-            if any((station.side>0)==("Left" in r.path) for r in (mount,fasten)) and station.phase not in TERMINAL_PHASES:
+            if any((station.side>0)==("Left" in r.path) for r in robots) and station.phase not in TERMINAL_PHASES:
                 station.press.Set(station.gap-station.initial_gap)
                 station.phase="interference"
 

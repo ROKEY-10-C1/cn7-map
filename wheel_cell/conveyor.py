@@ -85,8 +85,9 @@ def setup_factory(stage, root, material, guide_material, branch_side):
         if prim.IsA(UsdGeom.Mesh) and prim.GetName()=="SafetyMesh":
             points=UsdGeom.Mesh(prim).GetPointsAttr().Get()
             low,high=min(p[0] for p in points),max(p[0] for p in points)
+            bottom,top=min(p[2] for p in points),max(p[2] for p in points)
             slab=block(stage,str(prim.GetParent().GetPath())+"/ScreenCollision",
-                       ((low+high)/2,0,.79),(high-low,.013,1.13))
+                       ((low+high)/2,0,(top+bottom)/2),(high-low,.013,top-bottom))
             UsdGeom.Imageable(stage.GetPrimAtPath(slab)).CreateVisibilityAttr("invisible")
             continue
         if not (prim.IsA(UsdGeom.Cube) or prim.IsA(UsdGeom.Cylinder)):

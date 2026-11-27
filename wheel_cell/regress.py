@@ -9,7 +9,7 @@
 
 Areas: cycle (seed 42, the whole order: buffer -> gate -> dock, pick zone), gate (seed 42 from
 the gate), seeds (four seeds from the gate), buffer (only the buffer pick-up, slots 1 and 3),
-supply (truck infeed), insertion (hub bench), rails (same-rail arm interlock), full (everything).
+supply (truck infeed), insertion (hub bench), full (everything).
 """
 import argparse
 import json
@@ -32,7 +32,6 @@ SCENARIOS = {
     "gate7": (["--seed", "7", "--start", "gate"], "same, another seed"),
     "gate123": (["--seed", "123", "--start", "gate"], "same, another seed"),
     "gate2024": (["--seed", "2024", "--start", "gate"], "same, another seed"),
-    "rails": (["--interference-probe"], "same-rail arms commanded together are stopped"),
     "insert_nominal": (["--insertion-probe", "nominal"], "bench: wheel pressed onto the hub seats on the face"),
     "insert_skew": (["--insertion-probe", "skew"], "bench: 4 mm radial offset is stopped by the studs"),
     "supply_left": (["--supply-probe", "left"], "infeed reaches the left branch"),
@@ -48,7 +47,6 @@ AREAS = {
     "cycle": ("seed42",),
     "gate": ("gate42",),
     "seeds": ("gate42", "gate7", "gate123", "gate2024"),
-    "rails": ("rails",),
     "buffer": ("buffer0", "buffer2"),
     "full": tuple(SCENARIOS),
 }
@@ -57,20 +55,20 @@ AREAS = {
 FILE_AREAS = {
     "conveyor.py": ("supply", "cycle"),
     "handling.py": ("cycle",),
-    "gripper.py": ("cycle", "rails"),
+    "gripper.py": ("cycle"),
     "corner.py": ("insertion", "cycle"),
-    "physics.py": ("insertion", "cycle", "rails"),
+    "physics.py": ("insertion", "cycle"),
     "sim_util.py": ("full",),
     "live_params.py": ("full",),
     "wheel.py": ("insertion", "cycle"),
     "station.py": ("insertion", "cycle"),
-    "live_robot.py": ("cycle", "rails"),
-    "carrier.py": ("cycle", "gate", "rails", "buffer"),
+    "live_robot.py": ("cycle"),
+    "carrier.py": ("cycle", "gate", "buffer"),
     "vehicle.py": ("cycle", "buffer"),
     "cell.py": ("full",),
     "fitment.py": ("insertion", "cycle"),
     "wheel_geometry.py": ("insertion", "cycle"),
-    "robot.py": ("cycle", "rails"),
+    "robot.py": ("cycle"),
     "cell_config.py": ("insertion", "cycle"),
     "process.py": ("full",),
     "physical_data.py": ("full",),

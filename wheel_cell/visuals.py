@@ -94,7 +94,7 @@ def copy_mesh(stage, path, source, matrix, color, preserve_normals=True):
 
 
 class VisualAssets:
-    def __init__(self, stage, root: Path, arm_library: Path, robot_file=None, amr_file=None):
+    def __init__(self, stage, root: Path, robot_file=None, amr_file=None):
         library = UsdGeom.Xform.Define(stage, LIB)
         library.CreateVisibilityAttr("invisible")
         self.stage = stage
@@ -111,25 +111,6 @@ class VisualAssets:
             raise FileNotFoundError(f"Set --asset-root to isaacpjt. Missing: {missing}")
         robot = Usd.Stage.Open(str(robot_file))
         cache = UsdGeom.XformCache()
-        arm_models = Usd.Stage.Open(str(arm_library))
-        for model in ("h2515","m1509"):
-            for i in range(7):
-                source = arm_models.GetPrimAtPath(f"/{model}/Link_{i}")
-                destination = f"{LIB}/{model}_Link_{i}"
-                UsdGeom.Xform.Define(stage,destination)
-                for j, prim in enumerate(Usd.PrimRange(source)):
-                    if prim.IsA(UsdGeom.Mesh):
-                        relative=prim.GetPath().MakeRelativePath(source.GetPath()).pathString
-                        if relative.startswith("Collision_"):
-                            collision_root=f"{LIB}/{model}_Collision_{i}"
-                            UsdGeom.Xform.Define(stage,collision_root)
-                            copy_mesh(stage,f"{collision_root}/Part_{j}",prim,Gf.Matrix4d(1),PANEL)
-                            continue
-                        source_color = tuple(UsdGeom.Gprim(prim).GetDisplayColorAttr().Get()[0])
-                        rgb = ROBOT_YELLOW if max(source_color)>.3 else (.036,.042,.05)
-                        copy_mesh(stage,f"{destination}/Part_{j}",prim,Gf.Matrix4d(1),rgb)
-                if not stage.GetPrimAtPath(destination).GetChildren():
-                    raise ValueError(f"Missing {model} visual for link {i}")
         self.robot_tools(robot, cache)
         self.has_amr = amr_file is not None
         if amr_file:
