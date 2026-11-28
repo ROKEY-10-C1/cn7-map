@@ -6,6 +6,16 @@
 
 ## 실행 (저장소 루트에서)
 
+2026-11-28부터 셀 장착은 `mount_control.py`를 쓴다(`cell_mount_run.py`는 1단계 기록용으로 그대로 둔다).
+**Isaac Sim은 한 번에 하나만 돌린다.** 동시에 돌리면 같은 시드라도 결과가 달라진다(TS-22).
+
+```bash
+~/isaacsim/python.sh wheel_mount_sim/mount_control.py --seed 42 --no-video --out wheel_mount_sim/output/cell/run1        # 앞바퀴 좌우
+~/isaacsim/python.sh wheel_mount_sim/mount_control.py --seed 1 --car --car-dynamic --no-video --out .../car1           # A 앞바퀴 → 이동 → B 뒷바퀴
+MOUNT_CAMS=zoom_left,zoom_right ~/isaacsim/python.sh wheel_mount_sim/mount_control.py --replay-video .../run1 --t0 17 --t1 31   # 확대 영상
+./wheel_mount_sim/ros2_nodes/run_ros2_test.sh wheel_mount_sim/output/cell/ros2_1 --seed 1                              # ROS 2 (2단계)
+```
+
 ```bash
 ./wheel_mount_sim/tools/fetch_assets.sh                          # 처음 한 번: RS080N USD 받기 (커밋하지 않음)
 ~/isaacsim/python.sh wheel_mount_sim/run.py --no-video           # 빠른 확인 (~5분)
@@ -55,6 +65,12 @@ Isaac Sim에서 **File → Open**으로 열어 형상·충돌체·관절·재질
 | `docs/troubleshooting/` | 트러블슈팅 기록과 이미지(노션 「트러블슈팅 → 장착로봇팔」 원본) |
 | `cell_mount.py`, `cell_check.py/.sh` | 조립 셀 라이브 물리에 장착로봇·장착 물리를 넣는 모듈과 셀 안 대기 검사 ([`docs/CELL_INTEGRATION.md`](docs/CELL_INTEGRATION.md)) |
 | `cell_mount_run.py` | 조립 셀 맵에서 우리 부분만(AMR 이송 제외): 좌우 장착로봇이 벨트 끝 타이어를 집어 앞 허브에 끼움 |
+| `mount_control.py` | 위 제어를 `CellEnv`(셀·PhysX·기록)와 `MountSide`(로봇 1대, 단계별 동작)로 나눈 모듈. 분리 직후 1단계와 이벤트까지 같음을 확인했고(TS-22), 그 뒤 집기·걸림 복구 수정이 들어감. `--car`(A 앞바퀴 → 차량 이동 → B 뒷바퀴), `--car-dynamic`, `--replay-video` |
+| `cell_mount_ros2.py`, `cell_mount_ros2.sh` | 2단계: Isaac Sim 쪽 로봇 제어기(서보·240 Hz 힘 제어·그리퍼)와 가짜 AMR. ROS 2로 단계 명령을 받고 `/Parking`을 보냄 |
+| `ros2_nodes/mount_sequencer.py` | ROS 2 순서 노드(시스템 Jazzy): `/Parking`을 받으면 바퀴마다 단계를 명령하고 `/Mount`로 결과를 냄 |
+| `ros2_config.py` | 토픽 이름·메시지 형식(임시, 한 곳에 모음) |
+| `ros2_nodes/run_ros2_test.sh` | 제어기 + 순서 노드 + `/Mount`·`/Parking` 기록을 한 번에 돌리는 시험 |
+| `docs/STUD_SPEC.md` | 허브 스터드·너트 규격, 장착 쪽과 체결 쪽 형상 비교 |
 | `cell_layout.py`, `tools/extend_belt_end.py`, `cell_feed_check.py` | 벨트 끝 적재식 공급(연장 벨트, V 끝 스토퍼: `scene/overrides/factory.usda`), 그 검사 |
 | `docs/GOALS.md` | **목표와 합격 기준** (공정 시간, 단계별 수치 범위와 근거) |
 
