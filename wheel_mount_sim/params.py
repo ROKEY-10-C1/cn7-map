@@ -66,6 +66,9 @@ PILOT = p("hub_pilot_diameter", .06694, "m", "model", "cell value, 0.08 mm radia
 PILOT_LEN = p("hub_pilot_length", .012, "m", "model", "cell value")
 STUD_D = p("stud_diameter", .012, "m", "oem", "M12 x 1.5")
 STUD_PROJ = p("stud_projection", .030, "m", "model", "cell value")
+STUD_TIP = p("stud_dog_point", (.0012, .0013), "m", "model",
+             "length, radial step of the stud end: fastening side's stud (wheel_geometry.hub, r 5.22 -> 4.7 over 1.2 mm on "
+             "the shank, here on the 6.0 mm thread crest); the cell collider had 2.0 mm / 1.5 mm (docs/STUD_SPEC.md)")
 FLANGE_R = p("hub_flange_radius", .069, "m", "literature", "aftermarket CN7-family hub flange OD ~138 mm (Bunnings listing)")
 ROTOR = p("front_rotor_radius_thickness", (.140, .025), "m", "model", "cell value (280 x 25 mm ventilated)")
 ARCH_R = p("wheelhouse_arch_radius", .365, "m", "model", "cell wheelhouse liner datum from the body mesh")

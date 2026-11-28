@@ -6,13 +6,15 @@ replaced by the models validated in this folder (docs/GOALS.md, params.py):
 - mount robots: RS080N articulation + SCHUNK PHL-W 63-080-S tread clamp (synchronised jaws, PU shoes 10 deg
   under the horizontal), on the cell's fixed bases, starting in the cell's PARK pose. The keyframed visual
   arms of the same place are switched off in the live stage only.
-- hub: 144-gon pilot prism (the native cylinder made false contacts), contact offsets from the clearances,
+- hub: 144-gon pilot prism (the native cylinder made false contacts), face radius 69 mm (params.FLANGE_R,
+  assets/README.md; the cell's fitment.FLANGE_RADIUS is 79 mm), contact offsets from the clearances,
   preloaded bearing (no play, 0.75 N m drag), suspension wheel rate from the ride frequency, steel/alloy friction.
 - wheel: mounting pad as Delaunay triangles with the hub-side bore chamfer; ring-tire stiffness from the
   measured-average literature values.
 
 Call `install(stage, stations)` after the stations exist; it returns the arm paths for control.
 """
+import os
 import sys
 from math import pi
 from pathlib import Path
@@ -54,6 +56,33 @@ def _offset(prim, value):
     api.CreateRestOffsetAttr(0.)
 
 
+STUD_TIP_FASTEN = os.environ.get("MOUNT_STUD_TIP", "fasten") == "fasten"   # "cell" keeps the cell's 2.0/1.5 mm
+
+
+def _stud_tip(stage, tip):
+    """Re-shape the stud end like the fastening side's stud (params.STUD_TIP): shank cylinder up to the dog point,
+    cone over the last 1.2 mm from the 6.0 mm crest to 4.7 mm."""
+    length, step = P.STUD_TIP
+    pts = np.array(UsdGeom.Mesh(tip).GetPointsAttr().Get(), float)
+    z_top = pts[:, 2].max()
+    xy = (pts[:, :2].max(axis=0)+pts[:, :2].min(axis=0))/2
+    r = float(np.max(np.hypot(*(pts[:, :2]-xy).T)))
+    n = len(pts)//2
+    new = [(xy[0]+rr*np.cos(i*2*pi/n), xy[1]+rr*np.sin(i*2*pi/n), z) for z, rr in ((z_top-length, r), (z_top, r-step))
+           for i in range(n)]
+    from pxr import Gf
+    UsdGeom.Mesh(tip).GetPointsAttr().Set([Gf.Vec3f(*map(float, q)) for q in new])
+    shank = stage.GetPrimAtPath(str(tip.GetPath())[:-3])
+    if shank and shank.IsA(UsdGeom.Cylinder):
+        cyl = UsdGeom.Cylinder(shank)
+        op = shank.GetAttribute("xformOp:translate")
+        t = op.Get()
+        base = t[2]-cyl.GetHeightAttr().Get()/2
+        h = z_top-length-base
+        cyl.GetHeightAttr().Set(h)
+        op.Set(Gf.Vec3d(t[0], t[1], base+h/2))
+
+
 def _hub(stage, station, M, V):
     hub = station.hub_path
     pilot = stage.GetPrimAtPath(hub+"/Pilot")
@@ -71,8 +100,12 @@ def _hub(stage, station, M, V):
         n = child.GetName()
         if n == "Face":
             _offset(child, P.FACE_CONTACT_OFFSET)
+            if child.IsA(UsdGeom.Cylinder):
+                UsdGeom.Cylinder(child).GetRadiusAttr().Set(P.FLANGE_R)            # 69 mm (assets/README.md)
         if n == "Face" or n.startswith("Stud"):
             _bind_physics(child, M["steel"])
+        if STUD_TIP_FASTEN and n.startswith("Stud") and n.endswith("Tip") and child.IsA(UsdGeom.Mesh):
+            _stud_tip(stage, child)
     name = station.name
     brg = stage.GetPrimAtPath(f"{ROOT}/{name}/Bearing")
     if brg:
