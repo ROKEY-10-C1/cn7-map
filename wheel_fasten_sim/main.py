@@ -6,6 +6,7 @@
 import argparse
 import json
 import sys
+import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -72,8 +73,17 @@ def run_session(app, headless, through, context, wait_for_play):
     scene = PhysxSchema.PhysxSceneAPI(stage.GetPrimAtPath("/World/Physics"))
     hz = scene.GetTimeStepsPerSecondAttr().Get()
     dt = 1. / hz
-    world = World(physics_dt=dt, rendering_dt=1./60., physics_prim_path="/World/Physics",
-                  set_defaults=False)
+
+    RENDER_HZ = 15
+    GUI_EVERY = max(1, round(hz / RENDER_HZ))
+
+    world = World(
+        physics_dt=dt,
+        rendering_dt=1. / RENDER_HZ,
+        physics_prim_path="/World/Physics",
+        set_defaults=False
+    )
+
     world.get_physics_context().enable_fabric(False)
     if not headless:
         set_camera_view(eye=[10., 7.5, 5.7], target=[4.1, 0., 1.0])
@@ -82,26 +92,83 @@ def run_session(app, headless, through, context, wait_for_play):
                   else FastenCell(stage, through))
     previous = None
     frame = 0
+
+    wall_start = time.perf_counter()
+
+    prof = {
+        "control": 0.0,
+        "physics": 0.0,
+        "render": 0.0
+    }
+
     while app.is_running():
         if not world.is_playing():
             if headless or world.is_stopped():
                 break
             app.update()
             continue
+
+        # 1. 로봇 제어 연산
+        tic = time.perf_counter()
         state = controller.update(dt)
+        prof["control"] += time.perf_counter() - tic
+
         if state != previous:
             print(f"{through} {frame*dt:6.2f}s {state}", flush=True)
             previous = state
+
         if state in ("DONE", "FAILED"):
             break
-        # 화면을 그리는 프레임에서도 컨트롤러 갱신당 물리는 정확히 한 번만 진행한다.
+
+        # 2. 물리 연산: 240Hz
+        tic = time.perf_counter()
         world.step(render=False)
-        if not headless and frame % max(1, hz//60) == 0:
+        prof["physics"] += time.perf_counter() - tic
+
+        # 3. GUI 렌더링: 15Hz
+        if not headless and frame % GUI_EVERY == 0:
+            tic = time.perf_counter()
             world.render()
+            prof["render"] += time.perf_counter() - tic
+
         frame += 1
+
+        # 4. 물리 시간 5초마다 성능 출력
+        if frame % max(1, round(5 * hz)) == 0:
+            sim_time = frame * dt
+            wall_time = time.perf_counter() - wall_start
+            rtf = sim_time / max(wall_time, 1e-9)
+
+            print(
+                f"SPEED sim {sim_time:.1f}s "
+                f"wall {wall_time:.1f}s x{rtf:.2f}",
+                {k: round(v, 1) for k, v in prof.items()},
+                flush=True
+            )
 
     stopped = world.is_stopped()
     terminal = controller.state in ("DONE", "FAILED")
+    sim_time = frame * dt
+    wall_time = time.perf_counter() - wall_start
+    rtf = sim_time / max(wall_time, 1e-9)
+
+    print(
+        f"PERF sim {sim_time:.2f}s "
+        f"wall {wall_time:.2f}s "
+        f"RTF {rtf:.3f}",
+        flush=True
+    )
+
+    for name, elapsed in prof.items():
+        percentage = 100 * elapsed / max(wall_time, 1e-9)
+        print(
+            f"  {name}: {elapsed:.2f}s ({percentage:.1f}%)",
+            flush=True
+        )
+
+    stopped = world.is_stopped()
+    terminal = controller.state in ("DONE", "FAILED")
+    
     if terminal:
         world.pause()
     result = controller.result()
