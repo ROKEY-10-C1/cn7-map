@@ -45,6 +45,8 @@ QUEUE_GAP = .90                            # initial spacing of the tires on the
 FIRST_AHEAD = .70                          # first tire put on the belt this far upstream of the pick point
 SEATED_SPEED = .005                        # m/s: tire counts as stopped below this
 SEATED_TIME = .5                           # s blocked eye + stopped before pick_ready
+import os as _os
+FIXED_SPIN = 36. if _os.environ.get("MOUNT_FIXED", "0") == "1" else None   # deg, tire spin on the belt
 FEED_TIMEOUT = 25.                         # s for the head tire to reach the stop
 
 
@@ -118,6 +120,14 @@ def post_build(stage, stations):
                 p = op.Get()
                 op.Set(Gf.Vec3d(x, p[1], p[2]))
         _SIDES[side].order = [unit.wheel for unit in queue]
+        if FIXED_SPIN is not None:
+            # fixed setup (MOUNT_FIXED=1, no vision): every tire is put on the belt at the same spin, so the
+            # taught grip yaw puts a hole on a stud (hub parked stud-at-top, cell_config)
+            q = Gf.Quatd(cos(radians(FIXED_SPIN)/2), 0., 0., sin(radians(FIXED_SPIN)/2))
+            for unit in queue:
+                for path in (unit.wheel, unit.tire):
+                    op = stage.GetPrimAtPath(path).GetAttribute("xformOp:orient")
+                    op.Set(Gf.Quatf(q) if op.GetTypeName() == "quatf" else q)
         for unit in queue:
             # station.py holds an 'arriving' station until its tire passes the pick-zone inlet (axle+START_AHEAD);
             # the end stop has no inlet and steps every tire on its belt from the start

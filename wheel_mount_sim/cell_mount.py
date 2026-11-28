@@ -86,7 +86,7 @@ def _stud_tip(stage, tip):
 def _hub(stage, station, M, V):
     hub = station.hub_path
     pilot = stage.GetPrimAtPath(hub+"/Pilot")
-    radius = UsdGeom.Cylinder(pilot).GetRadiusAttr().Get() if pilot and pilot.IsA(UsdGeom.Cylinder) else P.PILOT/2
+    radius = P.PILOT/2           # params.PILOT (0.15 mm radial clearance, 2026-11-28) instead of the cell's fitment value
     for name in ("Pilot", "PilotTip"):
         if stage.GetPrimAtPath(hub+"/"+name):
             stage.GetPrimAtPath(hub+"/"+name).SetActive(False)
@@ -158,6 +158,8 @@ def _wheel(stage, station, M, V):
         p = extrude(stage, station.wheel+f"/{name}MS", tri, z0, P.OFFSET+P.WEB_T, phys=M["alloy"],
                     offset=P.PAD_CONTACT_OFFSET)
         UsdGeom.Imageable(p).CreatePurposeAttr("guide")
+    for body in (station.wheel, station.tire):          # push-out speed cap (params.WHEEL_MAX_DEPEN)
+        PhysxSchema.PhysxRigidBodyAPI.Apply(stage.GetPrimAtPath(body)).CreateMaxDepenetrationVelocityAttr(P.WHEEL_MAX_DEPEN)
     # ring tire on its sidewall springs (cell joint, our rates)
     mount = stage.GetPrimAtPath(station.tire+"Mount")
     if mount:

@@ -14,12 +14,13 @@
 | mounting_pad_thickness | 0.014 | m | model | cell value; worst case for bore length |
 | rim_mass | 9.1 | kg | literature | wheel-size.com listing for 6.5Jx16 ET46 CN7 (single source) |
 | tire_mass | 8 | kg | catalogue | Continental ProContact RX 205/55R16 (cell physical_data) |
-| tire_k_radial | 180000 | N/m | literature | average radial stiffness of passenger tyres, Eksploatacja i Niezawodnosc 2014 (archive.ein.org.pl 2014-01-11) |
-| tire_k_circumferential | 80000 | N/m | literature | same study, circumferential |
-| tire_k_lateral | 65000 | N/m | literature | same study, lateral |
-| tire_k_torsion | 7985.95 | N m/rad | derived | k_circ * R^2 = 7.99 kN m/rad = 139 N m/deg (study reports ~150, consistent) |
-| tire_k_tilt | 3244.29 | N m/rad | derived | lateral springs spread round the bead: k_lat * R^2 / 2 |
-| tire_damping_ratio | 0.08 | - | estimate | passenger tyre structural damping is a few per cent of critical; 0.05-0.10 swept |
+| tire_k_radial | 1.7e+06 | N/m | literature | sidewall translational stiffness from the 77.2 Hz in-plane mode, passenger tyre r0 0.3135 m, belt 7.25 kg (Sivaramakrishnan, VT MSc thesis 2015, Table 5.5: 1.703e6 N/m) |
+| tire_k_circumferential | 781000 | N/m | literature | torsion 7.817e4 N m/rad (same thesis, 58.95 Hz) / R^2 |
+| tire_k_lateral | 700000 | N/m | derived | out-of-plane rigid-ring modes of car tyres 51-85 Hz (single-track tyre study) with an ~8 kg ring -> ~0.45-2 MN/m; low end taken (47 Hz). No direct measurement for this tyre |
+| tire_k_torsion | 77962.9 | N m/rad | derived | k_circ * R^2 = 7.99 kN m/rad = 139 N m/deg (study reports ~150, consistent) |
+| tire_k_tilt | 34938.5 | N m/rad | derived | lateral springs spread round the bead: k_lat * R^2 / 2 |
+| tire_damping_ratio | 0.055 | - | literature | measured modal damping of the sidewall modes 0.050-0.056 (same VT thesis, Table 5.5) |
+| wheel_max_depenetration_velocity | 0.05 | m/s | derived | solver setting, not a material value: PhysX push-out speed cap on rim and tire. Default (large) kicked seated wheels off the pilot; bench 0.01 let the press sink 0.3 mm into the hub, 0.05 8/8 and 0.2 8/8 seated with no penetration (2026-11-28) |
 | hub_mass | 6.5 | kg | estimate | hub flange + rotor hat + inner race; cell value |
 | bearing_drag | 0.75 | N m | literature | hub-unit design limit <=0.75 N m with two seals (US patent 'wheel hub assembly having low friction') |
 | bearing_radial_play | 0 | m | literature | generation-3 hub units are preloaded (no radial play) |
@@ -29,6 +30,7 @@
 | hub_pilot_length | 0.012 | m | model | cell value |
 | stud_diameter | 0.012 | m | oem | M12 x 1.5 |
 | stud_projection | 0.03 | m | model | cell value |
+| stud_dog_point | (0.0012, 0.0013) | m | model | length, radial step of the stud end: fastening side's stud (wheel_geometry.hub, r 5.22 -> 4.7 over 1.2 mm on the shank, here on the 6.0 mm thread crest); the cell collider had 2.0 mm / 1.5 mm (docs/STUD_SPEC.md) |
 | hub_flange_radius | 0.069 | m | literature | aftermarket CN7-family hub flange OD ~138 mm (Bunnings listing) |
 | front_rotor_radius_thickness | (0.14, 0.025) | m | model | cell value (280 x 25 mm ventilated) |
 | wheelhouse_arch_radius | 0.365 | m | model | cell wheelhouse liner datum from the body mesh |
@@ -56,5 +58,5 @@
 | hub_pin_contact_offset | 0.0008 | m | model | cell value on the hub studs (validated insertion bench) |
 | hub_face_contact_offset | 0.0002 | m | derived | ~5 x travel per step at 10 mm/s; 0.8 mm brought hundreds of pad triangles into contact at once and the seat blew up (dbg40) |
 | stud_contact_offset | 0.0003 | m | derived | > 3 x travel per step at 20 mm/s (0.083 mm) and stud+pad offsets (0.345 mm) < stud-hole clearance 0.7 mm; 0.8 mm created false axial contacts at the hole edges (sim dbg27) |
-| pilot_contact_offset | 0.00035 | m | derived | just over the travel per step of the cell insertion bench (76 mm/s / 240 Hz = 0.32 mm). 0.2 mm jammed that bench at 8.9 mm; 0.8 mm (9x the 0.09 mm radial bore clearance) wedged the bore 3 mm onto the pilot in the cell mount runs (gap 9 mm, both sides); 0.02 mm tunnelled on release (dbg47) |
+| pilot_contact_offset | 0.00035 | m | derived | built at 0.35 mm (stable for a hanging wheel; phase-1 / --process keep it). mount_control lowers it to 0.1 mm while inserting: 0.35 mm (4x the 0.08 mm radial clearance) made speculative contacts all round the pilot and the pad stuck to it at 8.8 mm (1.1 kN side contact); 0.05 mm jammed again. After seating mount_control raises it to 0.35 mm (PILOT_CO_SEATED): at 0.1 mm the hanging wheel jittered off the pilot (bench lip_t, 2026-11-28) |
 | pad_contact_offset | 4.5e-05 | m | model | cell value on the wheel pad: below the 0.08 mm pilot clearance |

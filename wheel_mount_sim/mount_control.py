@@ -40,14 +40,35 @@ FRAME_EVERY = 16                       # 15 video frames per simulated second
 REC_EVERY = 8                          # replay.npz at 30 Hz
 PILOT_ZONE = (.006, .014)              # m to the seat: the bore chamfer runs onto the pilot tip (jams at 9 mm)
 PILOT_SLOW = float(os.environ.get("MOUNT_PILOT_SLOW", "1"))   # speed factor there (1 = phase 1)
-PILOT_LAT_RATE = float(os.environ.get("MOUNT_PILOT_LAT_RATE", ".005"))  # m/s lateral admittance rate there
-PILOT_DEADBAND = float(os.environ.get("MOUNT_PILOT_DEADBAND", "3"))     # N lateral deadband there (10 elsewhere)
+PILOT_LAT_RATE = float(os.environ.get("MOUNT_PILOT_LAT_RATE", ".0005"))  # m/s lateral admittance rate there
+PILOT_DEADBAND = float(os.environ.get("MOUNT_PILOT_DEADBAND", "10"))     # N lateral deadband there (10 elsewhere)
 GRIP_HOLD = 1.2                        # s on the tread before lifting (first cycle had 1.25 s)
 GRIP_MIN_N = 200.                      # N on the jaw drive before lifting (good grips 430-1760 N)
 GRIP_TIMEOUT = 3.                      # s for the jaws to reach the tread
+LAT_CONTACT_N = float(os.environ.get("MOUNT_LAT_CONTACT_N", "30"))   # N axial before the lateral admittance acts
+SEARCH = os.environ.get("MOUNT_SEARCH", "0") == "1"   # spiral search on a pilot jam (F/T + encoders)
+OPEN_SCALE = float(os.environ.get("MOUNT_OPEN_SCALE", "1"))   # jaw opening speed factor (1 = catalogue)
+OPEN_CLEAR = float(os.environ.get("MOUNT_OPEN_CLEAR", ".022"))                      # m per jaw before retracting (lip r 290 mm clears the 316 mm tire)
+PILOT_CO_INSERT = float(os.environ.get("MOUNT_PILOT_CO_INSERT", ".0001"))     # m while inserting
+PILOT_CO_SEATED = float(os.environ.get("MOUNT_PILOT_CO_SEATED", ".00035")) or None   # m after seating
+PUSH_END_N = float(os.environ.get("MOUNT_PUSH_END_N", "30"))   # pusher force when its pad leaves the web
+PUSH_RAMP_S = .5
+GRIP_RAMP_S = float(os.environ.get("MOUNT_GRIP_RAMP_S", "0"))   # s of grip-force ramp-down before opening (0 = off)
 RETRY_CLEAR = .014                     # m: jam retry backs off until the wheel is this far from the seat
 RETRY_BACK_MAX = .024                  # m of flange travel at most (studs stay engaged: tips at ~76 mm)
 RELEASE_PRESS = float(os.environ.get("MOUNT_RELEASE_PRESS", "0"))   # N while the jaws open (0 = phase 1)
+FIXED = os.environ.get("MOUNT_FIXED", "0") == "1"   # fixed cell: zero hub tolerances, tires at one spin
+# where positions come from: "vision" (measured, with noise) or "teach" (taught once, no vision at run time)
+PERCEPTION = os.environ.get("MOUNT_PERCEPTION", "teach" if FIXED else "vision")
+TEACH_FILE = Path(os.environ.get("MOUNT_TEACH_FILE", str(HERE/"teach"/"cell_fixed.json")))
+TEACH_RECORD = os.environ.get("MOUNT_TEACH", "0") == "1"   # re-teach every point in this run
+# laser displacement sensors on the gripper (no camera): 3 on the rim's outboard face (tilt) + 2 on the bead-seat
+# lip (centre) give the wheel pose relative to the gripper. Keyence IL class: repeatability ~1 um, linearity
+# +-0.1 % FS; modelled conservatively as 5 um / 0.005 deg (1 sigma). The hub stays taught (fixed cell).
+LASER = os.environ.get("MOUNT_LASER", "1" if FIXED else "0") == "1"
+LASER_SIGMA_MM = float(os.environ.get("MOUNT_LASER_SIGMA_MM", ".005"))
+LASER_SIGMA_DEG = float(os.environ.get("MOUNT_LASER_SIGMA_DEG", ".005"))
+RETRY_BACK = .016                      # m of flange travel backed off on a jam (no vision: fixed amount)
 K_DIR = Path.home()/"isaacsim/exts/isaacsim.robot_motion.motion_generation/motion_policy_configs/Kawasaki/rs080n"
 
 
@@ -73,6 +94,8 @@ def _late_imports():
     g = globals()
     if "tensors" in g:
         return
+    if FIXED and not os.environ.get("CELL_CONFIG"):
+        os.environ["CELL_CONFIG"] = str(HERE/"config"/"fixed.json")   # read when wheel_cell is imported
     import carb
     import omni.physics.tensors as tensors
     import omni.usd
@@ -117,6 +140,9 @@ class CellEnv:
         self.events = []
         self.event_log = open(self.out/"events.jsonl", "w")
         self.listeners = []                # callables(event dict): phase 2 publishes /Mount from here
+        self.teach = json.loads(TEACH_FILE.read_text()) if (PERCEPTION == "teach" and TEACH_FILE.exists()) else {}
+        self.teach_dirty = False
+        print("PERCEPTION", PERCEPTION, "fixed" if FIXED else "random", f"teach points {len(self.teach)}", flush=True)
         self.units = []
         self.car_dx = 0.                   # car shift from dock A (fake index move)
         # car body dynamic on the lift pads (AMR deck and lift kinematic = held by the locked dock clamps,
@@ -205,6 +231,8 @@ class CellEnv:
                           if p.HasAPI(UsdPhysics.RigidBodyAPI)]
         for s in cell.stations:
             self.rec_paths += [s.wheel, s.tire]
+        # car, AMR deck/lift, knuckles and hubs (they move in the A->B index; the replay must move them too)
+        self.rec_paths += [p for p in [self.ROOT+"/CN7", self.ROOT+"/DockedAMR"]+self._car_movers() if p not in self.rec_paths]
         self.rec_t, self.rec_pose = [], []
         self.step_i = 0
         self.prof = dict(control=0., physics=0., diag=0., render=0.)
@@ -500,6 +528,10 @@ class CellEnv:
         """trace/summary/replay.npz/videos into self.out; returns the summary dict."""
         out = self.out
         L_ = L
+        if self.teach_dirty:
+            TEACH_FILE.parent.mkdir(parents=True, exist_ok=True)
+            TEACH_FILE.write_text(json.dumps(self.teach, indent=1))
+            print("TEACH saved", TEACH_FILE, len(self.teach), "points", flush=True)
         queue = {}
         for s in self.cell.stations:
             if s.hub[0] < 0:
@@ -553,6 +585,10 @@ class MountSide:
         self.dofs = list(meta.dof_names)
         self.JR = self.dofs.index("JawRSlide")
         self.ti = list(meta.link_names).index("Tool")
+        self.rcc = [self.dofs.index(n) for n in ("RCCSlideX", "RCCSlideY") if n in self.dofs]
+        self.rcc_target = np.zeros(len(self.rcc))
+        self.push_i = self.dofs.index("PusherSlide") if "PusherSlide" in self.dofs else None
+        self.push_target = 0.
         self.q = np.array(self.av.get_dof_positions()[0], float)
         self.jaw_v = 0.
         self.ik = LulaKinematicsSolver(robot_description_path=str(K_DIR/"rmpflow/rs080n_robot_description.yaml"),
@@ -598,9 +634,42 @@ class MountSide:
             self.command()
 
     # ---- low level
+    def rcc_lock(self, locked):
+        """RCC unit: locked (stiff) for transfer, released for insertion. Released, each slide's spring target
+        carries the static weight hanging below it (tool, jaws, rim, tire; + the RCC body for the x slide) along
+        that slide's axis, so the tool stays centred and only contact forces move it (gravity preload)."""
+        if not self.rcc:
+            return
+        c = getattr(self, "cfg", {})
+        kl, ku = S.RCC["k_lock"], c.get("rcc_k", S.RCC["k"])
+        k = np.array(self.av.get_dof_stiffnesses(), np.float32)
+        if not hasattr(self, "_rcc_mass"):
+            def m(path):
+                prim = self.env.stage.GetPrimAtPath(path)
+                return float(UsdPhysics.MassAPI(prim).GetMassAttr().Get() or 0.) if prim else 0.
+            below = m(self.prefix+"/Tool")+m(self.prefix+"/JawR")+m(self.prefix+"/JawL")
+            self._rcc_mass = (below, m(self.prefix+"/RCC"))
+        below, m_rcc = self._rcc_mass
+        if not locked:
+            below += float(c.get("rcc_payload_kg", P.RIM_MASS+P.TIRE_MASS))
+        Rf, _ = self.pose(self.prefix+"/Arm/link6")
+        g = np.array([0., 0., -9.81])
+        loads = [(below+m_rcc)*float(g@Rf[:, 0]), below*float(g@Rf[:, 1])]
+        free = c.get("rcc_free", os.environ.get("MOUNT_RCC_FREE", "xy"))   # which slides float when released
+        for n, i in enumerate(self.rcc):
+            k[0, i] = kl if (locked or "xy"[n] not in free) else ku
+            self.rcc_target[n] = -loads[n]/k[0, i]
+        self.av.set_dof_stiffnesses(k, self.IDX0)
+        self.event("rcc_locked" if locked else "rcc_released", load_N=[round(v, 1) for v in loads],
+                   target_mm=[round(float(v)*1000, 4) for v in self.rcc_target])
+
     def command(self):
         q = self.av.get_dof_positions().copy()
         q[0, :6] = self.q[:6]
+        for n, i in enumerate(self.rcc):
+            q[0, i] = self.rcc_target[n]
+        if self.push_i is not None:
+            q[0, self.push_i] = self.push_target
         self.av.set_dof_position_targets(q.astype(np.float32), self.IDX0)
         v = np.zeros((1, len(self.dofs)), np.float32)
         v[0, self.JR] = self.jaw_v
@@ -625,6 +694,30 @@ class MountSide:
         Rw, _ = self.pose(self.station.wheel)
         x = Rh.T@Rw[:, 0]
         return (degrees(atan2(x[1], x[0]))+36.) % 72.-36.
+
+    # ---- perception: taught values (no vision) or measured
+    def taught(self, key, compute):
+        """Value of a taught point. teach mode: the stored value; if missing (or MOUNT_TEACH=1) it is taught now
+        from the cell (operator jogging the robot) and stored. vision mode: measured every time, with noise."""
+        if PERCEPTION == "vision":
+            return compute(True)
+        T = self.env.teach
+        if key not in T or TEACH_RECORD and key not in getattr(self.env, "_taught_now", set()):
+            T[key] = compute(False)
+            self.env.__dict__.setdefault("_taught_now", set()).add(key)
+            self.env.teach_dirty = True
+            self.event("taught", point=key)
+        return T[key]
+
+    def hub_pose(self):
+        """Hub frame at the current dock (taught per dock; vision: measured)."""
+        st = self.station
+
+        def compute(noise):
+            Rh, oh = self.pose(st.hub_path)
+            return dict(R=Rh.tolist(), o=oh.tolist())
+        v = self.taught(f"{st.name}:hub:dx{self.env.car_dx:.3f}", compute)
+        return np.array(v["R"]), np.array(v["o"])
 
     # ---- planning (IK / trajectories): the phase-2 planning node would own these
     def fk(self, q):
@@ -796,13 +889,19 @@ class MountSide:
 
     def grip(self, close):
         v_close, v_open = P.GRIP["stroke"]/P.GRIP["t_close"], P.GRIP["stroke"]/P.GRIP["t_open"]
-        self.jaw_v = -v_close if close else v_open
+        self.jaw_v = -v_close if close else v_open*getattr(self, "cfg", {}).get("open_scale", OPEN_SCALE)
 
     def force_insert(self, R_G, o_start, axis, v, expect):
         """Admittance insertion on the flange F/T sensor (145 N set point, 25 N/mm lateral, seat = >= 90 % force
         and < 0.02 mm in 0.3 s, then the press force is ramped down). 240 Hz loop in the robot controller."""
         FAST = self.prof.fast
-        Kl, Fset = P.LATERAL_COMPLIANCE, P.PRESS_FORCE
+        c = getattr(self, "cfg", {})                       # per-robot overrides (benches run variants side by side)
+        Kl, Fset = c.get("Kl", P.LATERAL_COMPLIANCE), c.get("Fset", P.PRESS_FORCE)
+        z_slow, z_rate, z_dead = c.get("pilot_slow", PILOT_SLOW), c.get("pilot_lat_rate", PILOT_LAT_RATE), \
+            c.get("pilot_deadband", PILOT_DEADBAND)
+        lat_rate, lat_dead, lat_on = c.get("lat_rate", .0005), c.get("lat_deadband", 10.), c.get("lat_contact_n", LAT_CONTACT_N)
+        zone = c.get("pilot_zone", PILOT_ZONE)
+        v = v*c.get("v_scale", 1.)
         st = dict(s=0., lat=np.zeros(3), Ff=np.zeros(3), f_ax=0., q_prev=self.q[:6].copy())
         tare = self.ft_world()
         sub_n = int(self.env.HZ/60)
@@ -816,14 +915,18 @@ class MountSide:
             st["f_ax"] = f_ax
             f_lat = st["Ff"]-f_ax*axis
             left = expect-st["s"]                          # travel to the seat known from vision
-            in_pilot = PILOT_ZONE[0] < left < PILOT_ZONE[1]
+            in_pilot = zone[0] < left < zone[1]
             n_lat = np.linalg.norm(f_lat)
-            dead, rate = (PILOT_DEADBAND, PILOT_LAT_RATE) if in_pilot else (10., .0005)
+            dead, rate = (z_dead, z_rate) if in_pilot else (lat_dead, lat_rate)
             f_lat = f_lat*max(n_lat-dead, 0.)/n_lat if n_lat > 1e-9 else f_lat
-            slow = PILOT_SLOW if in_pilot else 1.
+            slow = z_slow if in_pilot else 1.
             st["s"] += v*slow/60*float(np.clip(1-f_ax/setpoint, -.5, 1.))
-            goal = np.clip(f_lat/Kl, -.005, .005)
-            st["lat"] = st["lat"]+np.clip(goal-st["lat"], -rate/60, rate/60)
+            # lateral admittance only once the wheel is in contact: without contact the F/T read 4-11 N sideways
+            # (tare offset after the 100 mm/s approach) and moved the wheel 0.3 mm off the axis before the pilot,
+            # which jammed the bore chamfer on the pilot at 9 mm (fx_dins FR, contact Web_255MSCh | PilotTip)
+            if f_ax > lat_on:
+                goal = np.clip(f_lat/Kl, -.005, .005)
+                st["lat"] = st["lat"]+np.clip(goal-st["lat"], -rate/60, rate/60)
             o = o_start-axis*st["s"]+st["lat"]
             q_next = self.solve(R_G, o, st["q_prev"])
             for j in range(1, sub_n+1):
@@ -832,10 +935,19 @@ class MountSide:
                 yield
             st["q_prev"] = q_next
             st["o"] = o
+            if hasattr(self, "ins_log"):
+                rel, tilt = self.seat()
+                top = sorted(getattr(self, "now_contacts", {}).items(), key=lambda kv: -kv[1][0])[:4]
+                self.ins_log.append(dict(t=round(self.env.t, 4), gap=round(float(rel[2])*1000, 3),
+                                         rad=round(float(np.hypot(rel[0], rel[1]))*1000, 3), tilt=round(float(tilt), 3),
+                                         f_ax=round(f_ax, 1), f_lat=[round(float(v), 1) for v in (st["Ff"]-f_ax*axis)],
+                                         lat=[round(float(v)*1000, 3) for v in st["lat"]], top=top))
 
         for _ in range(int(15.*60)):
             yield from cycle(Fset)
-            gaps.append(self.seat()[0][2])
+            # flange position from the joint encoders (robot side), not the wheel gap
+            q_enc = np.asarray(self.av.get_dof_positions()[0][:6], float)
+            gaps.append(float(self.fk(q_enc)[1]@axis))
             if (st["f_ax"] >= P.SEAT_FORCE_RATIO*Fset and len(gaps) > still_n
                     and max(gaps[-still_n:])-min(gaps[-still_n:]) < P.SEAT_STILL[1]):
                 # stopping well short of the travel known from vision under full force is a jam, not a seat
@@ -847,10 +959,12 @@ class MountSide:
                    f_axial_N=round(st["f_ax"], 1))
         if seated:
             for _ in range(int((.4 if FAST else .6)*60)):
-                yield from cycle(max(RELEASE_PRESS, P.RELEASE_FORCE))
+                yield from cycle(c.get("relief_N", max(RELEASE_PRESS, P.RELEASE_FORCE)))
             self.event("press_relieved", f_axial_N=round(st["f_ax"], 1))
         self.stopped_at = st["o"]
         self.seated = seated
+        if hasattr(self, "ins_log"):
+            (self.env.out/f"insert_log_{self.station.name}.json").write_text(json.dumps(self.ins_log))
 
     def hold_press(self, R_G, o_start, axis, force, seconds, v=.010, s_max=.002):
         """Axial force control only (no lateral): keep pressing the wheel on the hub with `force` N for `seconds`
@@ -879,6 +993,51 @@ class MountSide:
         self.hold_log = dict(f_first=round(f_log[0], 1) if f_log else 0., f_last=round(f_log[-1], 1) if f_log else 0.,
                              travel_mm=round(st["s"]*1000, 2))
 
+    def spiral_search(self, R_G, o_jam, axis, force=None, r_max=None, step=None, dwell=None):
+        """Jam at the pilot without vision: relieve 0.5 mm, then keep `force` N axially while the flange moves on an
+        Archimedean spiral in the hub plane (0.03 -> r_max mm). The wheel drops into the pilot where the offset is
+        right: the flange (joint encoders) advances > 1 mm -> found. Returns the lateral offset found or None."""
+        c = getattr(self, "cfg", {})
+        force = force or c.get("search_force", 60.)
+        r_max = r_max or c.get("search_r_max", .0004)
+        step = step or c.get("search_pitch", .000045)
+        dwell = dwell or int(c.get("search_dwell", 4))
+        e1 = np.cross(axis, [0., 0., 1.])
+        e1 = e1/np.linalg.norm(e1)
+        e2 = np.cross(axis, e1)
+        tare = getattr(self, "tare_free", np.zeros(3))
+        o_base = np.asarray(o_jam)+axis*.0005
+        q_enc = np.asarray(self.av.get_dof_positions()[0][:6], float)
+        x0 = float(self.fk(q_enc)[1]@axis)
+        st = dict(s=0., Ff=np.zeros(3), q_prev=self.q[:6].copy())
+        sub_n = int(self.env.HZ/60)
+        th = 0.
+        while True:
+            r = .00003+step*th/(2*np.pi)
+            if r > r_max:
+                self.event("search_end", found=False)
+                return None
+            lat = r*(np.cos(th)*e1+np.sin(th)*e2)
+            for _ in range(dwell):
+                F = -(self.ft_world()-tare)
+                st["Ff"] = st["Ff"]+(F-st["Ff"])*.15
+                f_ax = float(st["Ff"]@axis)
+                st["s"] = float(np.clip(st["s"]+.010/60*float(np.clip(1-f_ax/force, -.5, 1.)), -.002, .004))
+                o = o_base-axis*st["s"]+lat
+                q_next = self.solve(R_G, o, st["q_prev"])
+                for j in range(1, sub_n+1):
+                    self.q[:6] = st["q_prev"]+(q_next-st["q_prev"])*j/sub_n
+                    self.command()
+                    yield
+                st["q_prev"] = q_next
+                q_enc = np.asarray(self.av.get_dof_positions()[0][:6], float)
+                if x0-float(self.fk(q_enc)[1]@axis) > .001:   # moved 1 mm toward the hub: in the pilot
+                    self.stopped_at = o
+                    self.event("search_end", found=True, lat_mm=[round(float(v)*1000, 3) for v in lat],
+                               r_mm=round(r*1000, 3))
+                    return lat
+            th += c.get("search_dtheta", .6)
+
     # ================================================================== cycle steps (sequencer calls these)
     def prepare(self):
         """Empty gripper over the pick point (cycle steady state: the robot ends each cycle there)."""
@@ -905,13 +1064,21 @@ class MountSide:
         generator (no time passes). Sets the grip yaws for pick()."""
         st = self.station
         self.t0 = self.env.t
-        Rw, ow = self.pose(st.wheel)
-        ow = ow+self.rng.normal(0, CENTER_NOISE, 3)*np.array([1, 1, 0])
-        spin = degrees(atan2(Rw[1, 0], Rw[0, 0]))+self.rng.normal(0, NOISE_DEG)
-        Rh, _ = self.pose(st.hub_path)
-        Rk, _ = self.pose(self.contact)
-        xh = Rk.T@Rh[:, 0]
-        hub_deg = degrees(atan2(xh[1], xh[0]))+self.rng.normal(0, NOISE_DEG)
+
+        def compute(noise):
+            Rw, ow = self.pose(st.wheel)
+            spin = degrees(atan2(Rw[1, 0], Rw[0, 0]))
+            Rh, _ = self.pose(st.hub_path)
+            Rk, _ = self.pose(self.contact)
+            xh = Rk.T@Rh[:, 0]
+            hub_deg = degrees(atan2(xh[1], xh[0]))
+            if noise:
+                ow = ow+self.rng.normal(0, CENTER_NOISE, 3)*np.array([1, 1, 0])
+                spin += self.rng.normal(0, NOISE_DEG)
+                hub_deg += self.rng.normal(0, NOISE_DEG)
+            return dict(ow=ow.tolist(), spin=float(spin), hub_deg=float(hub_deg))
+        m = self.taught(f"{st.name}:pick", compute)
+        ow, spin, hub_deg = np.array(m["ow"]), m["spin"], m["hub_deg"]
         # the wheel x axis ends up at (180 - g) in the knuckle frame on the left (R_mount has a 180 deg turn about
         # the hub axis) and at -g on the right, and must sit on a stud
         g = ((180. if self.side > 0 else 0.)-hub_deg) % 72.
@@ -996,10 +1163,12 @@ class MountSide:
         self.clear = ow+np.array([0, 0, .05])              # straight up off the belt and the next tire first
         yield from self.move_line(R_pick, ow, self.clear, .10)
         _, ow_up = self.pose(st.wheel)
-        rise = float(ow_up[2]-ow[2])
-        if rise < .03:                                     # gripper went up 50 mm without the wheel
-            self.event("pick_lost", rise_mm=round(rise*1000, 1))
-            raise StopSide(f"wheel not lifted ({rise*1000:.1f} mm)", "pick")
+        rise = float(ow_up[2]-ow[2])                       # ground truth, for the log only
+        jq = float(self.av.get_dof_positions()[0][self.JR])
+        jf = float(self.av.get_dof_projected_joint_forces()[0][self.JR])
+        if jq > .0015 or abs(jf) < GRIP_MIN_N:             # jaws opened or lost force: the wheel slipped out
+            self.event("pick_lost", rise_mm=round(rise*1000, 1), jaw_mm=round(jq*1000, 2), jaw_N=round(jf, 1))
+            raise StopSide(f"wheel slipped in the jaws after lifting (jaw {jq*1000:.1f} mm, {jf:.0f} N)", "pick")
         st.zone.picked()                                   # the next tire moves into the stop
         self.event("lifted", rise_mm=round(rise*1000, 1))
 
@@ -1007,7 +1176,7 @@ class MountSide:
         FAST = self.prof.fast
         st = self.station
         self.phase = "transfer"
-        Rh, oh = self.pose(st.hub_path)
+        Rh, oh = self.hub_pose()
         axis = Rh[:, 2]
         via = oh+axis*.45
         self.pre = pre = oh+axis*.12
@@ -1037,11 +1206,30 @@ class MountSide:
         self.phase = "align"
         self.gap_pre = gap_pre = .12
         RG_t, oG_t = self.R_mount, self.pre
-        for it in range(2):
+        key = f"{st.name}:align:dx{self.env.car_dx:.3f}"
+        if PERCEPTION == "teach" and key in self.env.teach and not TEACH_RECORD:
+            # no vision: go to the taught insertion start (taught with the robot calibration bias of that pose)
+            a = self.env.teach[key]
+            RG_t, oG_t = np.array(a["RG"]), np.array(a["oG"])
+            self.bias = dict(R=np.array(a["bR"]), p=np.array(a["bp"]))
+            yield from self.move_joints(self.solve(RG_t, oG_t, self.q[:6]), scale=.2 if FAST else .08)
+            yield from self.wait(.10 if FAST else .4)
+            rel, _ = self.seat()
+            self.event("aligned_taught", radial_mm=round(float(np.hypot(rel[0], rel[1]))*1000, 3))
+            passes = 0
+            if LASER:
+                self.RG_t, self.oG_t = RG_t, oG_t
+                yield from self.laser_align()
+                RG_t, oG_t = self.RG_t, self.oG_t
+        else:
+            passes = 2
+        noise = PERCEPTION == "vision"
+        for it in range(passes):
             Rh, oh = self.pose(st.hub_path)
             Rw, ow = self.pose(st.wheel)
-            ow = ow+self.rng.normal(0, CENTER_NOISE, 3)
-            Rw = Rw@S.rot(self.rng.normal(0, 1, 3), self.rng.normal(0, NOISE_DEG))
+            if noise:
+                ow = ow+self.rng.normal(0, CENTER_NOISE, 3)
+                Rw = Rw@S.rot(self.rng.normal(0, 1, 3), self.rng.normal(0, NOISE_DEG))
             RG, oG = self.grip_frame()
             R_GW, p_GW = RG.T@Rw, RG.T@(ow-oG)
             x = Rh.T@Rw[:, 0]
@@ -1058,6 +1246,11 @@ class MountSide:
             yield from self.wait(.10 if FAST else .4)
             rel, _ = self.seat()
             self.event(f"aligned_{it}", radial_mm=round(float(np.hypot(rel[0], rel[1]))*1000, 3))
+        if passes and PERCEPTION == "teach":
+            self.env.teach[key] = dict(RG=RG_t.tolist(), oG=list(map(float, oG_t)), bR=self.bias["R"].tolist(),
+                                       bp=list(map(float, self.bias["p"])))
+            self.env.teach_dirty = True
+            self.event("taught", point=key)
         self.RG_t, self.oG_t = RG_t, oG_t
         Rh, oh = self.pose(st.hub_path)
         Rw, ow = self.pose(st.wheel)
@@ -1065,6 +1258,37 @@ class MountSide:
         studs = [self._stud_local(st, i) for i in range(5)]
         self.event("hole_check", hole_to_stud_mm=[round(float(min(np.hypot(*(h[:2]-s[:2])) for s in studs))*1000, 3)
                                                   for h in holes])
+
+    def laser_measure(self):
+        """Wheel pose in the grip frame from the gripper's laser displacement sensors (with sensor noise)."""
+        RG, oG = self.grip_frame()
+        Rw, ow = self.pose(self.station.wheel)
+        R_GW, p_GW = RG.T@Rw, RG.T@(ow-oG)
+        p_GW = p_GW+self.rng.normal(0, LASER_SIGMA_MM/1000, 3)*np.array([1., 1., .2])
+        R_GW = R_GW@S.rot(np.r_[self.rng.normal(0, 1, 2), 0.], self.rng.normal(0, LASER_SIGMA_DEG))
+        return R_GW, p_GW
+
+    def laser_align(self, passes=2, gap=None):
+        """No camera: taught hub + measured wheel-in-gripper -> grip target that puts the wheel on the hub axis,
+        holes on the studs (phase from the robot's own pose), `gap` out. The robot calibration bias stays the
+        taught one."""
+        FAST = self.prof.fast
+        gap = self.gap_pre if gap is None else gap
+        Rh, oh = self.hub_pose()
+        for it in range(passes):
+            R_GW, p_GW = self.laser_measure()
+            RG, oG = self.grip_frame()
+            Rw = RG@R_GW
+            x = Rh.T@Rw[:, 0]
+            phi = degrees(atan2(x[1], x[0]))
+            Rw_des = Rh@S.rot((0, 0, 1), phi-((phi+36.) % 72.-36.))
+            RG_t = Rw_des@R_GW.T
+            oG_t = oh+Rh@np.array([0, 0, gap])-RG_t@p_GW
+            yield from self.move_joints(self.solve(RG_t, oG_t, self.q[:6]), scale=.2 if FAST else .08)
+            yield from self.wait(.10 if FAST else .3)
+            rel, _ = self.seat()
+            self.event(f"laser_aligned_{it}", radial_mm=round(float(np.hypot(rel[0], rel[1]))*1000, 3))
+        self.RG_t, self.oG_t = RG_t, oG_t
 
     def _stud_local(self, st, i):
         """Stud position in the hub frame from the authored USD (static offset under the hub body)."""
@@ -1078,13 +1302,49 @@ class MountSide:
             cache[key] = np.array(rel.ExtractTranslation())
         return cache[key]
 
+    def pilot_offset(self, value):
+        """Contact offset of the hub pilot colliders: small while inserting (0.1 mm: the 0.35 mm offset, 4x the
+        0.08 mm radial clearance, made the pad stick to the pilot at 9 mm), larger once seated (0.1 mm let the
+        hanging wheel jitter off the pilot after the robot left, bench lip_t E0)."""
+        if value is None:
+            return
+        hub = self.env.stage.GetPrimAtPath(self.station.hub_path)
+        for prim in Usd.PrimRange(hub):
+            if "Pilot" in prim.GetName() and prim.HasAPI(PhysxSchema.PhysxCollisionAPI):
+                PhysxSchema.PhysxCollisionAPI(prim).GetContactOffsetAttr().Set(float(value))
+
     def insert(self):
         FAST = self.prof.fast
         st = self.station
         self.phase = "insert"
-        Rh, oh = self.pose(st.hub_path)
+        if os.environ.get("MOUNT_INS_LOG") == "1":       # position/force log only (no contact reports)
+            self.ins_log = []
+        if os.environ.get("MOUNT_DIAG_INSERT") == "1":
+            # contact reports from insertion start only (switching them on from the start changed the outcome)
+            for path in (st.wheel, st.tire):
+                PhysxSchema.PhysxContactReportAPI.Apply(self.env.stage.GetPrimAtPath(path)).CreateThresholdAttr(0.)
+            self.env.diag = True
+            self.ins_log = []
+        self.pilot_offset(PILOT_CO_INSERT)               # 0.1 mm while inserting, 0.35 mm again once seated
+        Rh, oh = self.hub_pose()
         axis = Rh[:, 2]
         self.oh, self.axis = oh, axis
+        self.rcc_lock(False)
+        if self.rcc:
+            # the released unit settles a little off centre (preload error, 0.19 mm for 5 N): read its slide
+            # sensors and move the flange back by that much so the wheel is on the taught line again
+            yield from self.wait(.3)
+            x = np.asarray(self.av.get_dof_positions()[0], float)
+            Rf, _ = self.pose(self.prefix+"/Arm/link6")
+            shift = -(Rf[:, 0]*x[self.rcc[0]]+Rf[:, 1]*x[self.rcc[1]])
+            self.oG_t = self.oG_t+shift
+            yield from self.move_joints(self.solve(self.RG_t, self.oG_t, self.q[:6]), scale=.2)
+            yield from self.wait(.2)
+            x2 = np.asarray(self.av.get_dof_positions()[0], float)
+            rel, _ = self.seat()
+            self.event("rcc_recentred", slide_mm=[round(float(x[i])*1000, 3) for i in self.rcc],
+                       after_mm=[round(float(x2[i])*1000, 3) for i in self.rcc],
+                       radial_mm=round(float(np.hypot(rel[0], rel[1]))*1000, 3))
         RG_t, oG_t, gap_pre = self.RG_t, self.oG_t, self.gap_pre
         near = oG_t-axis*(gap_pre-.032)
         tare = self.ft_world()
@@ -1098,6 +1358,37 @@ class MountSide:
             if self.seated:
                 break
             self.event("jam_retry", attempt=attempt)
+            if SEARCH and attempt == 1:
+                o_jam = np.asarray(self.stopped_at)
+                gen = self.spiral_search(RG_t, o_jam, axis)
+                try:
+                    while True:
+                        next(gen)
+                        yield
+                except StopIteration as fin:
+                    lat = fin.value
+                if lat is not None:
+                    o_now = np.asarray(self.stopped_at)
+                    o_seat = self.oG_t-axis*gap_pre+lat
+                    yield from self.force_insert(RG_t, o_now, axis, v=.010, expect=float((o_now-o_seat)@axis))
+                    continue
+            if PERCEPTION == "teach":
+                # no vision: back the flange off a fixed 16 mm (the wheel follows only part of it, the tire stretches
+                # in the shoes), return to the taught axis line and press again with the travel known from the teach
+                o_seat = self.oG_t-axis*gap_pre
+                o_now = np.asarray(self.stopped_at)
+                o_back = o_seat+axis*float((o_now-o_seat)@axis+RETRY_BACK)
+                yield from self.move_line(RG_t, o_now, o_back, .010)
+                yield from self.wait(.1)
+                if LASER:                                   # measure the wheel in the gripper again
+                    gap_b = float((o_back-o_seat)@axis)+0.
+                    yield from self.laser_align(passes=1, gap=gap_b)
+                    o_back, o_seat = np.asarray(self.oG_t), self.oG_t-axis*gap_b
+                RG_t = self.RG_t
+                exp = float((o_back-o_seat)@axis)
+                self.event("jam_backed", backed_mm=round(RETRY_BACK*1000, 1), expect_mm=round(exp*1000, 2))
+                yield from self.force_insert(RG_t, o_back, axis, v=.010, expect=exp)
+                continue
             # back off until the bore is off the pilot (tip at 12 mm): backing the flange 5 mm left the wheel at
             # 8.5-11.8 mm (the tire stretched in the shoes), still on the pilot, and it re-jammed at the same gap
             o_now = np.asarray(self.stopped_at)
@@ -1120,12 +1411,43 @@ class MountSide:
             raise StopSide("not seated after jam retries", "jam")
         yield from self.wait(.1 if FAST else .3)
         self.stop_at = np.asarray(self.stopped_at)
+        self.pilot_offset(PILOT_CO_SEATED)
         self.event("inserted")
 
     def release_retract(self):
         FAST = self.prof.fast
         self.phase = "release"
         oh, axis, stop_at, RG_t = self.oh, self.axis, self.stop_at, self.RG_t
+        if self.push_i is not None:                      # web pusher on the wheel before the jaws open
+            fpush = getattr(self, "cfg", {}).get("push_force")
+            if fpush is not None:                         # per robot (bench variants): drive force limit
+                mf = np.array(self.av.get_dof_max_forces(), np.float32)
+                mf[0, self.push_i] = fpush
+                self.av.set_dof_max_forces(mf, self.IDX0)
+            self.push_target = S.PUSHER["extend_target"]
+            yield from self.wait(.25)
+            RG, oG = self.grip_frame()
+            _, opu = self.pose(self.prefix+"/Pusher")
+            _, ow = self.pose(self.station.wheel)
+            self.event("pusher_on", stroke_mm=round(float(self.av.get_dof_positions()[0][self.push_i])*1000, 2),
+                       pusher_body_in_G_mm=[round(float(v)*1000, 1) for v in RG.T@(opu-oG)],
+                       wheel_in_G_mm=[round(float(v)*1000, 1) for v in RG.T@(ow-oG)])
+        ramp = getattr(self, "cfg", {}).get("grip_ramp_s", GRIP_RAMP_S)
+        if ramp:
+            # proportional pressure valve: grip force 2.3 kN -> ~0 before the jaws move, so the tire's stored
+            # compression goes gradually (the jaws keep the closing command, force-limited)
+            mf0 = np.array(self.av.get_dof_max_forces(), np.float32)
+            f0 = float(mf0[0, self.JR])
+            n = int(ramp/self.env.DT)
+            for k in range(1, n+1):
+                mf = mf0.copy()
+                mf[0, self.JR] = max(f0*(1-k/n), 1.)
+                self.av.set_dof_max_forces(mf, self.IDX0)
+                self.command()
+                yield
+            self.event("grip_ramped", s=ramp, f_from=round(f0, 0))
+            mf0[0, self.JR] = f0                          # full force again for opening
+            self.av.set_dof_max_forces(mf0, self.IDX0)
         self.grip(False)
         if RELEASE_PRESS:
             # keep pressing through the outboard shoe lip while the jaws open (wheel tipped 1.6 deg in the first
@@ -1134,11 +1456,41 @@ class MountSide:
             stop_at = self.stop_at
             self.event("released_pressing", **self.hold_log)
         else:
-            yield from self.wait(.90 if FAST else P.GRIP["t_open"]+.3)
+            # wait until the jaws are clear of the tread (sensor), not a fixed time: a slow opening lets the tire's
+            # stored axial compression go gradually instead of kicking the wheel off the pilot
+            t0 = self.env.t
+            yield from self.wait(.2)
+            while float(self.av.get_dof_positions()[0][self.JR]) < OPEN_CLEAR and self.env.t-t0 < 6.:
+                self.command()
+                yield
+            # stop the jaws there (pneumatic mid-position valve): fully open they ran into the wheelhouse liner at
+            # ~29.7 mm and dragged along it (-1.75 kN on retract) while the shoe lip hooked the tire shoulder
+            self.jaw_v = 0.
+            self.event("jaws_open", s=round(self.env.t-t0, 2))
+        if self.push_i is not None:
+            # ramp the pusher force down before its pad leaves the web (proportional pressure regulator)
+            f_hi = getattr(self, "cfg", {}).get("push_force", S.PUSHER["force"])
+            f_lo = getattr(self, "cfg", {}).get("push_force_end", PUSH_END_N)
+            n = int(PUSH_RAMP_S/self.env.DT)
+            for k in range(1, n+1):
+                mf = np.array(self.av.get_dof_max_forces(), np.float32)
+                mf[0, self.push_i] = f_hi+(f_lo-f_hi)*k/n
+                self.av.set_dof_max_forces(mf, self.IDX0)
+                self.command()
+                yield
         self.mounted_station = self.station
+        self.rcc_lock(True)
         self.phase = "retract"
         out = oh+axis*.45+(stop_at-oh-axis*((stop_at-oh)@axis))
         off_studs = stop_at+axis*.04                       # slow until the shoes are clear of the tread
+        if self.push_i is not None:
+            # back off 12 mm with the pusher still holding the web (it follows over its stroke), then retract it
+            hold = stop_at+axis*.012
+            yield from self.move_line(RG_t, stop_at, hold, .05)
+            self.push_target = 0.
+            yield from self.wait(.25)
+            self.event("pusher_off")
+            stop_at = hold
         yield from self.move_line(RG_t, stop_at, off_studs, .10 if FAST else .05)
         yield from self.move_line(RG_t, off_studs, out, .50 if FAST else .10)
         self.event("retracted")
@@ -1235,8 +1587,12 @@ def replay(env, run_dir):
                 op.Set(S_*world(poses[k, i])*parent_w.GetInverse())
 
     show(0)
+    from omni.kit.viewport.utility import get_active_viewport
+    cam = env.cams.get(os.environ.get("REPLAY_CAM", "overview"), env.cams["overview"])
     for _ in range(30):
+        get_active_viewport().camera_path = cam              # after the stage settled (set earlier it reverted)
         app.update()
+    print("REPLAY camera", get_active_viewport().camera_path, flush=True)
     print(f"REPLAY {run_dir}: {times[-1]:.1f} s at real time", flush=True)
     while app.is_running():
         wall0 = time.perf_counter()
@@ -1346,6 +1702,7 @@ def main():
     ap.add_argument("--t1", type=float, default=None)
     ap.add_argument("--tag", default="video")
     ap.add_argument("--t-max", type=float, default=None)
+    ap.add_argument("--index-anyway", action="store_true", help="index A->B even if a front wheel failed (tests)")
     ap.add_argument("--car-dynamic", action="store_true", help="car body dynamic on the lift pads (AMR/lift held)")
     ap.add_argument("--car", action="store_true",
                     help="whole car: front wheels at dock A, fake index move A->B (+wheelbase), rear wheels at B")
@@ -1387,7 +1744,7 @@ def main():
             yield
         if not args.car:
             return
-        if not all(r == "mounted" for u in units for r in u.results.values()):
+        if not args.index_anyway and not all(r == "mounted" for u in units for r in u.results.values()):
             env.log_event(dict(t=round(env.t, 3), side="Cell", event="index_held",
                                reason="front wheel not mounted", wheels={k: v for u in units for k, v in u.results.items()}))
             return

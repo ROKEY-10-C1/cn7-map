@@ -67,9 +67,16 @@ BODY_FRONT = P.TIRE_HALF_W+.050             # gripper face 50 mm outboard of the
 JAW_BLOCK = .025                            # base jaw height above the gripper face (estimate)
 ADAPTER_T = .020
 FLANGE_Z = BODY_FRONT+BODY_H+ADAPTER_T      # flange in G
+JAW_BASE_X = .160                           # base jaw centre on the housing at tread contact (G x)
 S_TOUCH = .025                              # jaw opening (per side) at tread contact; 25 mm reserve to close
 JAW_Q_RANGE = (-S_TOUCH, P.GRIP["stroke"]-S_TOUCH)
-SHOE = dict(r_in=P.TIRE_R, pu=.010, backing=.008, z0=-.070, z1=.085, lip=(.106, .114), lip_r0=.290)
+import os as _os
+SHOE = dict(r_in=P.TIRE_R, pu=.010, backing=.008, z0=-.070, z1=.085, lip=(.106, .114), lip_r0=float(_os.environ.get("MOUNT_LIP_R0", ".304")))
+PUSHER_ON = _os.environ.get("MOUNT_PUSHER", "1") == "1"
+PUSHER = dict(mass=.8, pad_r=.044, pad_z=.072, stroke=.025, k=2.0e4, c=400., force=150.,
+              extend_target=.040)                     # pneumatic Ø25 with a proportional regulator: 150 N while the jaws open, ramped down before the pad leaves (bench st0-3: 60 N let 5/16 kick off at jaw opening; gui_pf: 150 N rocked the wheel when the pad left)
+RCC_ON = _os.environ.get("MOUNT_RCC", "0") == "1"
+RCC = dict(mass=1.5, travel=.001, k=2.5e4, k_lock=1.0e7, c=2.0e3)   # k = SCHUNK AGE-F XY spring rate 25 N/mm (catalogue); AGE-F 080 is rated 32 kg < ~40 kg here -> larger size to verify; mass, travel, damping estimated
 R_FG = np.diag([1., -1., -1.])              # flange axes in G
 T_GF = np.array([0., CHORD_Y, FLANGE_Z])    # flange origin in G
 
@@ -262,6 +269,7 @@ def wheel(stage, M, V, rng):
     R0 = rot((0, 0, 1), spin)
     c = np.array([*TABLE_C, P.TABLE_TOP+P.TIRE_HALF_W+.002])
     rim = rigid(stage, "/World/Wheel", c, gq(R0), P.RIM_MASS, ccd=False, iters=(64, 8))
+    PhysxSchema.PhysxRigidBodyAPI(rim).CreateMaxDepenetrationVelocityAttr(P.WHEEL_MAX_DEPEN)
     UsdPhysics.MassAPI(rim).CreateDiagonalInertiaAttr(Gf.Vec3f(.17, .17, .27))
     UsdPhysics.MassAPI(rim).CreateCenterOfMassAttr(Gf.Vec3f(0, 0, 0))
     PhysxSchema.PhysxContactReportAPI.Apply(rim).CreateThresholdAttr(0.)
@@ -291,6 +299,7 @@ def wheel(stage, M, V, rng):
     visual_only(stage, wp+"/Visual")
 
     tire = rigid(stage, "/World/Tire", c, gq(R0), P.TIRE_MASS, ccd=False, iters=(64, 8))
+    PhysxSchema.PhysxRigidBodyAPI(tire).CreateMaxDepenetrationVelocityAttr(P.WHEEL_MAX_DEPEN)
     r_i, r_o, w = P.RIM_R, P.TIRE_R, 2*P.TIRE_HALF_W
     UsdPhysics.MassAPI(tire).CreateDiagonalInertiaAttr(Gf.Vec3f(*((3*(r_i**2+r_o**2)+w*w)/12*P.TIRE_MASS,)*2,
                                                                  (r_i**2+r_o**2)/2*P.TIRE_MASS))
@@ -388,11 +397,28 @@ def robot(stage, M, V, sync=True, rp="/World/Robot", base=None, yaw=0., prefix="
     box(stage, tp+"/Body", tuple(c), (BODY_L, BODY_W, BODY_H), phys=M["steel"], vis=V["blue"])
     box(stage, tp+"/Adapter", tuple(g2f((0, CHORD_Y, FLANGE_Z-ADAPTER_T/2))), (.22, .16, ADAPTER_T),
         phys=M["steel"], vis=V["alu"])
-    j = joint(stage, prefix+"/ToolMount", "fixed", f"{rp}/link6", tool.GetPath())
+    if RCC_ON:
+        # remote-centre-compliance unit between flange and tool (ATI RCC class, estimate 1.5 kg): two
+        # prismatic slides across the flange axis (x, y of the flange frame), +-1 mm, spring + damper drives.
+        # Locked (very stiff) for transfer, released for the insertion by the controller (mount_control).
+        rc = rigid(stage, prefix+"/RCC", tuple(l6p), gq(l6R), RCC["mass"])
+        UsdPhysics.MassAPI(rc).CreateDiagonalInertiaAttr(Gf.Vec3f(2e-3, 2e-3, 2e-3))
+        for name, b0, b1, ax in (("RCCSlideX", f"{rp}/link6", rc.GetPath(), "X"),
+                                 ("RCCSlideY", rc.GetPath(), tool.GetPath(), "Y")):
+            js = joint(stage, f"{prefix}/{name}", "prismatic", b0, b1)
+            js.CreateAxisAttr(ax)
+            js.CreateLowerLimitAttr(-RCC["travel"])
+            js.CreateUpperLimitAttr(RCC["travel"])
+            drive(js, "linear", 0., RCC["k_lock"], RCC["c"], 1e5)
+        j = None
+    else:
+        j = joint(stage, prefix+"/ToolMount", "fixed", f"{rp}/link6", tool.GetPath())
     jaws = []
     for side, name in ((1, "R"), (-1, "L")):    # right first: the left slide mimics it
         jp = f"{prefix}/Jaw{name}"
-        origin_g = np.array([side*TOUCH_X, CHORD_Y, BODY_FRONT])
+        # base jaw on the housing's guide: +-160 mm at tread contact, +-215 mm fully open (housing ends at +-270 mm).
+        # It was at the tread contact (+-311 mm), outside the housing, so the jaws looked detached from it.
+        origin_g = np.array([side*JAW_BASE_X, CHORD_Y, BODY_FRONT])
         jaw = rigid(stage, jp, tuple(l6p), gq(l6R), None)
         # base jaw block
         box(stage, jp+"/Base", tuple(g2f(origin_g+(0, 0, -JAW_BLOCK/2))), (.09, .12, JAW_BLOCK), phys=M["steel"], vis=V["dark"])
@@ -405,7 +431,11 @@ def robot(stage, M, V, sync=True, rp="/World/Robot", base=None, yaw=0., prefix="
         fc = g2f((fx, fy, (f0+f1)/2))
         flen = f1-f0
         box(stage, jp+"/Finger", tuple(fc), (.025, .10, flen), phys=M["steel"], vis=V["alu"])
-        finger_mass = .025*.10*flen*P.ALU_DENSITY
+        # finger arm: base jaw -> finger, just outboard of the sidewall bulge (z 102.9 mm; arm 107.5-127.5 mm)
+        ax0, ax1 = JAW_BASE_X, abs(fx)+.0125
+        box(stage, jp+"/Arm", tuple(g2f((side*(ax0+ax1)/2, fy, f1-.010))), (ax1-ax0, .10, .020), phys=M["steel"],
+            vis=V["alu"])
+        finger_mass = .025*.10*flen*P.ALU_DENSITY+(ax1-ax0)*.10*.020*P.ALU_DENSITY
         # shoe: PU face on an aluminium backing, arc centred at +-45 deg below the centre
         centre = -pi/2+side*SHOE_A
         a0, a1 = centre-P.SHOE_ARC/2, centre+P.SHOE_ARC/2
@@ -440,7 +470,31 @@ def robot(stage, M, V, sync=True, rp="/World/Robot", base=None, yaw=0., prefix="
             mimic.GetGearingAttr().Set(1.)       # q_L = -q_R: symmetric rack-and-pinion synchronisation
             mimic.GetOffsetAttr().Set(0.)
         jaws.append((jp, side))
+    extra = []
+    if PUSHER_ON:
+        # web pusher: pneumatic cylinder on the wheel axis (bracket from the gripper face up to the axis), PU disc
+        # r 44 mm on the web between the centre bore (r 33.5) and the nut seats (r >= 45.8). It holds the wheel on
+        # the hub while the jaws open and during the first retract, so the tire's stored axial compression cannot
+        # kick the wheel off the pilot (bench pc15_z4t: 7.7 mm in 0.1 s after the jaws opened).
+        box(stage, tp+"/PusherBracket", tuple(g2f((0, CHORD_Y/2+.01, BODY_FRONT+.010))), (.05, abs(CHORD_Y)+.02, .020),
+            phys=M["steel"], vis=V["alu"])
+        pp = prefix+"/Pusher"
+        pu = rigid(stage, pp, tuple(l6p), gq(l6R), PUSHER["mass"])
+        UsdPhysics.MassAPI(pu).CreateDiagonalInertiaAttr(Gf.Vec3f(1e-3, 1e-3, 1e-3))
+        z_pad = PUSHER["pad_z"]                              # pad face in G, retracted
+        cp = g2f((0., 0., z_pad+.004))                    # on the wheel axis (G), in flange coordinates
+        cylinder(stage, pp+"/Pad", (cp[0], cp[1]), cp[2]-.004, cp[2]+.004, PUSHER["pad_r"], phys=M["pu"], vis=V["pu"])
+        cr = g2f((0., 0., (z_pad+.008+BODY_FRONT)/2))
+        hr = (BODY_FRONT-z_pad-.008)/2
+        cylinder(stage, pp+"/Rod", (cr[0], cr[1]), cr[2]-hr, cr[2]+hr, .010, phys=M["steel"], vis=V["steel"])
+        js = joint(stage, prefix+"/PusherSlide", "prismatic", tp, pp)
+        js.CreateAxisAttr("Z")                               # +q: flange +z = toward the wheel
+        js.CreateLowerLimitAttr(0.)
+        js.CreateUpperLimitAttr(PUSHER["stroke"])
+        drive(js, "linear", 0., PUSHER["k"], PUSHER["c"], PUSHER["force"])
+        UsdPhysics.FilteredPairsAPI.Apply(pu).CreateFilteredPairsRel().AddTarget(tp)
+        extra.append(pp)
     for link in ("link6", "link5", "link4"):
-        for b in [tp]+[j for j, _ in jaws]:
+        for b in [tp]+[j for j, _ in jaws]+extra:
             UsdPhysics.FilteredPairsAPI.Apply(stage.GetPrimAtPath(b)).CreateFilteredPairsRel().AddTarget(f"{rp}/{link}")
     return jaws

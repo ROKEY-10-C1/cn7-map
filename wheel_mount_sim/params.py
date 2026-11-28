@@ -39,16 +39,28 @@ RIM_MASS = p("rim_mass", 9.1, "kg", "literature", "wheel-size.com listing for 6.
 TIRE_MASS = p("tire_mass", 8.0, "kg", "catalogue", "Continental ProContact RX 205/55R16 (cell physical_data)")
 
 # ---------------------------------------------------------------- tire compliance (rigid-ring model)
-TIRE_K_RADIAL = p("tire_k_radial", 180e3, "N/m", "literature",
-                  "average radial stiffness of passenger tyres, Eksploatacja i Niezawodnosc 2014 (archive.ein.org.pl 2014-01-11)")
-TIRE_K_CIRC = p("tire_k_circumferential", 80e3, "N/m", "literature", "same study, circumferential")
-TIRE_K_LAT = p("tire_k_lateral", 65e3, "N/m", "literature", "same study, lateral")
+import os as _os
+# Rigid-ring sidewall (rim <-> tread ring), not the tyre's ground-contact stiffness. Until 2026-11-28 the radial and
+# lateral values were the passenger-tyre ground-contact (vertical) stiffness of EiN 2014 (180 / 65 N/mm): 10-30x too
+# soft for the sidewall, so a 145 N press compressed the tire 2.1 mm against the rim and the release kicked the wheel.
+TIRE_K_RADIAL = p("tire_k_radial", float(_os.environ.get("MOUNT_TIRE_K_RADIAL", "1.7e6")), "N/m", "literature",
+                  "sidewall translational stiffness from the 77.2 Hz in-plane mode, passenger tyre r0 0.3135 m, belt 7.25 kg "
+                  "(Sivaramakrishnan, VT MSc thesis 2015, Table 5.5: 1.703e6 N/m)")
+TIRE_K_CIRC = p("tire_k_circumferential", float(_os.environ.get("MOUNT_TIRE_K_CIRC", "7.81e5")), "N/m", "literature",
+                "torsion 7.817e4 N m/rad (same thesis, 58.95 Hz) / R^2")
+TIRE_K_LAT = p("tire_k_lateral", float(_os.environ.get("MOUNT_TIRE_K_LAT", "7.0e5")), "N/m", "derived",
+               "out-of-plane rigid-ring modes of car tyres 51-85 Hz (single-track tyre study) with an ~8 kg ring -> "
+               "~0.45-2 MN/m; low end taken (47 Hz). No direct measurement for this tyre")
 TIRE_K_TORSION = p("tire_k_torsion", TIRE_K_CIRC*TIRE_R**2, "N m/rad", "derived",
                    "k_circ * R^2 = 7.99 kN m/rad = 139 N m/deg (study reports ~150, consistent)")
 TIRE_K_TILT = p("tire_k_tilt", TIRE_K_LAT*TIRE_R**2/2, "N m/rad", "derived",
                 "lateral springs spread round the bead: k_lat * R^2 / 2")
-TIRE_ZETA = p("tire_damping_ratio", .08, "-", "estimate",
-              "passenger tyre structural damping is a few per cent of critical; 0.05-0.10 swept")
+TIRE_ZETA = p("tire_damping_ratio", float(_os.environ.get("MOUNT_TIRE_ZETA", ".055")), "-", "literature",
+              "measured modal damping of the sidewall modes 0.050-0.056 (same VT thesis, Table 5.5)")
+WHEEL_MAX_DEPEN = p("wheel_max_depenetration_velocity", float(_os.environ.get("MOUNT_MAX_DEPEN", ".05")), "m/s",
+                    "derived", "solver setting, not a material value: PhysX push-out speed cap on rim and tire. Default "
+                    "(large) kicked seated wheels off the pilot; bench 0.01 let the press sink 0.3 mm into the hub, "
+                    "0.05 8/8 and 0.2 8/8 seated with no penetration (2026-11-28)")
 
 # ---------------------------------------------------------------- hub corner (car lifted, wheel at full droop)
 HUB_MASS = p("hub_mass", 6.5, "kg", "estimate", "hub flange + rotor hat + inner race; cell value")
@@ -118,11 +130,13 @@ FACE_CONTACT_OFFSET = p("hub_face_contact_offset", .0002, "m", "derived",
 STUD_CONTACT_OFFSET = p("stud_contact_offset", .0003, "m", "derived",
                         "> 3 x travel per step at 20 mm/s (0.083 mm) and stud+pad offsets (0.345 mm) < stud-hole clearance 0.7 mm; "
                         "0.8 mm created false axial contacts at the hole edges (sim dbg27)")
-PILOT_CONTACT_OFFSET = p("pilot_contact_offset", .00035, "m", "derived",
-                         "just over the travel per step of the cell insertion bench (76 mm/s / 240 Hz = 0.32 mm). "
-                         "0.2 mm jammed that bench at 8.9 mm; 0.8 mm (9x the 0.09 mm radial bore clearance) wedged the "
-                         "bore 3 mm onto the pilot in the cell mount runs (gap 9 mm, both sides); 0.02 mm tunnelled on "
-                         "release (dbg47)")
+import os as _os
+PILOT_CONTACT_OFFSET = p("pilot_contact_offset", float(_os.environ.get("MOUNT_PILOT_CO", ".00035")), "m", "derived",
+                         "built at 0.35 mm (stable for a hanging wheel; phase-1 / --process keep it). mount_control lowers it "
+                         "to 0.1 mm while inserting: 0.35 mm (4x the 0.08 mm radial clearance) made speculative contacts all "
+                         "round the pilot and the pad stuck to it at 8.8 mm (1.1 kN side contact); 0.05 mm jammed again. "
+                         "After seating mount_control raises it to 0.35 mm (PILOT_CO_SEATED): at 0.1 mm the hanging wheel "
+                         "jittered off the pilot (bench lip_t, 2026-11-28)")
 PAD_CONTACT_OFFSET = p("pad_contact_offset", .000045, "m", "model", "cell value on the wheel pad: below the 0.08 mm pilot clearance")
 
 
@@ -146,7 +160,9 @@ LATERAL_COMPLIANCE = p("lateral_compliance", 25e3, "N/m", "catalogue",
                        "because the gripper+wheel (~40 kg) exceeds the unit's 32 kg rating")
 SEAT_FORCE_RATIO = p("seat_force_ratio", .9, "-", "estimate", "seated when the axial force holds >= 90 % of the set point ...")
 SEAT_STILL = p("seat_still", (.3, .00002), "s, m", "estimate", "... and the wheel moves < 0.02 mm in 0.3 s (force-displacement window)")
-RELEASE_FORCE = p("release_hold_force", 20., "N", "estimate", "press force is ramped down to this before the jaws open")
+RELEASE_FORCE = p("release_hold_force", 100., "N", "derived",
+                  "press force held until the jaws open: at 20 N the wheel backed out 1-2 mm and 2 of 4 fell off the "
+                  "pilot on release; 60 N 4/4 and 100 N 4/4 seated, 0.25-0.37 mm, <= 0.14 deg (bench rel20/60/100)")
 MOUNTED = p("mounted_criteria", (.002, 2.), "m, deg", "derived",
             "after release the wheel hangs on pilot + studs: gap < 2 mm keeps the pilot (12 mm) engaged, lean < 2 deg; "
             "the fastening robot's nuts then draw it flat (11/26 release test: 1.45 deg lean)")
