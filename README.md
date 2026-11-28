@@ -7,7 +7,8 @@ Isaac Sim에서 CN7 차체 이송, 휠 장착, 너트 체결을 개발하고 검
 | 경로 | 역할 |
 |---|---|
 | [`wheel_mount_sim/`](wheel_mount_sim/README.md) | 좌전륜 장착 단독 시험. Kawasaki RS080N과 SCHUNK 트레드 클램프 |
-| [`map_fasten/`](map_fasten/README.md) | 너트 체결 구체화. Kawasaki RS080N과 5축 헤드의 단독 시험 |
+| [`wheel_fasten_sim/`](wheel_fasten_sim/wheel_fasten.usda) | 너트 체결 시뮬레이션의 새 위치. B 정차점의 정지 USD를 Isaac Sim에서 열어 확인할 수 있다. |
+| [`map_fasten/`](map_fasten/README.md) | 기존 너트 체결 동작 시험과 Kawasaki RS080N·5축 체결기 에셋 |
 | [`wheel_cell/`](wheel_cell/README.md) | 전체 조립 셀 생성·실행·물리 검증과 공용 제어 코드 |
 | [`wheel_cell/HANDOVER.md`](wheel_cell/HANDOVER.md) | 장착 완료 휠의 허브 기준 상태, 스터드 데이터와 체결기 설계 사양 |
 | [`scene/`](scene/README.md) | 전체 조립 셀의 USD 시작 장면과 공장·재질·주문별 레이어 |
