@@ -53,7 +53,7 @@ class Settings:
     wheel_gap: float = .0065
     wheel_tilt_deg: float = 2.7
     stud_protrusion: float = .003
-    spindle_deg_s: float = 720.
+    spindle_deg_s: float = 1440.
     feed_lateral_error: float = .001
     motion_timeout: float = 20.
     phase_timeout: float = 6.
@@ -65,6 +65,14 @@ class FastenTask:
         if corner not in ("FL", "FR", "RL", "RR"):
             raise ValueError(f"Unknown corner {corner}")
         self.stage = stage
+
+        import omni.physx
+
+        self.physics = omni.physx.get_physx_interface()
+        self._local_matrices = {}
+        self._body_matrices = {}
+        self._frame_cache = None
+
         self.corner = corner
         side = "Left" if corner.endswith("L") else "Right"
         self.side = 1 if side == "Left" else -1
@@ -132,11 +140,103 @@ class FastenTask:
                 or list(map(str, joint.GetBody1Rel().GetTargets())) != [body1]):
             raise ValueError(f"Invalid joint endpoints {joint}")
 
+    def get_world_matrix(self, path, cache):
+        path = str(path)
+
+        # 새로운 관측 구간: 동적 강체 좌표만 초기화
+        if self._frame_cache is not cache:
+            self._frame_cache = cache
+            self._body_matrices.clear()
+
+        # 고정 상대 변환은 관측 구간이 바뀌어도 재사용
+        if path not in self._local_matrices:
+            prim = self.prim(path)
+            body = prim
+
+            while body and not body.IsPseudoRoot():
+                if body.HasAPI(UsdPhysics.RigidBodyAPI):
+                    break
+
+                xformable = UsdGeom.Xformable(body)
+
+                if xformable and xformable.GetResetXformStack():
+                    body = None
+                    break
+
+                body = body.GetParent()
+
+            # 정적 객체는 USD 좌표 사용
+            if not body or body.IsPseudoRoot():
+                return cache.GetLocalToWorldTransform(prim)
+
+            body_path = str(body.GetPath())
+
+            prim_world = cache.GetLocalToWorldTransform(prim)
+            body_world = cache.GetLocalToWorldTransform(body)
+
+            # 강체 자세와 하위 형상의 Scale을 분리
+            body_pose = body_world.RemoveScaleShear()
+            local = prim_world * body_pose.GetInverse()
+
+            self._local_matrices[path] = (body_path, local)
+
+        body_path, local = self._local_matrices[path]
+
+        # 동일 관측 구간에서 같은 강체는 한 번만 조회
+        if body_path not in self._body_matrices:
+            state = self.physics.get_rigidbody_transformation(
+                body_path
+            )
+
+            if not state.get("ret_val"):
+                raise RuntimeError(
+                    f"Missing PhysX rigid body: {body_path}"
+                )
+
+            x, y, z, w = state["rotation"]
+
+            matrix = Gf.Matrix4d(1.0)
+
+            matrix.SetRotate(
+                Gf.Quatd(
+                    float(w),
+                    Gf.Vec3d(float(x), float(y), float(z))
+                )
+            )
+
+            matrix.SetTranslateOnly(
+                Gf.Vec3d(*state["position"])
+            )
+
+            self._body_matrices[body_path] = matrix
+
+        return local * self._body_matrices[body_path]
+
     def get_world_pose(self, path, cache):
-        matrix = cache.GetLocalToWorldTransform(self.prim(path))
-        quat = matrix.ExtractRotationQuat()
-        rotation = Rotation.from_quat([quat.GetReal(), *quat.GetImaginary()], scalar_first=True)
-        return Pose(np.array(matrix.ExtractTranslation()), rotation.as_matrix())
+        matrix = self.get_world_matrix(path, cache)
+        return Pose(np.array(matrix.ExtractTranslation()), self._rotation_matrix(matrix))
+
+    @staticmethod
+    def _rotation_matrix(matrix):
+        quat = matrix.RemoveScaleShear().ExtractRotationQuat()
+
+        rotation = Rotation.from_quat(
+            [quat.GetReal(), *quat.GetImaginary()],
+            scalar_first=True
+        )
+
+        return rotation.as_matrix()
+
+    def _observe_spindle_rotations(self):
+        # 초기화에서 여섯 경로가 모두 강체임을 확인했다. 위상에는 회전만 필요하다.
+        quats = []
+        for path in (self.flange, *self.rotors):
+            state = self.physics.get_rigidbody_transformation(path)
+            if not state.get("ret_val"):
+                raise RuntimeError(f"Missing PhysX rigid body: {path}")
+            quats.append(state["rotation"])
+        flange, *rotors = Rotation.from_quat(quats).as_matrix()
+        return flange, rotors
 
     def observe(self):
         cache = UsdGeom.XformCache()
@@ -311,7 +411,13 @@ class FastenController:
         if not self.motion:
             return True
         start, goal = self.motion_start, self.motion[0]
-        duration = max(1.6, float(np.max(1.5*np.abs(goal-start)/(.55*self.arm.speed))))
+        duration = max(
+            1.2,
+            float(np.max(
+                1.5*np.abs(goal-start)/(.70*self.arm.speed)
+            ))
+        )
+
         self.motion_time += dt
         t = min(1., self.motion_time/duration)
         self.command_arm(start + (goal-start)*t*t*(3.-2.*t))
@@ -352,9 +458,21 @@ class FastenController:
         correction = np.clip(commanded-obs.flange.xyz, -.0015, .0015)
         if np.linalg.norm(error) < .004:
             goal += correction
-        # IK에 넘기는 목표는 현재 플랜지에서 프레임당 최대 4 mm 이동한다.
+        # IK 목표의 제어 스텝당 이동량은 상태별로 제한한다.
         delta = goal-obs.flange.xyz
-        goal = obs.flange.xyz + delta*min(1., .004/max(np.linalg.norm(delta), 1e-9))
+
+        step_limit = {
+            "ALIGN": .006,
+            "ENGAGE": .004,
+            "RUN_DOWN": .004,
+            "SEAT": .004,
+            "RETRACT": .008,
+        }.get(self.state, .004)
+
+        goal = obs.flange.xyz + delta*min(
+            1.,
+            step_limit/max(np.linalg.norm(delta), 1e-9)
+        )
         self.command_arm(self.solve(obs, goal, rotation))
 
     def errors(self, obs, positions):
@@ -384,8 +502,15 @@ class FastenController:
 
     @staticmethod
     def phases(obs):
+        return FastenController._spindle_phases(
+            obs.flange.rotation, (rotor.rotation for rotor in obs.rotors)
+        )
+
+    @staticmethod
+    def _spindle_phases(flange, rotors):
         # 플랜지에 대한 로터의 상대 X축으로 실제 스핀을 측정한다. 팔 회전은 누적에서 제외한다.
-        axes = np.array([obs.flange.rotation.T @ rotor.rotation[:, 0] for rotor in obs.rotors])
+        world_to_flange = flange.T
+        axes = np.array([world_to_flange @ rotor[:, 0] for rotor in rotors])
         return np.arctan2(axes[:, 1], axes[:, 0])
 
     @staticmethod
@@ -449,20 +574,26 @@ class FastenController:
                     self.enter("ALIGN" if self.state == "APPROACH" else "VERIFY")
                 return self.state
 
-            # 회전 위상만 매 물리 스텝 추적해 ±π 경계를 넘는 회전도 센다.
-            turning = self.state in ("RUN_DOWN", "SEAT")
-            if turning:
+            # 전체 관측이 있는 스텝에는 같은 플랜지·로터 자세를 재사용한다.
+            until_control = self.until_control - dt
+            # 240 Hz에서 1/30초를 8번 빼면 부동소수점 잔차가 남을 수 있다.
+            control_due = until_control <= 1e-12
+            if control_due:
                 obs = self.task.observe()
-                phase = self.phases(obs)
+
+            # 회전 위상만 매 물리 스텝 추적해 ±π 경계를 넘는 회전도 센다.
+            if self.state in ("RUN_DOWN", "SEAT"):
+                if control_due:
+                    phase = self.phases(obs)
+                else:
+                    phase = self._spindle_phases(*self.task._observe_spindle_rotations())
                 self.turns += np.angle(np.exp(1j*(phase-self.last_phase)))/tau
                 self.last_phase = phase
-            self.until_control -= dt
-            if self.until_control > 0.:
-                return self.state
-            self.until_control = self.config.control_period
-            if not turning:
-                obs = self.task.observe()
-            self.control(obs)
+
+            self.until_control = until_control
+            if control_due:
+                self.until_control = self.config.control_period
+                self.control(obs)
         except (RuntimeError, ValueError, np.linalg.LinAlgError) as error:
             self.speed(np.zeros(5))
             self.message = f"{self.state}: {error}"
@@ -841,8 +972,10 @@ class FastenCell:
     def reload_clearance(self):
         # AMR 선형 경로 전체를 덮는 보수적인 횡방향 분리 검사.
         cache = UsdGeom.XformCache()
+        reader = self.controllers[0].task
         if self.clearances is None:
             self.clearances = []
+            self.static_clearance = float("inf")
             for robot in self.controllers:
                 label = "Left" if robot.task.side > 0 else "Right"
                 for root in (robot.task.robot, f"/World/{label}NutMagazine"):
@@ -855,15 +988,21 @@ class FastenCell:
                             ext = UsdGeom.Boundable.ComputeExtentFromPlugins(shape, Usd.TimeCode.Default())
                         if ext:
                             low, high = (Gf.Vec3d(point) for point in ext)
-                            self.clearances.append((robot.task.side, prim, (low+high)/2, (high-low)/2))
+                            path = str(prim.GetPath())
+                            center, half = (low+high)/2, (high-low)/2
+                            xform = reader.get_world_matrix(path, cache)
+                            if path in reader._local_matrices:
+                                self.clearances.append((robot.task.side, path, center, half))
+                            else:
+                                self.static_clearance = min(
+                                    self.static_clearance,
+                                    self.box_clearance(robot.task.side, xform, center, half),
+                                )
         # 차폭, 휠 외곽 및 여유를 포함한 통과 영역은 ±1.06 m다.
-        clearance = float("inf")
-        for side, prim, center, half in self.clearances:
-            xform = cache.GetLocalToWorldTransform(prim)
-            # 상자 중심의 Y 투영에서 세 축의 반폭 기여분을 빼면 가장 가까운 모서리다.
-            half_y = sum(abs(xform[i][1])*half[i] for i in range(3))
-            lateral = side*xform.Transform(center)[1]-half_y
-            clearance = min(clearance, lateral-TRAVEL_HALF_WIDTH)
+        clearance = self.static_clearance
+        for side, path, center, half in self.clearances:
+            xform = reader.get_world_matrix(path, cache)
+            clearance = min(clearance, self.box_clearance(side, xform, center, half))
         for robot in self.controllers:
             if robot.load:
                 for path in robot.load[0]:
@@ -873,6 +1012,12 @@ class FastenCell:
             self.metrics.get("reload_lane_clearance_mm", float("inf")), clearance*1000)
         if clearance < TRAVEL_MARGIN:
             raise RuntimeError(f"Reload arm entered AMR travel corridor: {clearance*1000:.1f} mm")
+
+    @staticmethod
+    def box_clearance(side, xform, center, half):
+        # 세 축의 Scale을 포함한 Y 투영에서 통과 영역에 가장 가까운 면을 구한다.
+        half_y = sum(abs(xform[i][1])*half[i] for i in range(3))
+        return side*xform.Transform(center)[1]-half_y-TRAVEL_HALF_WIDTH
 
     def update(self, dt):
         if self.state in ("DONE", "FAILED"):

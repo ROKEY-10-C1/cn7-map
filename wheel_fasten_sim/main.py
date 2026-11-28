@@ -11,22 +11,31 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 
+WRITEBACK_KEYS = (
+    "/physics/updateToUsd",
+    "/physics/updateVelocitiesToUsd",
+    "/physics/updateParticlesToUsd",
+    "/physics/updateForceSensorsToUsd",
+    "/physics/updateResidualsToUsd",
+)
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--headless", action="store_true")
     parser.add_argument("--through", choices=("FL", "FR", "front", "reload", "move", "full"), default="full")
+    parser.add_argument("--fabric", action="store_true")
     args = parser.parse_args()
 
     from isaacsim import SimulationApp
     app = SimulationApp({"headless": args.headless, "multi_gpu": False})
     try:
-        return run(app, args.headless, args.through)
+        return run(app, args.headless, args.through, args.fabric)
     finally:
         app.close()
 
 
-def run(app, headless, through):
+def run(app, headless, through, fabric=False):
     import omni.usd
     from isaacsim.core.api import World
     sys.path.insert(0, str(HERE.parent / "wheel_cell"))
@@ -34,7 +43,9 @@ def run(app, headless, through):
     context = omni.usd.get_context()
     wait_for_play = False
     while True:
-        code, restart = run_session(app, headless, through, context, wait_for_play)
+        code, restart = run_session(
+            app, headless, through, context, wait_for_play, fabric
+        )
         if not restart:
             return code
         World.clear_instance()
@@ -44,7 +55,27 @@ def run(app, headless, through):
         wait_for_play = True
 
 
-def run_session(app, headless, through, context, wait_for_play):
+def run_session(app, headless, through, context, wait_for_play, fabric=False):
+    import carb
+    import omni.kit.app
+    from isaacsim.core.simulation_manager import SimulationManager
+
+    settings = carb.settings.get_settings()
+    before = {key: settings.get(key) for key in WRITEBACK_KEYS}
+    manager = omni.kit.app.get_app().get_extension_manager()
+    fabric_before = manager.is_extension_enabled("omni.physx.fabric")
+    try:
+        return _run_session(app, headless, through, context, wait_for_play, fabric)
+    finally:
+        SimulationManager.enable_fabric(fabric_before)
+        for key, value in before.items():
+            if value is None:
+                settings.destroy_item(key)
+            else:
+                settings.set_bool(key, value)
+
+
+def _run_session(app, headless, through, context, wait_for_play, fabric):
     import carb
     import omni.timeline
     from isaacsim.core.api import World
@@ -84,10 +115,24 @@ def run_session(app, headless, through, context, wait_for_play):
         set_defaults=False
     )
 
-    world.get_physics_context().enable_fabric(False)
+
+    world.get_physics_context().enable_fabric(fabric)
+    settings = carb.settings.get_settings()
+    if fabric:
+        for key in WRITEBACK_KEYS:
+            settings.set_bool(key, False)
+
+    print(f"FABRIC: {fabric}", flush=True)
+
     if not headless:
         set_camera_view(eye=[10., 7.5, 5.7], target=[4.1, 0., 1.0])
     world.reset()
+    if fabric:
+        print(
+            "USD_WRITEBACK:",
+            {key: settings.get(key) for key in WRITEBACK_KEYS},
+            flush=True
+        )
     controller = (FastenController(FastenTask(stage, through)) if through in ("FL", "FR")
                   else FastenCell(stage, through))
     previous = None
@@ -122,6 +167,7 @@ def run_session(app, headless, through, context, wait_for_play):
 
         # 2. 물리 연산: 240Hz
         tic = time.perf_counter()
+        # Isaac Sim 5.1의 render()가 GUI 프레임에서 Fabric을 갱신한다.
         world.step(render=False)
         prof["physics"] += time.perf_counter() - tic
 
@@ -166,9 +212,6 @@ def run_session(app, headless, through, context, wait_for_play):
             flush=True
         )
 
-    stopped = world.is_stopped()
-    terminal = controller.state in ("DONE", "FAILED")
-    
     if terminal:
         world.pause()
     result = controller.result()
@@ -178,6 +221,7 @@ def run_session(app, headless, through, context, wait_for_play):
     if not headless:
         while app.is_running():
             if stopped or world.is_stopped():
+
                 return int(controller.state != "DONE"), True
             if world.is_playing():
                 world.pause()
