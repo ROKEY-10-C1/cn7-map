@@ -145,9 +145,10 @@ def split(source_path, out_dir, root_name="wheel_cell.usda"):
     for layer in layers.values():
         layer.Save()
     root.Save()
-    texture = Path(source_path).parent/"concrete.png"
-    if texture.exists() and texture.parent.resolve() != out_dir.resolve():
-        shutil.copy2(texture, out_dir/"concrete.png")
+    for name in ("concrete.png", "miku_decal.png", "IMG_9117_toon.jpg"):
+        texture = Path(source_path).parent/name
+        if texture.exists() and texture.parent.resolve() != out_dir.resolve():
+            shutil.copy2(texture, out_dir/name)
     return root_file, order
 
 

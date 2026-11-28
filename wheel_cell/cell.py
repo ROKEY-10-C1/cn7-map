@@ -182,6 +182,10 @@ class Cell:
         texture=UsdShade.Shader.Get(compiled,"/Looks/Concrete/Texture")
         if texture:
             texture.GetInput("file").Set(Sdf.AssetPath("./concrete.png"))
+        for look,name in (("MikuDecal","miku_decal.png"),("ToonDecal","IMG_9117_toon.jpg")):
+            decal=UsdShade.Shader.Get(compiled,f"/Looks/{look}/Texture")
+            if decal:
+                decal.GetInput("file").Set(Sdf.AssetPath("./"+name))
         return compiled.GetRootLayer().Export(str(path))
 
     def robot_clearance(self):

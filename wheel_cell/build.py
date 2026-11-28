@@ -30,6 +30,7 @@ _ensure_usd()
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import argparse
+import shutil
 import sqlite3
 from math import atan2, ceil, cos, degrees, hypot, sin, sqrt, tau
 from pathlib import Path
@@ -57,8 +58,8 @@ from wheel_geometry import barrel, center_web, hub as make_hub, nut as make_nut,
 from robot import Arm
 from cell_motion import (GRIP_AT, GRIP_CENTRE, HEAD_LENGTH, MAGAZINE, NUT_ADVANCE, NUT_PICK_AT, fasten_keys,
                          mount_keys, samples, solve_plan)
-from visuals import (ALLOY, BRUSHED, CONCRETE, GLASS, LIB, PANEL, RUBBER, ZINC, VisualAssets, add_instance,
-                     copy_mesh, finish, mesh)
+from visuals import (ALLOY, BRUSHED, CONCRETE, DECAL_FILES, DECAL_SOURCE, GLASS, LIB, PANEL, RUBBER, ZINC, VisualAssets, add_instance,
+                     copy_mesh, decal_for, decal_prototype, finish, mesh)
 
 BLUE = (.10, .34, .55)
 STEEL = (.38, .45, .49)
@@ -245,6 +246,7 @@ def parking(stage, root, side):
             pos.CreateVisibilityAttr("invisible")
             car=str(pos.GetPath())
             add_instance(stage,car+"/Body",LIB+"/Body")
+            add_instance(stage,car+"/Decal",decal_prototype(stage,decal_for(i+1)))
             for name,(axle,sign) in STATIONS.items():
                 y=sign*half_track(axle)
                 cylinder(stage,car+f"/Hub_{name}",(axle,y,HUB_Z),.132,.065,ALLOY,"Y")
@@ -591,8 +593,9 @@ def carrier(stage, assets, root):
     return model, position, yaw, lift
 
 
-def vehicle_body(stage, h):
+def vehicle_body(stage, h, number=1):
     add_instance(stage, h+"/SedanShell", LIB+"/Body")
+    add_instance(stage, h+"/DoorDecal", decal_prototype(stage, decal_for(number)))
     box(stage, h+"/Undertray", (0, 0, 1.035), (3.43, 1.02, .115), DARK)
     beam_x=-AXLE+.14
     for i,x in enumerate((beam_x-.039,beam_x+.039)):
@@ -778,7 +781,7 @@ def order(stage, assets, arm, data, record):
     car_yaw.Set(-90.)
     move(car_pos,0.,(slot_x,AMR_BAY_Y,BUFFER_CAR_Z))
     car_yaw.Set(-90.,0.)
-    vehicle_body(stage,car_path)
+    vehicle_body(stage,car_path,number)
     index_start=front+MOUNT_CLEAR
     redock=index_start+INDEX_TRAVEL
     dock_clamps(stage,root,start+AMR_DOCKED,index_start,base_x=DOCK_X)
@@ -925,6 +928,8 @@ def main():
     stage.SetEndTimeCode(frame(end_time))
     args.output.mkdir(parents=True, exist_ok=True)
     write_concrete(args.output/"concrete.png")
+    for name in DECAL_FILES:
+        shutil.copy2(DECAL_SOURCE.parent/name, args.output/name)
     usd = args.output/"wheel_cell.usdc"
     if not stage.GetRootLayer().Export(str(usd)):
         raise OSError(f"Could not export {usd}")

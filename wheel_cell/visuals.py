@@ -217,6 +217,127 @@ class VisualAssets:
                      (.26, .18, .14), double=True)
         add_instance(self.stage, path, name)
 
+DECAL_FILE = "miku_decal.png"                       # copied next to every exported USD
+DECAL_SOURCE = Path(__file__).resolve().parent/"textures"/DECAL_FILE
+# Hood pictures per car (2026-11-28): order 2 (and the slot 2 waiting car) the toon picture, the others Miku.
+DECALS = {"Miku": DECAL_FILE, "Toon": "IMG_9117_toon.jpg"}
+DECAL_FILES = tuple(DECALS.values())
+BODY_SURFACE = []                                   # sedan_body's side-skin function, for the per-car decals
+
+
+def decal_for(number):
+    return "Toon" if number == 2 else "Miku"
+DECAL_X, DECAL_RATIO = .26, (.16, .67)              # front-door centre, sill-to-belt band of the side profile
+
+
+def decal_material(stage, key="Miku"):
+    path = "/Looks/MikuDecal" if key == "Miku" else f"/Looks/{key}Decal"
+    mat = UsdShade.Material.Get(stage, path)
+    if mat:
+        return mat
+    mat = UsdShade.Material.Define(stage, path)
+    surface = UsdShade.Shader.Define(stage, path+"/Surface")
+    surface.CreateIdAttr("UsdPreviewSurface")
+    surface.CreateInput("metallic", Sdf.ValueTypeNames.Float).Set(0.)
+    surface.CreateInput("roughness", Sdf.ValueTypeNames.Float).Set(.24)
+    surface.CreateInput("clearcoat", Sdf.ValueTypeNames.Float).Set(.75)
+    surface.CreateInput("clearcoatRoughness", Sdf.ValueTypeNames.Float).Set(.21)
+    surface.CreateInput("opacityThreshold", Sdf.ValueTypeNames.Float).Set(.5)
+    coords = UsdShade.Shader.Define(stage, path+"/UV")
+    coords.CreateIdAttr("UsdPrimvarReader_float2")
+    coords.CreateInput("varname", Sdf.ValueTypeNames.Token).Set("st")
+    coords.CreateOutput("result", Sdf.ValueTypeNames.Float2)
+    image = UsdShade.Shader.Define(stage, path+"/Texture")
+    image.CreateIdAttr("UsdUVTexture")
+    image.CreateInput("file", Sdf.ValueTypeNames.Asset).Set(Sdf.AssetPath("./"+DECALS[key]))
+    image.CreateInput("wrapS", Sdf.ValueTypeNames.Token).Set("clamp")
+    image.CreateInput("wrapT", Sdf.ValueTypeNames.Token).Set("clamp")
+    image.CreateInput("sourceColorSpace", Sdf.ValueTypeNames.Token).Set("sRGB")
+    image.CreateInput("st", Sdf.ValueTypeNames.Float2).ConnectToSource(coords.ConnectableAPI(), "result")
+    image.CreateOutput("rgb", Sdf.ValueTypeNames.Float3)
+    image.CreateOutput("a", Sdf.ValueTypeNames.Float)
+    surface.CreateInput("diffuseColor", Sdf.ValueTypeNames.Color3f).ConnectToSource(image.ConnectableAPI(), "rgb")
+    surface.CreateInput("opacity", Sdf.ValueTypeNames.Float).ConnectToSource(image.ConnectableAPI(), "a")
+    surface.CreateOutput("surface", Sdf.ValueTypeNames.Token)
+    mat.CreateSurfaceOutput().ConnectToSource(surface.ConnectableAPI(), "surface")
+    return mat
+
+
+def decal_prototype(stage, key):
+    """Library prim with the left and right door stickers of one picture (referenced per car)."""
+    path = LIB+f"/Decal_{key}"
+    if not stage.GetPrimAtPath(path):
+        UsdGeom.Xform.Define(stage, path)
+        if key in HOOD_DECALS:
+            hood_decal(stage, path+"/Decal_Hood", BODY_SURFACE[0], key)
+        else:
+            for side, suffix in ((-1, "R"), (1, "L")):
+                side_decal(stage, path+f"/Decal_{suffix}", BODY_SURFACE[0], side, key=key)
+    return path
+
+
+HOOD_DECALS = {"Toon", "Miku"}
+HOOD_X = (1.10, 2.28)                               # m, car frame: windshield base to just behind the nose
+
+
+def hood_decal(stage, path, surface, key, lift=.004, nu=24, nv=32):
+    """Picture on the hood, top of the picture toward the windshield, read from in front of the car."""
+    from PIL import Image
+
+    width, height = Image.open(DECAL_SOURCE.parent/DECALS[key]).size
+    half = (HOOD_X[1]-HOOD_X[0])*width/height/2
+    ratios = np.linspace(.70, 1., 60)
+    ys, xs = np.linspace(-half, half, nu), np.linspace(HOOD_X[0], HOOD_X[1], nv)
+    points = []
+    for x in xs:
+        section = np.array([surface(x, r) for r in ratios])          # left half: y from the shoulder in to 0
+        order = np.argsort(section[:, 1])
+        for y in ys:
+            z = float(np.interp(abs(y), section[order, 1], section[order, 2]))
+            points.append((x, y, z+lift))
+    # Seen from in front (looking -x) the viewer's left is -y: s runs with y; t = 1 at the windshield.
+    st = [((i/(nu-1)), 1-j/(nv-1)) for j in range(nv) for i in range(nu)]
+    faces = [(j*nu+i, (j+1)*nu+i, (j+1)*nu+i+1, j*nu+i+1) for j in range(nv-1) for i in range(nu-1)]
+    item = UsdGeom.Mesh.Define(stage, path)
+    item.CreatePointsAttr(points)
+    item.CreateFaceVertexCountsAttr([4]*len(faces))
+    item.CreateFaceVertexIndicesAttr([v for f in faces for v in f])
+    item.CreateSubdivisionSchemeAttr("none")
+    item.CreateDoubleSidedAttr(True)
+    item.CreateExtentAttr(UsdGeom.PointBased.ComputeExtent(item.GetPointsAttr().Get()))
+    UsdGeom.PrimvarsAPI(item).CreatePrimvar(
+        "st", Sdf.ValueTypeNames.TexCoord2fArray, UsdGeom.Tokens.vertex).Set(st)
+    UsdShade.MaterialBindingAPI.Apply(item.GetPrim()).Bind(decal_material(stage, key))
+    return item
+
+
+def side_decal(stage, path, surface, side, offset=.004, nu=20, nv=40, key="Miku"):
+    """Image sticker wrapped on the door skin, read upright and unmirrored from outside."""
+    from PIL import Image
+
+    width, height = Image.open(DECAL_SOURCE.parent/DECALS[key]).size
+    rs = np.linspace(*DECAL_RATIO, nv)
+    column = np.array([surface(DECAL_X, r, side) for r in rs])
+    span = np.linalg.norm(np.diff(column, axis=0), axis=1).sum()*width/height
+    xs = np.linspace(DECAL_X-span/2, DECAL_X+span/2, nu)
+    points = [surface(x, r, side, offset) for r in rs for x in xs]
+    # Seen from +Y (left side) the car's front is on the viewer's left, so u runs against X.
+    st = [((i/(nu-1)) if side < 0 else 1-i/(nu-1), j/(nv-1)) for j in range(nv) for i in range(nu)]
+    faces = [(j*nu+i, j*nu+i+1, (j+1)*nu+i+1, (j+1)*nu+i) for j in range(nv-1) for i in range(nu-1)]
+    item = UsdGeom.Mesh.Define(stage, path)
+    item.CreatePointsAttr(points)
+    item.CreateFaceVertexCountsAttr([4]*len(faces))
+    item.CreateFaceVertexIndicesAttr([v for f in (faces if side < 0 else [f[::-1] for f in faces])
+                                      for v in f])
+    item.CreateSubdivisionSchemeAttr("none")
+    item.CreateDoubleSidedAttr(False)
+    item.CreateExtentAttr(UsdGeom.PointBased.ComputeExtent(item.GetPointsAttr().Get()))
+    UsdGeom.PrimvarsAPI(item).CreatePrimvar(
+        "st", Sdf.ValueTypeNames.TexCoord2fArray, UsdGeom.Tokens.vertex).Set(st)
+    UsdShade.MaterialBindingAPI.Apply(item.GetPrim()).Bind(decal_material(stage, key))
+    return item
+
+
 def sedan_body(stage):
     """Sculpt the local CN7 envelope with separate closures, glass and wheel arches."""
     from scipy.interpolate import PchipInterpolator
@@ -264,6 +385,7 @@ def sedan_body(stage):
     normals /= np.maximum(1e-8, np.linalg.norm(normals, axis=-1, keepdims=True))
     skin.CreateNormalsAttr(normals.reshape(-1,3).tolist())
     skin.SetNormalsInterpolation("vertex")
+    BODY_SURFACE[:] = [surface]                    # stickers are per car: decal_prototype(), build.vehicle_body()
 
     for tag, x in (("Tail", xs[0]), ("Nose", xs[-1])):
         end = [surface(x,r,sign) for sign,r in

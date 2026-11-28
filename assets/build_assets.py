@@ -6,6 +6,7 @@ Source: the composed scene map/scene/wheel_cell.usda (order CN7_001, before the 
 Every output file is self-contained (meshes and materials copied in), metres / kilograms, +Z up.
 Run with ./map/assets/build_assets.sh after ./map/wheel_cell/build.sh.
 """
+import shutil
 import sys
 from pathlib import Path
 
@@ -25,6 +26,7 @@ LIBRARY = "/AssetLibrary"
 LIFT_TRAVEL = .12           # hanger lift stroke in the scene animation
 VERSION = "1.0"
 CAMERA_FILE = "RealSense_D455.usd"
+TEXTURES = {name: MAP/"wheel_cell"/"textures"/name for name in ("miku_decal.png", "IMG_9117_toon.jpg")}
 
 
 # ---------------------------------------------------------------- copying from the scene
@@ -162,7 +164,13 @@ def finish(src, stage, root):
         elif isinstance(spec, Sdf.AttributeSpec):
             items = spec.connectionPathList.GetAddedOrExplicitItems()
             if isinstance(spec.default, Sdf.AssetPath) and spec.default.path:
-                bad.append(f"{path} asset {spec.default.path}")
+                name = Path(spec.default.path).name
+                if name in TEXTURES:
+                    # Textures travel with the asset as a sibling file.
+                    shutil.copy2(TEXTURES[name], Path(layer.realPath).parent/name)
+                    spec.default = Sdf.AssetPath("./"+name)
+                else:
+                    bad.append(f"{path} asset {spec.default.path}")
         bad.extend(f"{path} -> {t}" for t in items if not t.HasPrefix(f"/{root}"))
     layer.Traverse(Sdf.Path(f"/{root}"), check)
     if bad:
