@@ -17,7 +17,7 @@ from pxr import Sdf
 # First matching rule wins; order matters (e.g. "Truck" before generic names).
 FACTORY_PARTS = (
     ("truck", r"^(Truck|Windshield)"),
-    ("floor", r"^(Slab|Concrete|FloorJoint|TransverseJoint|CellFloor|DockPlate|DockDirection|AMR_|AMRZone)"),
+    ("floor", r"^(Slab|Concrete|FloorJoint|TransverseJoint|CellFloor|DockPlate|DockDirection|AMR_|AMRZone|AMRCharging)"),
     ("building", r"^(Cladding|Clerestory|Column|EndUpright|EndWall|EndWindow|Mullion|Panel|"
                  r"RoofBeam|RoofEdge|UpperCladding|WallBase)"),
     ("conveyor", r"(Feed|AxleTransfer|ConveyorBend|Diverter|QA_Reject|RejectCrate|RejectGuard)"),
