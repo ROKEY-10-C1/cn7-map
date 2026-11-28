@@ -129,7 +129,22 @@ def format_step_report(state, event, metrics, nuts, **extra):
         elif state == FastenState.RETRACT and "nut_drift_mm" in m:
             detail = f"이격 {m['tcp_clearance_mm']:.3f} mm (기준 > {RETRACT_CLEARANCE*1000:.0f}) | 너트 최대 변위 {max(m['nut_drift_mm']):.3f} mm"
         elif state == FastenState.COMPLETE:
-            detail = f"안착 {count('seated')}/5 | 분리 {count('released')}/5 | 나사 물림·토크 미검증"
+            physical = m.get(
+                "physical_thread_engagement_verified",
+                False
+            )
+
+            mode = (
+                "물리 나사 물림 검증 완료"
+                if physical
+                else "Joint 기반 체결 모사"
+            )
+
+            detail = (
+                f"안착 {count('seated')}/5 | "
+                f"분리 {count('released')}/5 | "
+                f"{mode} | 최종 토크 미검증"
+            )
         elif state == FastenState.RELOAD:
             detail = f"장전 {count('loaded')}/5 | {m.get('mode', '박스 장전 모사')}"
         elif state == FastenState.ERROR:
@@ -209,8 +224,14 @@ def run(app, headless, captures, json_log=False, wheel_order=("RL", "FL"), physi
         raise RuntimeError("Run --build-head to regenerate the compact fastening head USD")
 
     dt = 1 / 120
-    sim = SimulationContext(physics_dt=dt, rendering_dt=1 / 60, stage_units_in_meters=1,
-                            physics_prim_path="/World/Physics")
+    substeps = 4 if physical_threads else 1
+
+    sim = SimulationContext(
+        physics_dt=dt / substeps,
+        rendering_dt=1 / 60,
+        stage_units_in_meters=1,
+        physics_prim_path="/World/Physics"
+    )
     timeline = omni.timeline.get_timeline_interface()
     timeline.set_end_time(300.)
     timeline.set_looping(False)
@@ -257,15 +278,20 @@ def run(app, headless, captures, json_log=False, wheel_order=("RL", "FL"), physi
     def step(frame):
         if not headless and (frame % 2 == 0 or not timeline.is_playing()):
             sim.render()
+
         while not timeline.is_playing() and not stopped and not restart and is_open():
             if not headless:
                 status.text = f"Paused | {active_status}"
             sim.render()
+
         if stopped or restart or not is_open():
             raise CycleInterrupted
+
         if not headless:
             status.text = active_status
-        sim.step(render=False)
+
+        for _ in range(substeps):
+            sim.step(render=False)
 
     session = stage.GetSessionLayer()
     # 관절 명령과 안착 조인트는 임시 레이어에 쓴다. 재시작 때 비우면 너트가 소켓에 고정된 초기 상태로 돌아간다.
@@ -459,9 +485,21 @@ class TaskController:
         self.finished_nuts[self.target_wheel] = (tuple(self.nut_paths), seated.copy())
         self.verify_finished_nuts()
         self.state = FastenState.COMPLETE
-        self.metrics = {"completion_mode": "joint_based_simulation",
-                        "physical_thread_engagement_verified": False,
-                        "torque_verified": False}
+        self.metrics = {
+            "completion_mode": (
+                "physical_thread_rundown"
+                if self.physical_threads
+                else "joint_based_simulation"
+            ),
+            "physical_thread_engagement_verified": (
+                self.physical_threads
+                and all(
+                    n["engaged_model"]
+                    for n in self.nut_status
+                )
+            ),
+            "torque_verified": False
+        }
         self.wheel_status[self.target_wheel] = "COMPLETE"
         self.completed.append(self.state.name)
         self.report("PASS")
@@ -670,14 +708,133 @@ class TaskController:
                 self.correct_arm(delta)
             self.step(frame)
 
+
     def align(self):
-        entry = self.tips + self.outward * (.005 if self.physical_threads else 0.)
+        # 물리 체결 시 스터드 끝에서 5mm 떨어진 위치
+        gap = .005 if self.physical_threads else 0.
+        entry = self.tips + self.outward * gap
+
         self.move_nuts(entry, 360)
-        errors = np.linalg.norm(self.nut_positions()-entry,axis=1)
-        self.metrics["entry_error_mm"] = (errors*1000).tolist()
-        for n,e in zip(self.nut_status,errors):
-            n["aligned"] = bool(e <= ENTRY_TOL)
-        self.require(all(n["aligned"] for n in self.nut_status), "Stud entry position error exceeds 0.7 mm")
+
+        # 물리 체결 모드에서 추가 정밀 정렬
+        if self.physical_threads:
+            LATERAL_TOL = .0001
+            AXIAL_TOL = .0002
+            ANGLE_TOL = .1
+
+            for attempt in range(60):
+                actual = self.nut_positions()
+                error = entry - actual
+
+                lateral = np.linalg.norm(
+                    self.planar(error), axis=1
+                )
+
+                axial = np.abs(error @ self.outward)
+
+                _, quat = self.tcp.get_world_pose()
+
+                actual_rotation = Rotation.from_quat(
+                    quat, scalar_first=True
+                ).as_matrix()
+
+                actual_axis = actual_rotation[:, 2]
+                target_axis = -self.outward
+
+                cross = np.cross(
+                    actual_axis, target_axis
+                )
+
+                cross_norm = np.linalg.norm(cross)
+
+                angle = np.arctan2(
+                    cross_norm,
+                    np.clip(
+                        actual_axis @ target_axis,
+                        -1., 1.
+                    )
+                )
+
+                axis_error = np.degrees(angle)
+
+                angles = self.pattern_angles(
+                    actual, self.tips
+                )
+
+                phase = float(
+                    np.angle(np.mean(np.exp(1j * angles)))
+                )
+
+                print(
+                    f"[ALIGN {attempt+1:02d}] "
+                    f"중심 오차={lateral.max()*1000:.3f} mm | "
+                    f"축 방향={axial.max()*1000:.3f} mm | "
+                    f"각도={axis_error:.3f} deg",
+                    flush=True
+                )
+
+                if (
+                    lateral.max() <= LATERAL_TOL
+                    and axial.max() <= AXIAL_TOL
+                    and axis_error <= ANGLE_TOL
+                ):
+                    break
+
+                # 중심축 보정
+                correction = np.eye(3)
+
+                if cross_norm > 1e-9:
+                    correction = Rotation.from_rotvec(
+                        cross / cross_norm
+                        * min(angle, .01)
+                    ).as_matrix()
+
+                # 볼트 패턴 보정
+                pattern_correction = Rotation.from_rotvec(
+                    self.outward * np.clip(phase, -.01, .01)
+                ).as_matrix()
+
+                desired_rotation = (
+                    pattern_correction
+                    @ correction
+                    @ self.rotation
+                )
+
+                # 중심 위치 보정
+                delta = error.mean(axis=0)
+
+                delta *= min(
+                    1.,
+                    .001 / max(np.linalg.norm(delta), 1e-9)
+                )
+
+                self.correct_arm(
+                    delta, desired_rotation
+                )
+
+                self.settle(24)
+
+            else:
+                raise RuntimeError(
+                    "Physical thread fine alignment failed"
+                )
+
+        errors = np.linalg.norm(
+            self.nut_positions() - entry,
+            axis=1
+        )
+
+        self.metrics["entry_error_mm"] = (
+            errors * 1000
+        ).tolist()
+
+        for nut, error in zip(self.nut_status, errors):
+            nut["aligned"] = bool(error <= ENTRY_TOL)
+
+        self.require(
+            all(n["aligned"] for n in self.nut_status),
+            "Stud entry alignment failed"
+        )
 
     def engage(self):
         if self.physical_threads:
@@ -690,113 +847,702 @@ class TaskController:
             n["engaged_model"] = bool(n["loaded"] and e<=ENTRY_TOL)
         self.require(all(n["engaged_model"] for n in self.nut_status), "Geometric entry check failed")
 
+
     def enable_thread_contact(self):
-        from pxr import PhysxSchema, Usd, UsdPhysics
+        from pxr import Gf, PhysxSchema, Usd, UsdPhysics
+        from isaacsim.core.prims import SingleXFormPrim
 
+        self.thread_guides = []
+        self.thread_springs = []
+
+        start = self.nut_positions().copy()
+
+        # =========================================
+        # 1. 실제 너트 위치 기준으로 직동 관절 생성
+        # =========================================
+        for i, root in enumerate(SPINDLES):
+
+            path = self.nut_paths[i]
+            rotor_path = root + "/Rotor"
+
+            rotor = SingleXFormPrim(
+                rotor_path,
+                reset_xform_properties=False
+            )
+
+            rotor_xyz, rotor_quat = rotor.get_world_pose()
+            nut_xyz, nut_quat = self.nuts[i].get_world_pose()
+
+            rotor_rotation = Rotation.from_quat(
+                rotor_quat, scalar_first=True
+            )
+
+            nut_rotation = Rotation.from_quat(
+                nut_quat, scalar_first=True
+            )
+
+            # Rotor 좌표계 기준 실제 너트 위치
+            local_position = rotor_rotation.inv().apply(
+                np.asarray(nut_xyz)
+                - np.asarray(rotor_xyz)
+            )
+
+            # Rotor 좌표계 기준 실제 너트 자세
+            local_rotation = (
+                rotor_rotation.inv() * nut_rotation
+            ).as_quat(scalar_first=True)
+
+            hold = UsdPhysics.FixedJoint.Get(
+                self.stage,
+                self.hold_paths[i]
+            )
+
+            guide = UsdPhysics.PrismaticJoint.Define(
+                self.stage,
+                path + "/ThreadGuide"
+            )
+
+            guide.CreateJointEnabledAttr(False)
+
+            guide.CreateBody0Rel().SetTargets(
+                [rotor_path]
+            )
+
+            guide.CreateBody1Rel().SetTargets(
+                [path]
+            )
+
+            guide.CreateLocalPos0Attr(
+                Gf.Vec3f(*local_position.tolist())
+            )
+
+            guide.CreateLocalPos1Attr(
+                Gf.Vec3f(0.0)
+            )
+
+            guide.CreateLocalRot0Attr(
+                Gf.Quatf(
+                    float(local_rotation[0]),
+                    Gf.Vec3f(
+                        *local_rotation[1:].tolist()
+                    )
+                )
+            )
+
+            guide.CreateLocalRot1Attr(
+                Gf.Quatf(1.0)
+            )
+
+            # 로컬 Z축 방향으로만 전진 허용
+            guide.CreateAxisAttr("Z")
+            guide.CreateLowerLimitAttr(-.004)
+            guide.CreateUpperLimitAttr(.032)
+
+            guide.CreateCollisionEnabledAttr(False)
+            guide.CreateExcludeFromArticulationAttr(True)
+
+            # 위치 기반 강제 이동 비활성화
+            spring = UsdPhysics.DriveAPI.Apply(
+                guide.GetPrim(), "linear"
+            )
+
+            spring.CreateStiffnessAttr(0.0)
+            spring.CreateDampingAttr(0.0)
+            spring.CreateMaxForceAttr(0.0)
+
+            # Fixed Joint -> Prismatic Joint
+            hold.CreateJointEnabledAttr(False)
+            guide.CreateJointEnabledAttr(True)
+
+            self.thread_guides.append(guide)
+            self.thread_springs.append(spring)
+
+        # =========================================
+        # 2. 관절 전환 자체의 안정성 확인
+        # =========================================
+        self.settle(12)
+
+        current = self.nut_positions()
+
+        drift = np.linalg.norm(
+            current - start,
+            axis=1
+        )
+
+        print(
+            "[GUIDE CHECK] 관절 전환 후 변위(mm):",
+            np.round(drift * 1000, 3),
+            flush=True
+        )
+
+        self.require(
+            np.all(drift < .0005),
+            "Prismatic joint transition unstable"
+        )
+
+        # =========================================
+        # 3. 나사산 Collider 활성화
+        # =========================================
         def enable(prim, approximation):
-            self.require(bool(prim), "Missing thread collider")
-            UsdPhysics.CollisionAPI.Apply(prim).CreateCollisionEnabledAttr(True)
-            UsdPhysics.MeshCollisionAPI.Apply(prim).CreateApproximationAttr(approximation)
-            config = PhysxSchema.PhysxCollisionAPI.Apply(prim)
-            config.CreateContactOffsetAttr(.00005)
-            config.CreateRestOffsetAttr(0.)
 
-        self.thread_guides, self.thread_springs = [], []
+            self.require(
+                bool(prim),
+                "Missing thread collider"
+            )
+
+            UsdPhysics.CollisionAPI.Apply(
+                prim
+            ).CreateCollisionEnabledAttr(True)
+
+            UsdPhysics.MeshCollisionAPI.Apply(
+                prim
+            ).CreateApproximationAttr(approximation)
+
+            config = PhysxSchema.PhysxCollisionAPI.Apply(
+                prim
+            )
+
+            config.CreateContactOffsetAttr(.00005)
+            config.CreateRestOffsetAttr(0.0)
+
+        before_contact = self.nut_positions().copy()
+
         for i, path in enumerate(self.nut_paths):
+
             for name in ("Stud", "Thread"):
-                enable(self.stage.GetPrimAtPath(f"{self.hub_path}/{name}_{i}"), "none")
-            thread = self.stage.GetPrimAtPath(path + "/Visual/InternalThread")
-            self.require(bool(thread), f"Missing internal thread on nut {i+1}")
+                enable(
+                    self.stage.GetPrimAtPath(
+                        f"{self.hub_path}/{name}_{i}"
+                    ),
+                    "none"
+                )
+
+            thread = self.stage.GetPrimAtPath(
+                path + "/Visual/InternalThread"
+            )
+
+            self.require(
+                bool(thread),
+                f"Missing internal thread: {path}"
+            )
+
             for part in Usd.PrimRange(thread):
+
                 if part.HasAPI(UsdPhysics.CollisionAPI):
                     enable(part, "convexHull")
 
-            # 소켓은 회전과 자세를 전달한다. 너트는 소켓을 따라 축 방향으로 미끄러질 수 있다.
-            hold = UsdPhysics.FixedJoint.Get(self.stage, self.hold_paths[i])
-            guide = UsdPhysics.Joint.Define(self.stage, path + "/ThreadGuide")
-            guide.CreateBody0Rel().SetTargets(hold.GetBody0Rel().GetTargets())
-            guide.CreateBody1Rel().SetTargets(hold.GetBody1Rel().GetTargets())
-            guide.CreateLocalPos0Attr(hold.GetLocalPos0Attr().Get())
-            guide.CreateLocalPos1Attr(hold.GetLocalPos1Attr().Get())
-            guide.CreateCollisionEnabledAttr(False)
-            guide.CreateExcludeFromArticulationAttr(True)
-            for dof in ("transX", "transY", "rotX", "rotY", "rotZ"):
-                limits = UsdPhysics.LimitAPI.Apply(guide.GetPrim(), dof)
-                limits.CreateLowAttr(1.)
-                limits.CreateHighAttr(-1.)
-            # 소켓 밖으로 무제한 밀려나지 않도록 후방 4 mm, 전방 32 mm의 기계적 스트로크를 둔다.
-            travel = UsdPhysics.LimitAPI.Apply(guide.GetPrim(), "transZ")
-            travel.CreateLowAttr(-.004)
-            travel.CreateHighAttr(.032)
-            spring = UsdPhysics.DriveAPI.Apply(guide.GetPrim(), "transZ")
-            spring.CreateStiffnessAttr(1500.)
-            spring.CreateDampingAttr(8.)
-            spring.CreateMaxForceAttr(2.)
-            spring.CreateTargetPositionAttr(0.)
-            hold.CreateJointEnabledAttr(False)
-            self.thread_guides.append(guide)
-            self.thread_springs.append(spring)
-        self.metrics = {"mode": "physical_threads", "axial_compliance_force_n": 2.}
+        # =========================================
+        # 4. Collider 활성화 이후 안정성 확인
+        # =========================================
+        self.settle(12)
+
+        drift = np.linalg.norm(
+            self.nut_positions() - before_contact,
+            axis=1
+        )
+
+        print(
+            "[COLLIDER CHECK] 활성화 후 변위(mm):",
+            np.round(drift * 1000, 3),
+            flush=True
+        )
+
+        self.require(
+            np.all(drift < .0005),
+            "Thread collider activation unstable"
+        )
+
+        self.metrics = {
+            "mode": "physical_threads",
+            "guide_type": "prismatic",
+            "axial_compliance_force_n": 2.0
+        }
+
 
     def spin_physical(self):
-        # 동일한 로봇팔과 스핀들을 구동한다. 팔은 3 mm/s로 8 mm 전진하고 멈춘다.
-        start = self.nut_positions()
-        flange_start = self.arm.fk(self.base_xyz, self.angles)[-1][0]
-        tcp_start = self.tcp.get_world_pose()[0]
-        try:
-            for drive in self.speeds:
-                drive.Set(360.)
-            for frame in range(int(np.ceil(.008 / (.003 * self.dt)))):
-                if frame % 12 == 0:
-                    distance = min((frame + 12) * .003 * self.dt, .008)
-                    target = flange_start - self.outward * distance
-                    self.angles = self.solve_pose(target, self.rotation, self.angles)
-                    self.command_arm(self.angles)
-                self.step(frame)
-                retreat = (self.nut_positions() - start) @ self.outward
-                if np.any(retreat > .006):
-                    self.metrics = {"mode": "physical_threads",
-                                    "nut_backout_mm": (retreat * 1000).tolist(),
-                                    "physical_contact_verified": False}
-                    print(f"THREADS {self.target_wheel}: {self.metrics}", flush=True)
-                    raise RuntimeError("Nut backed out during thread entry")
+        """힘 기반 최초 물림 + 고속 런다운 + 저속 안착."""
 
-            # 스프링을 끈 뒤에는 팔이 움직이지 않는다. 너트의 자력 전진과 피치만으로 물림을 판정한다.
-            pushed = self.nut_positions()
+        from pxr import Gf, PhysxSchema, UsdPhysics
+
+        # =============================================
+        # 1. 체결 파라미터
+        # =============================================
+        PUSH_FORCE = 2.0          # N / nut
+        ENGAGE_TORQUE = 0.02      # N·m
+        RUNDOWN_TORQUE = 0.08     # N·m
+        SEATING_TORQUE = 0.02     # N·m
+
+        ENGAGE_RPM = 60
+        RUNDOWN_RPM = 240
+        SEATING_RPM = 30
+
+        MAX_LINEAR_SPEED = 0.010  # m/s
+        ENGAGE_DEPTH = 0.007      # 스터드 끝 기준 7 mm
+        SLOW_DISTANCE = 0.003     # 안착 3 mm 전 감속
+        STOP_DISTANCE = 0.0003    # 안착 0.3 mm 이내 정지
+
+        PITCH_TOL = 0.0005
+        ENGAGE_TIMEOUT = 12.0
+        TOTAL_TIMEOUT = 40.0
+
+        PUSH = 0
+        VERIFY = 1
+        RUNDOWN = 2
+        SEATED = 3
+
+        count = len(SPINDLES)
+        zero = Gf.Vec3f(0.0)
+
+        # =============================================
+        # 2. 초기 상태 및 측정 변수
+        # =============================================
+        start = self.nut_positions()
+        tcp_start = np.array(self.tcp.get_world_pose()[0])
+
+        last_phase = self.phases()
+        turns = np.zeros(count)
+
+        states = np.full(count, PUSH)
+        slowed = np.zeros(count, dtype=bool)
+
+        free_start = start.copy()
+        free_turn_base = np.zeros(count)
+        peak_rpm = np.zeros(count)
+
+        forces = []
+        motors = []
+        angular_limits = []
+        saved_attrs = []
+
+        push_vector = Gf.Vec3f(
+            *(-self.outward * PUSH_FORCE).tolist()
+        )
+        reaction_vector = Gf.Vec3f(
+            *(self.outward * PUSH_FORCE).tolist()
+        )
+
+        def save_attr(attr, value):
+            saved_attrs.append((attr, attr.Get()))
+            attr.Set(value)
+
+        def force_attr(prim):
+            api = PhysxSchema.PhysxForceAPI.Apply(prim)
+            api.CreateModeAttr("force")
+            api.CreateWorldFrameEnabledAttr(True)
+            return api.CreateForceAttr(zero)
+
+        def set_push(i, enabled):
+            nut_force, rotor_force = forces[i]
+
+            nut_force.Set(
+                push_vector if enabled else zero
+            )
+            rotor_force.Set(
+                reaction_vector if enabled else zero
+            )
+
+        def set_motor(i, rpm, torque):
+            motors[i].GetMaxForceAttr().Set(
+                float(torque)
+            )
+
+            # USD 각속도 단위: deg/s
+            speed_deg = float(rpm * 6)
+
+            for attr in angular_limits[i]:
+                attr.Set(float(max(30, rpm) * 6))
+
+            self.speeds[i].Set(speed_deg)
+
+        def update_measurement():
+            nonlocal last_phase
+
+            phase = self.phases()
+            delta = np.angle(
+                np.exp(1j * (phase - last_phase))
+            ) / tau
+
+            turns[:] += delta
+            last_phase = phase
+
+            actual_rpm = np.abs(delta) * 60 / self.dt
+            peak_rpm[:] = np.maximum(
+                peak_rpm, actual_rpm
+            )
+
+            return self.nut_positions()
+
+        # =============================================
+        # 3. 실제 물리 제어 준비
+        # =============================================
+        try:
+            required_travel = (
+                start - self.seats
+            ) @ self.outward
+
+            self.require(
+                np.all(required_travel > 0)
+                and np.all(required_travel < 0.031),
+                "Insufficient axial floating stroke"
+            )
+
+            # 기존 축 방향 위치 스프링 비활성화
             for spring in self.thread_springs:
-                spring.GetStiffnessAttr().Set(0.)
-                spring.GetDampingAttr().Set(0.)
-                spring.GetMaxForceAttr().Set(0.)
-            last = self.phases()
-            turns = np.zeros(len(SPINDLES))
-            for frame in range(int(12 / self.dt)):
+                spring.GetStiffnessAttr().Set(0.0)
+                spring.GetDampingAttr().Set(0.0)
+                spring.GetMaxForceAttr().Set(0.0)
+
+            for i, root in enumerate(SPINDLES):
+                nut = self.stage.GetPrimAtPath(
+                    self.nut_paths[i]
+                )
+                rotor = self.stage.GetPrimAtPath(
+                    root + "/Rotor"
+                )
+                bearing = self.stage.GetPrimAtPath(
+                    root + "/Bearing"
+                )
+
+                # 너트 추력과 소켓 측 반력
+                forces.append((
+                    force_attr(nut),
+                    force_attr(rotor)
+                ))
+
+                nut_phys = (
+                    PhysxSchema.PhysxRigidBodyAPI.Apply(nut)
+                )
+                rotor_phys = (
+                    PhysxSchema.PhysxRigidBodyAPI.Apply(rotor)
+                )
+
+                save_attr(
+                    nut_phys.CreateMaxLinearVelocityAttr(),
+                    MAX_LINEAR_SPEED
+                )
+
+                caps = [
+                    nut_phys.CreateMaxAngularVelocityAttr(),
+                    rotor_phys.CreateMaxAngularVelocityAttr()
+                ]
+
+                for attr in caps:
+                    save_attr(attr, ENGAGE_RPM * 6.0)
+
+                angular_limits.append(caps)
+
+                # 실제 스핀들의 토크 제한
+                motor = UsdPhysics.DriveAPI.Get(
+                    bearing, "angular"
+                )
+
+                save_attr(
+                    motor.GetMaxForceAttr(),
+                    ENGAGE_TORQUE
+                )
+
+                motors.append(motor)
+
+                set_push(i, True)
+                set_motor(
+                    i, ENGAGE_RPM, ENGAGE_TORQUE
+                )
+
+            print(
+                "[THREAD] 최초 물림 시작 | "
+                f"{PUSH_FORCE} N | "
+                f"{ENGAGE_TORQUE} N·m | "
+                f"{ENGAGE_RPM} RPM",
+                flush=True
+            )
+
+            # =========================================
+            # 4. 너트별 독립 물리 제어
+            # =========================================
+            for frame in range(
+                int(TOTAL_TIMEOUT / self.dt)
+            ):
                 self.step(frame)
-                phase = self.phases()
-                turns += np.angle(np.exp(1j * (phase - last))) / tau
-                last = phase
-                end = self.nut_positions()
-                if np.max(np.linalg.norm(end - self.seats, axis=1)) < SEAT_TOL:
+
+                positions = update_measurement()
+                elapsed = (frame + 1) * self.dt
+
+                depth = (
+                    self.tips - positions
+                ) @ self.outward
+
+                remaining = (
+                    positions - self.seats
+                ) @ self.outward
+
+                backout = (
+                    positions - start
+                ) @ self.outward
+
+                tcp_now = np.array(
+                    self.tcp.get_world_pose()[0]
+                )
+
+                self.require(
+                    np.linalg.norm(tcp_now - tcp_start)
+                    < 0.001,
+                    "Robot TCP moved during thread contact"
+                )
+
+
+                if (
+                    frame % 60 == 0
+                    or np.any(backout >= 0.004)
+                ):
+                    lateral_error = np.linalg.norm(
+                        self.planar(positions - self.tips),
+                        axis=1
+                    )
+
+                    print(
+                        f"\n[THREAD DEBUG] "
+                        f"시간={elapsed:.3f} sec",
+                        flush=True
+                    )
+
+                    for i in range(count):
+                        print(
+                            f"NUT {i+1} | "
+                            f"후퇴={backout[i]*1000:.3f} mm | "
+                            f"진입={depth[i]*1000:.3f} mm | "
+                            f"중심오차={lateral_error[i]*1000:.3f} mm | "
+                            f"회전={turns[i]:.3f} rev | "
+                            f"최대RPM={peak_rpm[i]:.1f}",
+                            flush=True
+                        )
+
+                if np.any(backout >= 0.004):
+                    failed_ids = (
+                        np.where(backout >= 0.004)[0] + 1
+                    ).tolist()
+
+                    raise RuntimeError(
+                        f"Nut backed out: {failed_ids}"
+                    )
+
+
+                self.require(
+                    np.all(remaining > -SEAT_TOL),
+                    "Nut passed seating position"
+                )
+
+                for i in range(count):
+
+                    # ---------------------------------
+                    # A. 최초 나사 물림
+                    # ---------------------------------
+                    if states[i] == PUSH:
+
+                        if depth[i] >= ENGAGE_DEPTH:
+                            set_push(i, False)
+
+                            free_start[i] = positions[i]
+                            free_turn_base[i] = turns[i]
+
+                            states[i] = VERIFY
+
+                            print(
+                                f"[NUT {i+1}] "
+                                "진입 깊이 확보, 축힘 제거",
+                                flush=True
+                            )
+
+                        elif elapsed >= ENGAGE_TIMEOUT:
+                            raise RuntimeError(
+                                f"Nut {i+1}: engagement timeout"
+                            )
+
+                    # ---------------------------------
+                    # B. 자력 전진 및 피치 검증
+                    # ---------------------------------
+                    elif states[i] == VERIFY:
+
+                        free_turns = (
+                            turns[i] - free_turn_base[i]
+                        )
+
+                        advance = float(
+                            (free_start[i] - positions[i])
+                            @ self.outward
+                        )
+
+                        error = abs(
+                            advance - free_turns * PITCH
+                        )
+
+                        if free_turns >= 1.0:
+
+                            self.require(
+                                advance > 0.001
+                                and error < PITCH_TOL,
+                                f"Nut {i+1}: pitch mismatch"
+                            )
+
+                            self.nut_status[i][
+                                "engaged_model"
+                            ] = True
+
+                            states[i] = RUNDOWN
+
+                            set_motor(
+                                i,
+                                RUNDOWN_RPM,
+                                RUNDOWN_TORQUE
+                            )
+
+                            print(
+                                f"[NUT {i+1}] "
+                                "물리 물림 확인 | "
+                                f"피치 오차 {error*1000:.3f} mm "
+                                f"| {RUNDOWN_RPM} RPM",
+                                flush=True
+                            )
+
+                    # ---------------------------------
+                    # C. 고속 런다운 및 안착
+                    # ---------------------------------
+                    elif states[i] == RUNDOWN:
+
+                        if (
+                            remaining[i] <= SLOW_DISTANCE
+                            and not slowed[i]
+                        ):
+                            set_motor(
+                                i,
+                                SEATING_RPM,
+                                SEATING_TORQUE
+                            )
+
+                            slowed[i] = True
+
+                            print(
+                                f"[NUT {i+1}] "
+                                "안착 직전 감속",
+                                flush=True
+                            )
+
+                        if remaining[i] <= STOP_DISTANCE:
+
+                            seat_error = np.linalg.norm(
+                                positions[i] - self.seats[i]
+                            )
+
+                            self.require(
+                                seat_error < SEAT_TOL,
+                                f"Nut {i+1}: seating error"
+                            )
+
+                            set_motor(
+                                i, 0, SEATING_TORQUE
+                            )
+
+                            states[i] = SEATED
+
+                            print(
+                                f"[NUT {i+1}] 안착 위치 도달 | "
+                                f"오차 {seat_error*1000:.3f} mm",
+                                flush=True
+                            )
+
+                if np.all(states == SEATED):
                     break
-            advance = (pushed - end) @ self.outward
-            pitch_error = advance - turns * PITCH
-            engaged = (turns >= 1.) & (np.abs(pitch_error) < .0005)
+
+            # =========================================
+            # 5. 최종 물리 검증
+            # =========================================
+            self.require(
+                np.all(states == SEATED),
+                "Physical fastening timeout"
+            )
+
+            # 스핀들 정지 후 0.5초 안정화
+            for frame in range(int(0.5 / self.dt)):
+                self.step(frame)
+                positions = update_measurement()
+
+            end = self.nut_positions()
+
+            free_turns = turns - free_turn_base
+            advance = (
+                free_start - end
+            ) @ self.outward
+
+            pitch_error = np.abs(
+                advance - free_turns * PITCH
+            )
+
+            seat_errors = np.linalg.norm(
+                end - self.seats, axis=1
+            )
+
             self.metrics = {
                 "mode": "physical_threads",
-                "tcp_push_mm": float((tcp_start - self.tcp.get_world_pose()[0]) @ self.outward * 1000),
-                "push_advance_mm": (((start - pushed) @ self.outward) * 1000).tolist(),
-                "free_advance_mm": (advance * 1000).tolist(),
-                "free_turns": turns.tolist(),
-                "pitch_error_mm": (pitch_error * 1000).tolist(),
-                "physical_contact_verified": bool(np.all(engaged)),
+                "free_turns": free_turns.tolist(),
+                "free_advance_mm":
+                    (advance * 1000).tolist(),
+                "pitch_error_mm":
+                    (pitch_error * 1000).tolist(),
+                "physical_seat_error_mm":
+                    (seat_errors * 1000).tolist(),
+                "peak_rpm": peak_rpm.tolist(),
+                "elapsed_seconds": float(elapsed),
+                "physical_contact_verified": bool(
+                    np.all(free_turns >= 1)
+                    and np.all(pitch_error < PITCH_TOL)
+                ),
+                "torque_verified": False
             }
-            print(f"THREADS {self.target_wheel}: {self.metrics}", flush=True)
-            for nut, verified in zip(self.nut_status, engaged):
-                nut["engaged_model"] = bool(verified)
-            self.require(np.all(engaged), "Physical thread engagement failed")
-            return pushed, turns
+
+            print(
+                "\n[PHYSICAL THREAD RESULT]",
+                flush=True
+            )
+
+            for i in range(count):
+                print(
+                    f"NUT {i+1} | "
+                    f"회전 {free_turns[i]:.2f} rev | "
+                    f"전진 {advance[i]*1000:.2f} mm | "
+                    f"피치오차 {pitch_error[i]*1000:.3f} mm | "
+                    f"안착오차 {seat_errors[i]*1000:.3f} mm | "
+                    f"최대속도 {peak_rpm[i]:.1f} RPM",
+                    flush=True
+                )
+
+            self.require(
+                self.metrics["physical_contact_verified"],
+                "Physical pitch verification failed"
+            )
+
+            self.require(
+                np.all(seat_errors < SEAT_TOL),
+                "Physical seating verification failed"
+            )
+
+            return free_start, free_turns
+
         finally:
+            # 실패하거나 중단되어도 추력과 회전 명령 제거
+            for nut_force, rotor_force in forces:
+                nut_force.Set(zero)
+                rotor_force.Set(zero)
+
             self.stop_spindles()
 
+            # 다음 재장전 및 일반 로봇 이동을 위해 복원
+            for attr, old_value in reversed(saved_attrs):
+                if old_value is None:
+                    attr.Clear()
+                else:
+                    attr.Set(old_value)
+
+
+    
     def phases(self):
         rotations = [Rotation.from_quat(nut.get_world_pose()[1], scalar_first=True) for nut in self.nuts]
         axes = np.array([r.apply([1,0,0]) for r in rotations])
@@ -1513,12 +2259,12 @@ def run_thread_contact(app, gui, approach, push_force_n, spin_torque_nm, camera_
         geometry.GetReferences().AddInternalReference(f"{root}/Nut/Visual")
         UsdGeom.Xformable(geometry).ClearXformOpOrder()
         if approach:
-            # 원뿔 시트와 만나는 단면을 유지하며 육각 외형의 축 방향 높이만 반으로 줄인다.
+            # 원래 육각 외형 높이 유지: 두께 변경 영향 비교 시험.
             hex_mesh = UsdGeom.Mesh.Get(stage, path + "/Geometry/Hex")
             points = hex_mesh.GetPointsAttr()
             vertices = points.Get()
             base_z = min(point[2] for point in vertices)
-            points.Set([Gf.Vec3f(x, y, base_z + .5 * (z - base_z)) for x, y, z in vertices])
+            points.Set([Gf.Vec3f(x, y, base_z + 1.0 * (z - base_z)) for x, y, z in vertices])
             hex_mesh.GetExtentAttr().Set(UsdGeom.PointBased.ComputeExtent(points.Get()))
         for part in Usd.PrimRange(geometry):
             if part.HasAPI(UsdPhysics.CollisionAPI):
