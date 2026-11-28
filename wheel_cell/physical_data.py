@@ -29,6 +29,12 @@ AMR_ACCELERATION = .25
 AMR_TRACTION_COEFFICIENT = .4
 DOCK_CLAMP_OPEN = .72
 DOCK_CLAMP_CLOSED = .436
+# Closed dock clamp, toggle-locked (estimate, not a catalogue value; 2026-11-28): the former servo
+# (12,000 N/m, 400 N) was a spring that let a 145 N press at the front hub move the loaded AMR
+# 3.5 mm (hub 8.4 mm peak). Locked, the hub stays within 0.1 mm (choongman issue 2026-11-28).
+DOCK_CLAMP_STIFFNESS = 2e6
+DOCK_CLAMP_FORCE = 20000.
+DOCK_CLAMP_SPEED = .12      # m/s, jaw travel (0.284 m stroke, 2.4 s)
 
 # Interroll EC5000, 50 mm cylinder, 49:1 at 35 W.
 ROLLER_RADIUS = .025

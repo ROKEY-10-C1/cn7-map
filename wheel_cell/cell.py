@@ -73,6 +73,11 @@ class Cell:
             for side in (0,2):
                 clamp=f"/DockClamp_{axle}_{side}"
                 self.carrier.add_clamp(stage,ROOT+clamp,REFERENCE+clamp)
+                # Index stops B and C have their own floor clamps (build.dock_clamps); closed while the robots work.
+                for prefix,stop in (("RearDockClamp",1),("FinalDockClamp",2)):
+                    clamp=f"/{prefix}_{axle}_{side}"
+                    if stage.GetPrimAtPath(REFERENCE+clamp):
+                        self.carrier.add_clamp(stage,ROOT+clamp,REFERENCE+clamp,self.amr_stops[stop])
         car=body(stage,ROOT+"/CN7",car_start,None,BODY_MASS)
         PhysxSchema.PhysxContactReportAPI.Apply(car).CreateThresholdAttr(0.)
         # The replay hierarchy contains wheel/nut animation, not just the car shell.

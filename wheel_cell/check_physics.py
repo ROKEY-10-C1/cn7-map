@@ -109,7 +109,8 @@ def check_layout(stage, seed):
     completions=({"front_mounted"}, {"front_fastened","rear_mounted"}, {"rear_fastened"})
     reported=set()
     try:
-        for _ in range(50*HZ):
+        # 70 s: B·C floor clamps add ~9 s (close 2.4 s, release wait 1 s, twice); the exit is at ~58 s.
+        for _ in range(70*HZ):
             cell.step()
             for header in cell.sim.get_contact_report()[0]:
                 if not header.num_contact_data:

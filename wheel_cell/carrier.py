@@ -9,7 +9,7 @@ from physical_data import BODY_MASS
 from physical_data import box_inertia, servo_damping
 from physical_data import AMR_ACCELERATION, AMR_LIFT_MASS, AMR_LIFT_SPEED, AMR_MASS, AMR_PAYLOAD, AMR_SIZE
 from physical_data import AMR_SPEED_X, AMR_SPEED_Y, AMR_TRACTION_COEFFICIENT, AMR_WHEEL_RADIUS
-from physical_data import DOCK_CLAMP_CLOSED, DOCK_CLAMP_OPEN
+from physical_data import DOCK_CLAMP_CLOSED, DOCK_CLAMP_FORCE, DOCK_CLAMP_OPEN, DOCK_CLAMP_SPEED, DOCK_CLAMP_STIFFNESS
 from sim_util import body, constrain, cube, drive, mass_properties, material, pose, reference, vec
 from live_params import ROOT
 from process import DOCK_X
@@ -36,6 +36,8 @@ class Carrier:
         self.lift_target=0.
         self.clamp_target=0.
         self.clamps=[]
+        self.stop_clamps={}             # index stop x -> clamps closed while the AMR works there (B, C)
+        self.stop_clamp_target=0.
         self.locators=[]
         self.locator_root=ROOT+"/HangerLocator"
         self.clamp_contacts=set()
@@ -88,7 +90,8 @@ class Carrier:
         for target in self.locators:
             target.Set(0. if up else -LOCATOR_STROKE)
 
-    def add_clamp(self,stage,path,source):
+    def add_clamp(self,stage,path,source,stop_x=None):
+        """Floor dock clamp: the dock stop (A) when stop_x is None, else an index stop (B, C)."""
         base=reference(stage,path+"/Base",source+"/Base")
         collider(base)
         start,orientation=pose(stage,source+"/Slide",0.)
@@ -105,17 +108,24 @@ class Carrier:
         side=1 if start[1]>0 else -1
         joint.CreateLowerLimitAttr(-span if side>0 else 0.)
         joint.CreateUpperLimitAttr(0. if side>0 else span)
-        target=drive(joint,"linear",0.,12000.,servo_damping(12000.,3.),400.)
-        self.clamps.append((str(slide.GetPath()),side,target))
+        target=drive(joint,"linear",0.,DOCK_CLAMP_STIFFNESS,servo_damping(DOCK_CLAMP_STIFFNESS,3.),DOCK_CLAMP_FORCE)
+        clamp=(str(slide.GetPath()),side,target)
+        if stop_x is None:
+            self.clamps.append(clamp)
+        else:
+            self.stop_clamps.setdefault(round(stop_x,3),[]).append(clamp)
 
     def request_index(self, x):
         """Queue the next stop after the cell interlock grants permission."""
         if not self.ready and not self.index_arrived:
             return False
-        if self.index_target is None:
+        here=None if self.index_target is None else self.stop_clamps.get(round(self.index_target[0],3))
+        if self.index_target is None or here:
+            # Open the clamps of the stop being left and wait before moving off.
             self.clamp_release_time=1.
-            for _,_,target in self.clamps:
+            for _,_,target in self.clamps+(here or []):
                 target.Set(0.)
+        self.stop_clamp_target=0.
         self.index_target=Gf.Vec3d(x,0.,0.)
         self.index_arrived=False
         return True
@@ -135,7 +145,16 @@ class Carrier:
         distance=Gf.Vec3d(remaining[0],remaining[1],0.).GetLength()
         if distance<.006 and velocity.GetLength()<.025:
             if indexing:
-                self.index_arrived=not self.clamp_release_time
+                arrived=not self.clamp_release_time
+                clamps=self.stop_clamps.get(round(self.index_target[0],3))
+                if arrived and clamps:
+                    # Index stop with floor clamps: arrived once they are closed on the chassis.
+                    close=DOCK_CLAMP_OPEN-DOCK_CLAMP_CLOSED
+                    self.stop_clamp_target=min(close,self.stop_clamp_target+DOCK_CLAMP_SPEED*dt)
+                    for _,side,target in clamps:
+                        target.Set(-side*self.stop_clamp_target)
+                    arrived=self.stop_clamp_target>=close
+                self.index_arrived=arrived
             elif self.segment==0:
                 self.segment=1
                 remaining=self.waypoints[1]-point
@@ -165,7 +184,7 @@ class Carrier:
         self.previous_yaw=yaw
         if self.docked and not indexing:
             close=DOCK_CLAMP_OPEN-DOCK_CLAMP_CLOSED
-            self.clamp_target=min(close,self.clamp_target+.12*dt)
+            self.clamp_target=min(close,self.clamp_target+DOCK_CLAMP_SPEED*dt)
             for _,side,target in self.clamps:
                 target.Set(-side*self.clamp_target)
             clamped=len(self.clamp_contacts)==len(self.clamps)

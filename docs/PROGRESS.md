@@ -142,6 +142,14 @@ pull 후 다시 빌드할 필요는 없습니다. 바뀐 레이어 3개를 Isaac
 | `wheel_cell/split_scene.py` | `AMRZone`을 `factory/floor` 레이어로 보냄 (없으면 `factory/misc`가 새로 생김) |
 | `scene/factory/floor.usdc`, `building.usdc`, `shared/materials.usdc` | 위 변경으로 다시 생성 |
 
+### 2026-11-28 A·B·C 정차점 도크 클램프와 잠금
+
+- 차·AMR만 물리인 셀에서 A 정차 중 앞 왼쪽 허브에 −y 145 N(장착 압입 힘)을 0.3초 가함
+- 클램프 없음: 차는 행거 위 0 mm, AMR이 차째 밀려 허브 y −8.4 mm(최대) → −4.5 mm(남음), AMR 방향 최대 −0.22°
+- 클램프 닫고 잠금: 허브 이동 0.1 mm 이하
+- 행거 위치결정 핀도 시험했으나 145 N에서는 차가 행거 위에서 원래 안 밀려 효과가 없어 넣지 않음
+- 라이브 셀: B·C 클램프 추가, 클램프 2 MN/m·20 kN(추정), `--layout-probe` A·B·C·출차 통과(출차 58.3 s, 검사 제한 50 → 70 s)
+
 ## 4. 에러 기록 (발생 순서)
 
 모든 물리 결과는 `./map/wheel_cell/check_physics.sh --seed 42` 기준입니다.
