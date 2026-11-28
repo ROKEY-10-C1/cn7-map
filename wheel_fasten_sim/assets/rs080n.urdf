@@ -1,0 +1,198 @@
+<?xml version="1.0"?>
+<!-- Kawasaki Heavy Industries, LTD. BSD-3-Clause, see LICENSE-Kawasaki.txt. -->
+<robot name="khi_rs080n">
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <mesh filename="package://khi_rs_description/meshes/RS080N_J0.stl" />
+      </geometry>
+      <material name="White" />
+      <origin rpy="0 0 0" xyz="0 0 0" />
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://khi_rs_description/meshes/RS080N_J0.stl" />
+      </geometry>
+      <material name="White" />
+      <origin rpy="0 0 0" xyz="0 0 0" />
+    </collision>
+    <inertial>
+      <mass value="177.7519" />
+      <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0" />
+    </inertial>
+  </link>
+  <joint name="joint_1" type="revolute">
+    <axis rpy="0 0 0" xyz="0 0 -1" />
+    <limit effort="1000.0" lower="-3.141592653589793" upper="3.141592653589793" velocity="3.141592653589793" />
+    <origin rpy="0 0 0" xyz="0 0 0.68" />
+    <parent link="base_link" />
+    <child link="link1" />
+    <dynamics damping="0.0" friction="0.0" />
+  </joint>
+  <link name="link1">
+    <visual>
+      <geometry>
+        <mesh filename="package://khi_rs_description/meshes/RS080N_J1.stl" />
+      </geometry>
+      <material name="White" />
+      <origin rpy="0 0 0" xyz="0 0 0" />
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://khi_rs_description/meshes/RS080N_J1.stl" />
+      </geometry>
+      <material name="White" />
+      <origin rpy="0 0 0" xyz="0 0 0" />
+    </collision>
+    <inertial>
+      <mass value="216.15" />
+      <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0" />
+    </inertial>
+  </link>
+  <joint name="joint_2" type="revolute">
+    <axis rpy="0 0 0" xyz="0 0 1" />
+    <limit effort="1000.0" lower="-1.8325957145940461" upper="2.443460952792061" velocity="3.141592653589793" />
+    <origin rpy="0 -1.5707963267948966 0" xyz="0 0.15 0" />
+    <parent link="link1" />
+    <child link="link2" />
+    <dynamics damping="0.0" friction="0.0" />
+  </joint>
+  <link name="link2">
+    <visual>
+      <geometry>
+        <mesh filename="package://khi_rs_description/meshes/RS080N_J2.stl" />
+      </geometry>
+      <material name="White" />
+      <origin rpy="0 1.5707963267948966 0" xyz="0 0 0" />
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://khi_rs_description/meshes/RS080N_J2.stl" />
+      </geometry>
+      <material name="White" />
+      <origin rpy="0 1.5707963267948966 0" xyz="0 0 0" />
+    </collision>
+    <inertial>
+      <mass value="70.847" />
+      <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0" />
+    </inertial>
+  </link>
+  <joint name="joint_3" type="revolute">
+    <axis rpy="0 0 0" xyz="0 0 -1" />
+    <limit effort="1000.0" lower="-2.705260340591211" upper="2.356194490192345" velocity="2.792526803190927" />
+    <origin rpy="0 0 0" xyz="0.87 0 0" />
+    <parent link="link2" />
+    <child link="link3" />
+    <dynamics damping="0.0" friction="0.0" />
+  </joint>
+  <link name="link3">
+    <visual>
+      <geometry>
+        <mesh filename="package://khi_rs_description/meshes/RS080N_J3.stl" />
+      </geometry>
+      <material name="White" />
+      <origin rpy="0 1.5707963267948966 0" xyz="0 0 0" />
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://khi_rs_description/meshes/RS080N_J3.stl" />
+      </geometry>
+      <material name="White" />
+      <origin rpy="0 1.5707963267948966 0" xyz="0 0 0" />
+    </collision>
+    <inertial>
+      <mass value="51.71" />
+      <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0" />
+    </inertial>
+  </link>
+  <joint name="joint_4" type="revolute">
+    <axis rpy="0 0 0" xyz="0 0 1" />
+    <limit effort="1000.0" lower="-6.283185307179586" upper="6.283185307179586" velocity="3.2288591161895095" />
+    <origin rpy="0 1.5707963267948966 0" xyz="0.267 0 0" />
+    <parent link="link3" />
+    <child link="link4" />
+    <dynamics damping="0.0" friction="0.0" />
+  </joint>
+  <link name="link4">
+    <visual>
+      <geometry>
+        <mesh filename="package://khi_rs_description/meshes/RS080N_J4.stl" />
+      </geometry>
+      <material name="White" />
+      <origin rpy="0 0 0" xyz="0 0 0.813" />
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://khi_rs_description/meshes/RS080N_J4.stl" />
+      </geometry>
+      <material name="White" />
+      <origin rpy="0 0 0" xyz="0 0 0.813" />
+    </collision>
+    <inertial>
+      <mass value="31.6751" />
+      <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0" />
+    </inertial>
+  </link>
+  <joint name="joint_5" type="revolute">
+    <axis rpy="0 0 0" xyz="0 0 -1" />
+    <limit effort="1000.0" lower="-2.530727415391778" upper="2.530727415391778" velocity="2.8797932657906435" />
+    <origin rpy="0 -1.5707963267948966 0" xyz="0 0 0.813" />
+    <parent link="link4" />
+    <child link="link5" />
+    <dynamics damping="0.0" friction="0.0" />
+  </joint>
+  <link name="link5">
+    <visual>
+      <geometry>
+        <mesh filename="package://khi_rs_description/meshes/RS080N_J5.stl" />
+      </geometry>
+      <material name="White" />
+      <origin rpy="0 1.5707963267948966 0" xyz="0 0 0" />
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://khi_rs_description/meshes/RS080N_J5.stl" />
+      </geometry>
+      <material name="White" />
+      <origin rpy="0 1.5707963267948966 0" xyz="0 0 0" />
+    </collision>
+    <inertial>
+      <mass value="6.866" />
+      <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0" />
+    </inertial>
+  </link>
+  <joint name="joint_6" type="revolute">
+    <axis rpy="0 0 0" xyz="0 0 1" />
+    <limit effort="1000.0" lower="-6.283185307179586" upper="6.283185307179586" velocity="4.886921905584122" />
+    <origin rpy="0 1.5707963267948966 0" xyz="0.165 0 0" />
+    <parent link="link5" />
+    <child link="link6" />
+    <dynamics damping="0.0" friction="0.0" />
+  </joint>
+  <link name="link6">
+    <visual>
+      <geometry>
+        <mesh filename="package://khi_rs_description/meshes/RS080N_J6.stl" />
+      </geometry>
+      <material name="Black" />
+      <origin rpy="0 0 0" xyz="0 0 0" />
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://khi_rs_description/meshes/RS080N_J6.stl" />
+      </geometry>
+      <material name="Black" />
+      <origin rpy="0 0 0" xyz="0 0 0" />
+    </collision>
+    <inertial>
+      <mass value="0.0001" />
+      <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0" />
+    </inertial>
+  </link>
+  <link name="world" />
+  <joint name="world2base" type="fixed">
+    <parent link="world" />
+    <child link="base_link" />
+    <origin rpy="0 0 0" xyz="0 0 0" />
+  </joint>
+</robot>

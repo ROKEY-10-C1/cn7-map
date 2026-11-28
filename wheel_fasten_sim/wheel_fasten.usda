@@ -33110,7 +33110,10 @@ def Xform "World"
     }
 
     def Xform "LeftFastenRobot" (
-        prepend references = @../map_fasten/assets/RS080N.usdc@</RS080N>
+        prepend references = [
+            @./assets/RS080N.usdc@</RS080N>,
+            @./assets/FastenEndEffector.usda@</FastenEndEffector>
+        ]
     )
     {
         float xformOp:rotateZ = 180
@@ -33195,9 +33198,7 @@ def Xform "World"
             quatf xformOp:orient = (-0.13052619, 0.9914449, 0, -2.2014499e-16)
             double3 xformOp:translate = (1.4782587327275033e-16, 0.37716769370104597, 2.1587485477868764)
 
-            def Xform "Tool" (
-                prepend references = @../map_fasten/scene/fasten_head.usdc@</World/FastenRobot/link_6/Tool>
-            )
+            def Xform "Tool"
             {
                 over "FlangeAdapter"
                 {
@@ -33242,9 +33243,7 @@ def Xform "World"
             }
         }
 
-        def Xform "Head" (
-            prepend references = @../map_fasten/scene/fasten_head.usdc@</World/Head>
-        )
+        def Xform "Head"
         {
             over "Axis_0"
             {
@@ -33577,7 +33576,10 @@ def Xform "World"
     }
 
     def Xform "RightFastenRobot" (
-        prepend references = @../map_fasten/assets/RS080N.usdc@</RS080N>
+        prepend references = [
+            @./assets/RS080N.usdc@</RS080N>,
+            @./assets/FastenEndEffector.usda@</FastenEndEffector>
+        ]
     )
     {
         float xformOp:rotateZ = 0
@@ -33662,9 +33664,7 @@ def Xform "World"
             quatf xformOp:orient = (-0.13052619, 0.9914449, 0, -2.2014499e-16)
             double3 xformOp:translate = (1.4782587327275033e-16, 0.37716769370104597, 2.1587485477868764)
 
-            def Xform "Tool" (
-                prepend references = @../map_fasten/scene/fasten_head.usdc@</World/FastenRobot/link_6/Tool>
-            )
+            def Xform "Tool"
             {
                 over "FlangeAdapter"
                 {
@@ -33709,9 +33709,7 @@ def Xform "World"
             }
         }
 
-        def Xform "Head" (
-            prepend references = @../map_fasten/scene/fasten_head.usdc@</World/Head>
-        )
+        def Xform "Head"
         {
             over "Axis_0"
             {
