@@ -12,6 +12,8 @@
 ```bash
 ~/isaacsim/python.sh wheel_mount_sim/mount_control.py --seed 42 --no-video --out wheel_mount_sim/output/cell/run1        # 앞바퀴 좌우
 ~/isaacsim/python.sh wheel_mount_sim/mount_control.py --seed 1 --car --car-dynamic --no-video --out .../car1           # A 앞바퀴 → 이동 → B 뒷바퀴
+MOUNT_FIXED=1 ~/isaacsim/python.sh wheel_mount_sim/mount_control.py --seed 1 --car --car-dynamic --no-video --out .../fx1   # 고정 셀, 비전 없음(티칭 + 레이저)
+~/isaacsim/python.sh wheel_mount_sim/bench_insert.py --gui --set offsets --out wheel_mount_sim/output/bench/b1                  # 간이 셀(어긋남 0~0.3 mm × 4방향)
 MOUNT_CAMS=zoom_left,zoom_right ~/isaacsim/python.sh wheel_mount_sim/mount_control.py --replay-video .../run1 --t0 17 --t1 31   # 확대 영상
 ./wheel_mount_sim/ros2_nodes/run_ros2_test.sh wheel_mount_sim/output/cell/ros2_1 --seed 1                              # ROS 2 (2단계)
 ```
@@ -78,6 +80,8 @@ Isaac Sim에서 **File → Open**으로 열어 형상·충돌체·관절·재질
 | `ros2_config.py` | 토픽 이름·메시지 형식(임시, 한 곳에 모음) |
 | `ros2_nodes/run_ros2_test.sh` | 제어기 + 순서 노드 + `/Mount`·`/Parking` 기록을 한 번에 돌리는 시험 |
 | `docs/STUD_SPEC.md` | 허브 스터드·너트 규격, 장착 쪽과 체결 쪽 형상 비교 |
+| `bench_insert.py` | 삽입·놓기 간이 셀: 허브 코너 + 로봇 + 바퀴만 넣은 셀 N개를 한 장면에서 동시에 계산. 셀마다 어긋남·제어 설정을 다르게 줌(`--variants`), `--gui`로 보면서 계산, `--trace`로 40 Hz 기록 |
+| `config/fixed.json`, `teach/cell_fixed.json` | 고정 셀(`MOUNT_FIXED=1`: 허브 공차 0, 타이어 각도 고정)과 그 티칭값(비전 없이 쓰는 위치) |
 | `cell_layout.py`, `tools/extend_belt_end.py`, `cell_feed_check.py` | 벨트 끝 적재식 공급(연장 벨트, V 끝 스토퍼: `scene/overrides/factory.usda`), 그 검사 |
 | `docs/GOALS.md` | **목표와 합격 기준** (공정 시간, 단계별 수치 범위와 근거) |
 
