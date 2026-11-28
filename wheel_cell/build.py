@@ -53,7 +53,7 @@ from process import (
     REJECT_CRATE_Y, REJECT_GATE_HALF, REJECT_X, STATIONS, inbound_pickup, outbound_dropoff, schedule,
 )
 from layout import LAYOUT
-from process import AMR_TO_RETURN, EXIT_X, FASTEN_HUB_X, FINAL_X, INDEX_X, RETURN_X, belt_height
+from process import AMR_TO_RETURN, CHARGE_BAY_SIZE, CHARGE_BAY_X, CHARGE_BAY_YS, EXIT_X, FASTEN_HUB_X, FINAL_X, INDEX_X, RETURN_X, belt_height
 from wheel_geometry import barrel, center_web, hub as make_hub, nut as make_nut, wheelhouse
 from robot import Arm
 from cell_motion import (GRIP_AT, GRIP_CENTRE, HEAD_LENGTH, MAGAZINE, NUT_ADVANCE, NUT_PICK_AT, fasten_keys,
@@ -77,7 +77,8 @@ FLOOR_Y = HALL_Y+.40
 FLOOR_S = FLOOR_Y
 # Floor x range: 1 m extra on the aisle (west) side so the aisle paint keeps 1.05 m to the floor edge;
 # the east return aisle (RETURN_X) keeps the same 3.5 m to the east edge.
-FLOOR_X0, FLOOR_X1 = -11., max(10., EXIT_X+2.65, LAYOUT.supply_x+.7, RETURN_X+3.5)
+# West edge: 1 m past the AMR charging bays at the end of the west aisle (process.CHARGE_BAY_X).
+FLOOR_X0, FLOOR_X1 = min(-11., CHARGE_BAY_X-CHARGE_BAY_SIZE[1]/2-1.0), max(10., EXIT_X+2.65, LAYOUT.supply_x+.7, RETURN_X+3.5)
 FLOOR_XMID, FLOOR_W = (FLOOR_X0+FLOOR_X1)/2, FLOOR_X1-FLOOR_X0
 FLOOR_MID, FLOOR_LEN = (FLOOR_Y-FLOOR_S)/2, FLOOR_Y+FLOOR_S
 # AMR travel zones painted on the floor: the car-carrying AMR's swept area (CN7 body 4.71 x 1.825 m
@@ -231,6 +232,41 @@ def fence(stage, path, a, b, height=1.46):
             z=.10+j*.081
             points.extend(((-length/2,-.005,z),(length/2,-.005,z),(length/2,-.005,z+.008),(-length/2,-.005,z+.008)))
         mesh(stage,panel+"/SafetyMesh",points,[4]*(len(points)//4),list(range(len(points))),BRUSHED,True)
+
+
+def charging_bays(stage, root):
+    """AMR charging bays west of the outbound buffer, beside the end of the west AMR aisle: a zone floor,
+    three hatched bays stacked along y (the AMR stands along x, heading -x) and a contact charger at each
+    bay's west end."""
+    w, l = CHARGE_BAY_SIZE                                  # across (y), along the AMR (x)
+    cx = CHARGE_BAY_X
+    ys = CHARGE_BAY_YS
+    zy0, zy1 = min(ys)-w/2-.45, max(ys)+w/2+.45
+    zx0, zx1 = cx-l/2-.55, cx+l/2+.35
+    box(stage, root+"/ZoneFloor", ((zx0+zx1)/2, (zy0+zy1)/2, .002), (zx1-zx0, zy1-zy0, .002), (.30, .52, .40))
+    for j, (x, sx) in enumerate(((zx0, .06), (zx1, .06))):
+        box(stage, root+f"/ZoneEdgeX_{j}", (x, (zy0+zy1)/2, .003), (sx, zy1-zy0, .003), WHITE)
+    for j, y in enumerate((zy0, zy1)):
+        box(stage, root+f"/ZoneEdgeY_{j}", ((zx0+zx1)/2, y, .003), (zx1-zx0, .06, .003), WHITE)
+    for i, y in enumerate(ys):
+        bay = root+f"/ChargeBay_{i}"
+        for j, (dx, dy, sx, sy) in enumerate(((0, -w/2, l, .05), (0, w/2, l, .05), (-l/2, 0, .05, w+.05), (l/2, 0, .05, w+.05))):
+            box(stage, bay+f"/Edge_{j}", (cx+dx, y+dy, .004), (sx, sy, .004), AMBER)
+        n = 7                                               # diagonal hatch, 45 deg, across the whole bay
+        for k in range(n):
+            item = box(stage, bay+f"/Hatch_{k}", (cx+(k-(n-1)/2)*(l-1.32)/(n-1), y, .004), (.035, w, .003), AMBER)
+            ops = item.GetOrderedXformOps()                 # translate, rotate, then scale the unit cube
+            turn = item.AddRotateZOp()
+            turn.Set(45.)
+            item.SetXformOpOrder([ops[0], turn, ops[1]])
+        # contact charger at the bay's west end; floor contact plate under the AMR rear
+        ex = cx-l/2-.16
+        box(stage, bay+"/Charger", (ex, y, .25), (.26, .55, .50), PANEL)
+        box(stage, bay+"/ChargerFace", (ex+.135, y, .26), (.012, .40, .22), DARK)
+        box(stage, bay+"/ChargerLED", (ex+.136, y+.20, .44), (.012, .05, .03), TEAL)
+        box(stage, bay+"/ContactPlate", (cx-l/2+.30, y, .006), (.30, .42, .012), BRUSHED)
+        for s_ in (-1, 1):
+            box(stage, bay+f"/ContactRail_{s_+1}", (cx-l/2+.30, y+s_*.12, .014), (.26, .04, .008), ZINC)
 
 
 def parking(stage, root, side):
@@ -416,6 +452,8 @@ def factory(stage, arm):
              (ax+inward*2.02,side*AMR_BAY_Y-.20,.006)]
         mesh(stage,path+f"/AMR_{label}LoopArrow",tip,[3],[0,1,2],(.04,.54,.78),True)
         parking(stage,path+f"/{label}VehicleBuffer",side)
+        if side<0:
+            charging_bays(stage,path+"/AMRCharging")
         mount_flange = fixed_robot(stage, f"{path}/{label}MountRobot", arm, MOUNT_BASE_X, side, "mount")
         mount_gripper(stage, mount_flange+"/PHL_W_63_080_S")
         fasten_flange = fixed_robot(stage, f"{path}/{label}FastenRobot", arm, FASTEN_BASE_X, side, "tighten")

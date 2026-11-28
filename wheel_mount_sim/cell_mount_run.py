@@ -45,6 +45,8 @@ ap.add_argument("--replay", default=None, metavar="RUN_DIR",
 ap.add_argument("--t-max", type=float, default=None, help="simulated seconds before giving up (120, --process 300)")
 ap.add_argument("--process", action="store_true",
                 help="AMR docks at A, front wheels mounted, index to B, rear wheels mounted, C, exit")
+ap.add_argument("--no-fasten", action="store_true",
+                help="--process without the wheel_fasten_sim fastening robots (probe completion signals instead)")
 ap.add_argument("--keep-going", action="store_true",
                 help="--process demo: go on to B, C and the exit even when a wheel is not seated (results still logged)")
 args = ap.parse_args()
@@ -166,6 +168,18 @@ def park_car_at_dock():
 
 if not args.process:                   # --process: the AMR brings the car and docks it (Carrier, clamps)
     park_car_at_dock()
+# --process: the fastening robots and nut magazines of wheel_fasten_sim (same cell export, B stop layout) are
+# referenced in at the same /World paths; the keyframe fasten robots and magazines of the scene are hidden.
+FASTEN = args.process and not args.no_fasten
+if FASTEN:
+    FASTEN_USD = HERE.parent/"wheel_fasten_sim"/"wheel_fasten.usda"
+    sys.path.insert(0, str(FASTEN_USD.parent))
+    for label in ("Left", "Right"):
+        for name in (f"{label}FastenRobot", f"{label}NutMagazine"):
+            stage.DefinePrim(f"/World/{name}").GetReferences().AddReference(str(FASTEN_USD), f"/World/{name}")
+            old = stage.GetPrimAtPath(f"/World/Factory/{name}")
+            if old:
+                UsdGeom.Imageable(old).MakeInvisible()
 if "--diag" in sys.argv:                 # contact reports cost time in the cell's per-step contact loop
     for prim in Usd.PrimRange(stage.GetPrimAtPath("/World/Live/MountSim")):
         if prim.HasAPI(UsdPhysics.RigidBodyAPI) or prim.GetName().startswith(("link", "Tool", "Jaw")):
@@ -206,7 +220,7 @@ if not args.no_video:
 
 # ---------------------------------------------------------------- state
 PROXIES = []
-if not args.usd_writeback and not args.replay:
+if not args.usd_writeback and not args.replay and not FASTEN:   # fastening observes USD poses (FastenTask)
     use_fabric()
     # With Fabric the robots (articulations) render where PhysX has them, but the wheel bodies' referenced visual
     # stayed where the wheels started (speed7: hub empty, tire still on the belt). Each wheel visual is shown by a
@@ -785,11 +799,33 @@ def amr_x():
     return round(float(cell.api.get_rigidbody_transformation(cell.carrier.path)["position"][0]), 4)
 
 
+FC = {}                                # side letter -> wheel_fasten_sim FastenController (--process)
+
+
+def tick():
+    """One physics step of the fastening controllers (they write their drives; the loop steps PhysX)."""
+    for f in FC.values():
+        before = f.state
+        if f.update(DT) == "FAILED":
+            raise StopSide(f"fasten {f.task.corner}: {f.message}")
+        if f.state != before:
+            print("FASTEN", round(t_sim[0], 2), f.task.corner, f.operation, f.state, flush=True)
+
+
+def wait_fasten(tag):
+    while not all(f.state == "DONE" for f in FC.values()):
+        tick()
+        yield
+    for f in FC.values():
+        proc_event(f"{tag}_{f.task.corner}", **{k: v for k, v in f.result().items() if k not in ("state",)})
+
+
 def run_units(us):
     gs = [u.run() for u in us]
     while not all(u.phase == "done" or u.result.startswith("stopped") for u in us):
         for g in gs:
             next(g)
+        tick()
         yield
 
 
@@ -808,6 +844,9 @@ HANG_GAP = .010    # m: the process goes on while each wheel still hangs on the 
 def hung(tag, us):
     for u in us:
         if u.result.startswith("stopped"):
+            if args.keep_going:                    # demo: the other robots and the fastening go on
+                proc_event(f"{tag}_skipped_{u.label}", reason=u.result)
+                continue
             raise StopSide(f"{tag} {u.label}: {u.result}")
         rel, _ = u.seat()
         if rel[2] > HANG_GAP and not args.keep_going:
@@ -818,16 +857,37 @@ def index(completed, tag):
     while not cell.advance_amr(completed=completed, robots_clear=True, load_secured=True):
         if t_sim[0] > args.t_max-1:
             raise StopSide(f"index to {tag} refused (stop {cell.amr_stop}, interference {cell.interference[:1]})")
+        tick()
         yield
     proc_event(f"index_{tag}", amr_x=amr_x())
     while cell.amr_index_pending:
+        tick()
         yield
     proc_event(f"stopped_{tag}", amr_x=amr_x(), stop=cell.amr_stop)
 
 
+def transport_holds(on):
+    """Rear wheels hung on the studs, held to their hubs for the B -> C move (as FastenCell.begin_move)."""
+    from fastening import FastenController
+    reader = FC["L"].task
+    cache = UsdGeom.XformCache()
+    for corner in ("RL", "RR"):
+        path = f"/World/TransportHolds/{corner}"
+        if on:
+            frame, wheel = (reader.get_world_pose(f"{ROOT}/{corner}/{part}", cache) for part in ("Hub", "Wheel"))
+            FastenController.fixed_joint(stage, path, f"{ROOT}/{corner}/Hub", f"{ROOT}/{corner}/Wheel", frame, wheel).Set(True)
+        else:
+            UsdPhysics.FixedJoint.Get(stage, path).GetJointEnabledAttr().Set(False)
+
+
 def process_run():
     try:
+        if FASTEN:
+            from fastening import FastenController, FastenTask
+            for side in ("L", "R"):
+                FC[side] = FastenController(FastenTask(stage, "F"+side), autostart=False, return_to_park=False)
         while not cell.carrier.ready:              # gate -> dock A, clamps closed, lift at the work height
+            tick()
             yield
         proc_event("docked_A", amr_x=amr_x())
         yield from run_units(units)
@@ -837,17 +897,32 @@ def process_run():
         rear_units = [MountSide(lab+"_rear", info, rear[info["side"]]) for lab, info in sides]
         front_units = list(units)
         units.extend(rear_units)
+        for side, f in FC.items():                 # B: front nuts in parallel with the rear mounting
+            f.request_fasten("F"+side)
         yield from run_units(rear_units)
         hung("rear", rear_units)
-        # fastening has no physics here: probe completion signals for the two remaining moves
+        yield from wait_fasten("fastened")
+        if FC:
+            transport_holds(True)
+            for f in FC.values():                  # reload at the magazines while the AMR moves to C
+                f.request_reload()
+        # without --process fastening (--no-fasten): probe completion signals
         yield from index({"front_fastened", "rear_mounted"}, "C")
         carried("carried_to_C", front_units+rear_units)
+        if FC:
+            yield from wait_fasten("reloaded")
+            transport_holds(False)
+            for side, f in FC.items():
+                f.request_fasten("R"+side)
+            yield from wait_fasten("fastened")
         yield from index({"rear_fastened"}, "exit")
         carried("carried_to_exit", front_units+rear_units)
         proc["result"] = "done"
     except StopSide as exc:
         proc["result"] = f"stopped: {exc}"
         print("ERROR process", exc, flush=True)
+    for f in FC.values():                          # fastening state whatever stage the process reached
+        proc_event(f"fasten_state_{f.task.corner}", **f.result())
     proc["done"] = True
     while True:
         yield
@@ -888,7 +963,8 @@ REC_PATHS = [str(p.GetPath()) for p in Usd.PrimRange(stage.GetPrimAtPath("/World
 for s in cell.stations:
     REC_PATHS += [s.wheel, s.tire]
 if args.process:                       # the whole moving cell: car, AMR deck and lift, locators, clamps, hub corners
-    REC_PATHS += [str(p.GetPath()) for p in Usd.PrimRange(stage.GetPrimAtPath(ROOT))
+    roots = [ROOT]+([f"/World/{label}FastenRobot" for label in ("Left", "Right")] if FASTEN else [])
+    REC_PATHS += [str(p.GetPath()) for r in roots for p in Usd.PrimRange(stage.GetPrimAtPath(r))
                   if p.HasAPI(UsdPhysics.RigidBodyAPI) and str(p.GetPath()) not in REC_PATHS]
 rec_t, rec_pose = [], []
 

@@ -66,6 +66,14 @@ AMR_BAY_Y = CELL_Y + .21 + 1.55 + .03 + 2.65
 BUFFER_SLOT_X = (-3.12, 0., 3.12)
 BUFFER_STAND_X = 2.05             # car-frame stand position along the body, clear of the hanger rails
 BUFFER_STAND_Y = .68
+# AMR charging bays west of the outbound buffer, beside the end of the west aisle (AMR_GATE_X, -AMR_BAY_Y)
+# where the empty AMR comes out from under the outbound slots (2026-11-28, user picked this spot on the plan).
+# Three bays stacked along y, 2.2 m apart; the AMR stands along x, heading -x, its centre 3.1 m west of the aisle
+# (bay east edge 1.6 m from the aisle). Bays 0.5 m clear all round the AMR (user: 여유만 넓혀줘); the stack sits
+# 0.2 m north of the slot line so the zone stays on the floor (south edge -FLOOR_Y).
+CHARGE_BAY_X = AMR_GATE_X-3.10
+CHARGE_BAY_YS = (-AMR_BAY_Y-2.00, -AMR_BAY_Y+.20, -AMR_BAY_Y+2.40)
+CHARGE_BAY_SIZE = (1.80, 3.00)    # floor marking across (y) and along the AMR (x), around the 0.80 x 2.00 m AMR
 # Car height as the hanger/lift offset (0 = docked). Entry pads clear the parked body by 5 cm and the
 # carried body clears the stands by 5 cm when passing an empty slot.
 # Entry -0.16 (was -0.12): the live buffer probe found the hanger's side locating block 2 mm into the

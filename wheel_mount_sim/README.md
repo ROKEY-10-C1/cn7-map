@@ -34,7 +34,7 @@ MOUNT_CAMS=zoom_left,zoom_right ~/isaacsim/python.sh wheel_mount_sim/mount_contr
 ~/isaacsim/python.sh wheel_mount_sim/cell_mount_run.py --gui        # 계산하면서 보기: 이 PC에서는 실제의 약 0.4-0.7배 속도
 ```
 
-공정 연결(`--process`, 2026-11-28): AMR이 게이트에서 차를 싣고 A에 도킹(클램프·리프트) → 좌우 전륜 장착 → B 전진(걸린 휠 유지 측정) → 좌우 후륜 장착 → C → 출차. 체결은 물리가 없어 시험용 완료 신호로 넘어간다. 셀 전체를 기록하므로 `--process --replay 실행폴더`로 처음부터 재생한다. 2026-11-28 기준 공정 모드에서는 파일럿 끝 9 mm 걸림과 놓은 뒤 빠짐이 재현돼 전륜 단계에서 멈추는 경우가 있다(차 고정 모드는 좌우 mounted). 시연용 `--keep-going`은 휠이 덜 끼워져도 끝까지 진행한다.
+공정 연결(`--process`, 2026-11-28): AMR이 게이트에서 차를 싣고 A에 도킹(클램프·리프트) → 좌우 전륜 장착 → B 전진(걸린 휠 유지 측정) → 좌우 후륜 장착과 동시에 `wheel_fasten_sim` 체결 로봇이 전륜 너트 체결 → 후륜 이송 고정, 이동 중 매거진 재장전 → C에서 후륜 체결 → 출차. 체결 로봇·매거진은 `wheel_fasten_sim/wheel_fasten.usda`를 같은 `/World` 경로로 참조하고 `FastenController`(autostart=False, `request_fasten`, `request_reload`)를 그대로 쓴다. 체결 제어가 USD 자세를 읽어서 Fabric을 끄므로 헤드리스에서도 실제 시간의 약 0.13배다. `--no-fasten`은 체결 없이 시험용 완료 신호로 넘어간다. 2026-11-28 시험: B 전륜 체결 좌우 DONE(휠 간격 0.03/0.08 mm), 재장전 좌우 DONE. 왼쪽 후륜 집기 실패로 C 이후는 미확인. 셀 전체를 기록하므로 `--process --replay 실행폴더`로 처음부터 재생한다. 2026-11-28 기준 공정 모드에서는 파일럿 끝 9 mm 걸림과 놓은 뒤 빠짐이 재현돼 전륜 단계에서 멈추는 경우가 있다(차 고정 모드는 좌우 mounted). 시연용 `--keep-going`은 휠이 덜 끼워져도 끝까지 진행한다.
 
 ```bash
 ~/isaacsim/python.sh wheel_mount_sim/cell_mount_run.py --process --no-video --out wheel_mount_sim/output/cell/proc1
