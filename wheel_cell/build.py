@@ -732,13 +732,13 @@ def fasten_head(stage, head):
 
 
 def magazine(stage, path, side):
-    pocket=(MAGAZINE[0],side*MAGAZINE[1],MAGAZINE[2])
-    px,py,pz=pocket
-    box(stage,path+"/Stand",(px,py-side*.095,.715),(.098,.10,.77),BRUSHED)
-    # Nut presenter: five outlets on the stud pattern, filled for one wheel per pick.
-    box(stage,path+"/Cassette",(px,py-side*.065,pz),(.17,.11,.17),PANEL)
+    px,py,pz=MAGAZINE[0],side*MAGAZINE[1],MAGAZINE[2]
+    box(stage,path+"/Stand",(px,py,(pz-.12)/2),(.10,.10,pz-.12),BRUSHED)
+    # Nut presenter: five outlets on the stud pattern facing up, filled for one wheel per pick.
+    # The head comes down with cell_motion.FACE_DOWN, so socket (sx, sy) lands on (px+sx, py-sy).
+    box(stage,path+"/Cassette",(px,py,pz-.065),(.17,.17,.11),PANEL)
     for i,(sx,sy) in enumerate(SOCKET_LAYOUT):
-        cylinder(stage,path+f"/Outlet_{i}",(px+sx,py-side*.018,pz+side*sy),.020,.041,BRUSHED,"Y")
+        cylinder(stage,path+f"/Outlet_{i}",(px+sx,py-sy,pz-.018),.020,.041,BRUSHED,"Z")
 
 
 def dock_clamps(stage, root, dock, release, *, base_x=0., prefix="DockClamp"):

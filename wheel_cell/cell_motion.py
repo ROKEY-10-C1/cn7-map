@@ -19,13 +19,16 @@ PARK = np.deg2rad([0, -30, -65, 0, -130, 0])
 GRIP_CENTRE = .32
 # Mount: jaws open on the hub this long after the seat time (they close at process.GRIP_AT).
 RELEASE_AT = .6
+RETREAT_OUT, RETREAT_UP = .45, .30   # m: mount arm backs off along the axle, then rises, before parking
 # Fasten: sockets take the five nuts at this offset from the tighten time.
 NUT_PICK_AT = -2.0
 # Compact five-spindle head of map_fasten (TOOL_LENGTH, flange to socket tip; e32662d, 2026-11-27).
 HEAD_LENGTH = .235
 NUT_ADVANCE = 5*PITCH
-# Nut presenter pocket (socket tips meet it), beside the fastening arm, clear of the car and AMR.
-MAGAZINE = (FASTEN_BASE_X+.90, 1.45, 1.135)
+# Nut presenter pocket (socket tips meet it), on the robot's own line beside the fastening arm
+# (downstream, the arm's left facing the car), nuts facing up: well clear of the car and AMR.
+# Was (FASTEN_BASE_X+.90, 1.45, 1.135) facing the car, 0.5 m off the body side at stop B (2026-11-28).
+MAGAZINE = (FASTEN_BASE_X+.90, ROBOT_BASE_Y, .95)
 # Flange orientations as columns (x, y, z) in the world frame.
 FACE_DOWN = np.array([[1., 0, 0], [0, -1, 0], [0, 0, -1]])
 # Left-arm IK seed for picking: J1 turned round to the feed belt behind the robot, elbow up.
@@ -95,6 +98,10 @@ def mount_keys(side, seat, wheel):
             (seat, grip(hub, car)),
             (seat+RELEASE_AT, grip(hub, car)),
             (seat+1.4, grip(hub+.15*out, car)),
+            # Straight out along the axle, then up, before the joint-space move to PARK: from 0.15 m out
+            # that move swept the jaws through the front fender (113 mm into the body at stop A).
+            (seat+2.2, grip(hub+RETREAT_OUT*out, car)),
+            (seat+2.9, grip(hub+RETREAT_OUT*out+(0, 0, RETREAT_UP), car)),
             (seat+MOUNT_CLEAR, None)]
 
 
@@ -104,8 +111,8 @@ def fasten_keys(side, tight):
     out = LAYOUT.work_hub_y+NUT_SEAT+NUT_LENGTH+NUT_ADVANCE+HEAD_LENGTH
     at = lambda y: ((FASTEN_HUB_X, side*y, LAYOUT.work_hub_z), car)
     mx, my, mz = MAGAZINE
-    pocket = ((mx, side*(my+HEAD_LENGTH), mz), car)
-    clear = ((mx, side*(my+HEAD_LENGTH+.10), mz), car)
+    pocket = ((mx, side*my, mz+HEAD_LENGTH), FACE_DOWN)   # sockets straight down onto the nuts
+    clear = ((mx, side*my, mz+HEAD_LENGTH+.10), FACE_DOWN)
     return [(tight-5.0, None), (tight-2.6, clear), (tight+NUT_PICK_AT, pocket), (tight-1.4, clear),
             (tight+1.94, at(out+.08)), (tight+NUT_ENGAGE, at(out)),
             (tight+NUT_ENGAGE+NUT_DRIVE, at(out-NUT_ADVANCE)),
