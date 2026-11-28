@@ -7,8 +7,13 @@ through the -x side (J1 hard stop is straight back) standing the wheel up -> via
 tire then moves into the stop. Car: kinematic at dock A (front hub at process.MOUNT_HUB_X), the AMR parked under
 it; the AMR docking physics is not run.
 
+--process (2026-11-28): the main process instead of the parked car. The AMR brings the car from the gate and docks
+at A (floor clamps closed, lift up); both robots mount the front wheels; the AMR indexes 2.720 m to B with the
+front wheels hanging on the studs; both robots mount the rear wheels from the same belt-end stops; the AMR goes on
+to C and out the front. Fastening has no physics yet: the B->C and C->exit moves get probe completion signals.
+
 Usage:  ~/isaacsim/python.sh wheel_mount_sim/cell_mount_run.py [--seed N] [--side both|left|right] [--basic]
-                                                              [--no-video] [--gui] [--out DIR]
+                                                              [--no-video] [--gui] [--out DIR] [--process]
 (the cycle-time profile is the default; --basic is the slow commissioning profile)
 Writes output/cell/<run>/summary.json, events.jsonl and overview/left/hub_left .gif (+ .mp4 when available).
 """
@@ -37,8 +42,14 @@ ap.add_argument("--diag", action="store_true", help="per-step contact logging (s
 ap.add_argument("--diag-awake", action="store_true", help="keep wheels awake (contact reports after release)")
 ap.add_argument("--replay", default=None, metavar="RUN_DIR",
                 help="play a finished run (its replay.npz) in the Isaac Sim window at exactly real time, no physics")
-ap.add_argument("--t-max", type=float, default=120., help="simulated seconds before giving up")
+ap.add_argument("--t-max", type=float, default=None, help="simulated seconds before giving up (120, --process 300)")
+ap.add_argument("--process", action="store_true",
+                help="AMR docks at A, front wheels mounted, index to B, rear wheels mounted, C, exit")
+ap.add_argument("--keep-going", action="store_true",
+                help="--process demo: go on to B, C and the exit even when a wheel is not seated (results still logged)")
 args = ap.parse_args()
+if args.t_max is None:
+    args.t_max = 300. if args.process else 120.
 if args.replay:
     args.gui, args.no_video = True, True
 FAST = not args.basic                  # cycle-time profile (docs/GOALS.md section 1) is the default
@@ -153,7 +164,8 @@ def park_car_at_dock():
     cell.carrier.step = lambda api, dt: None          # no AMR traction, lift or clamp commands
 
 
-park_car_at_dock()
+if not args.process:                   # --process: the AMR brings the car and docks it (Carrier, clamps)
+    park_car_at_dock()
 if "--diag" in sys.argv:                 # contact reports cost time in the cell's per-step contact loop
     for prim in Usd.PrimRange(stage.GetPrimAtPath("/World/Live/MountSim")):
         if prim.HasAPI(UsdPhysics.RigidBodyAPI) or prim.GetName().startswith(("link", "Tool", "Jaw")):
@@ -753,10 +765,96 @@ class MountSide:
 front = {s.side: s for s in cell.stations if s.hub[0] > 0}
 sides = [(lab, info) for lab, info in cell.mount_arms.items()
          if args.side == "both" or args.side == lab.lower()]
-units = [MountSide(lab, info, front[info["side"]]) for lab, info in sides]
+rear = {s.side: s for s in cell.stations if s.hub[0] < 0}
+units = [MountSide(lab+("_front" if args.process else ""), info, front[info["side"]]) for lab, info in sides]
 gens = [u.run() for u in units]
 for u in units:
     u.command()
+proc = dict(done=not args.process, result="incomplete")
+
+
+def proc_event(name, **kv):
+    e = dict(t=round(t_sim[0], 3), side="AMR", event=name, **kv)
+    events.append(e)
+    event_log.write(json.dumps(e, default=float)+"\n")
+    event_log.flush()
+    print("EVENT", json.dumps(e, default=float), flush=True)
+
+
+def amr_x():
+    return round(float(cell.api.get_rigidbody_transformation(cell.carrier.path)["position"][0]), 4)
+
+
+def run_units(us):
+    gs = [u.run() for u in us]
+    while not all(u.phase == "done" or u.result.startswith("stopped") for u in us):
+        for g in gs:
+            next(g)
+        yield
+
+
+def carried(tag, us):
+    """Hung wheels after an AMR move: still on the studs (gap, radial offset and tilt to the hub)."""
+    for u in us:
+        rel, tilt = u.seat()
+        u.event(tag, radial_mm=round(float(np.hypot(rel[0], rel[1]))*1000, 3))
+
+
+HANG_GAP = .010    # m: the process goes on while each wheel still hangs on the pilot (12 mm) and the studs. The
+                   # params.MOUNTED limit (2 mm, 2 deg) is kept as each unit's result; the cell itself (car parked at
+                   # A, no --process) releases at 2.1-2.2 mm / 1.5 deg on seed 42 (base1, 2026-11-28).
+
+
+def hung(tag, us):
+    for u in us:
+        if u.result.startswith("stopped"):
+            raise StopSide(f"{tag} {u.label}: {u.result}")
+        rel, _ = u.seat()
+        if rel[2] > HANG_GAP and not args.keep_going:
+            raise StopSide(f"{tag} {u.label}: wheel off the hub, gap {rel[2]*1000:.1f} mm")
+
+
+def index(completed, tag):
+    while not cell.advance_amr(completed=completed, robots_clear=True, load_secured=True):
+        if t_sim[0] > args.t_max-1:
+            raise StopSide(f"index to {tag} refused (stop {cell.amr_stop}, interference {cell.interference[:1]})")
+        yield
+    proc_event(f"index_{tag}", amr_x=amr_x())
+    while cell.amr_index_pending:
+        yield
+    proc_event(f"stopped_{tag}", amr_x=amr_x(), stop=cell.amr_stop)
+
+
+def process_run():
+    try:
+        while not cell.carrier.ready:              # gate -> dock A, clamps closed, lift at the work height
+            yield
+        proc_event("docked_A", amr_x=amr_x())
+        yield from run_units(units)
+        hung("front", units)
+        yield from index({"front_mounted"}, "B")
+        carried("carried_to_B", units)
+        rear_units = [MountSide(lab+"_rear", info, rear[info["side"]]) for lab, info in sides]
+        front_units = list(units)
+        units.extend(rear_units)
+        yield from run_units(rear_units)
+        hung("rear", rear_units)
+        # fastening has no physics here: probe completion signals for the two remaining moves
+        yield from index({"front_fastened", "rear_mounted"}, "C")
+        carried("carried_to_C", front_units+rear_units)
+        yield from index({"rear_fastened"}, "exit")
+        carried("carried_to_exit", front_units+rear_units)
+        proc["result"] = "done"
+    except StopSide as exc:
+        proc["result"] = f"stopped: {exc}"
+        print("ERROR process", exc, flush=True)
+    proc["done"] = True
+    while True:
+        yield
+
+
+if args.process:
+    gens = [process_run()]
 
 
 def sync_proxies():
@@ -789,6 +887,9 @@ REC_PATHS = [str(p.GetPath()) for p in Usd.PrimRange(stage.GetPrimAtPath("/World
              if p.HasAPI(UsdPhysics.RigidBodyAPI)]
 for s in cell.stations:
     REC_PATHS += [s.wheel, s.tire]
+if args.process:                       # the whole moving cell: car, AMR deck and lift, locators, clamps, hub corners
+    REC_PATHS += [str(p.GetPath()) for p in Usd.PrimRange(stage.GetPrimAtPath(ROOT))
+                  if p.HasAPI(UsdPhysics.RigidBodyAPI) and str(p.GetPath()) not in REC_PATHS]
 rec_t, rec_pose = [], []
 
 
@@ -884,7 +985,8 @@ if writers:
 prof = dict(control=0., physics=0., diag=0., render=0.)
 wall0 = time.perf_counter()
 try:
-    while t_sim[0] < args.t_max and not all(u.phase == "done" or u.result.startswith("stopped") for u in units):
+    while t_sim[0] < args.t_max and not (proc["done"] if args.process else
+                                         all(u.phase == "done" or u.result.startswith("stopped") for u in units)):
         t0_ = time.perf_counter()
         for gen in gens:
             next(gen)
@@ -970,7 +1072,8 @@ for s in cell.stations:
                              across_mm=round(float(p[1]-s.side*L.LINE_Y)*1000, 2))
 for u in units:
     (OUT/f"trace_{u.label}.json").write_text(json.dumps(u.trace))
-summary = dict(results={u.label: u.result for u in units}, seed=args.seed, fast=FAST, speed=SPEED,
+summary = dict(results={u.label: u.result for u in units}, process=proc["result"] if args.process else None,
+               seed=args.seed, fast=FAST, speed=SPEED,
                sim_time_s=round(t_sim[0], 2), next_tires=queue, events=events)
 (OUT/"summary.json").write_text(json.dumps(summary, indent=1, default=float))
 if rec_t:

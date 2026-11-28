@@ -34,6 +34,13 @@ MOUNT_CAMS=zoom_left,zoom_right ~/isaacsim/python.sh wheel_mount_sim/mount_contr
 ~/isaacsim/python.sh wheel_mount_sim/cell_mount_run.py --gui        # 계산하면서 보기: 이 PC에서는 실제의 약 0.4-0.7배 속도
 ```
 
+공정 연결(`--process`, 2026-11-28): AMR이 게이트에서 차를 싣고 A에 도킹(클램프·리프트) → 좌우 전륜 장착 → B 전진(걸린 휠 유지 측정) → 좌우 후륜 장착 → C → 출차. 체결은 물리가 없어 시험용 완료 신호로 넘어간다. 셀 전체를 기록하므로 `--process --replay 실행폴더`로 처음부터 재생한다. 2026-11-28 기준 공정 모드에서는 파일럿 끝 9 mm 걸림과 놓은 뒤 빠짐이 재현돼 전륜 단계에서 멈추는 경우가 있다(차 고정 모드는 좌우 mounted). 시연용 `--keep-going`은 휠이 덜 끼워져도 끝까지 진행한다.
+
+```bash
+~/isaacsim/python.sh wheel_mount_sim/cell_mount_run.py --process --no-video --out wheel_mount_sim/output/cell/proc1
+~/isaacsim/python.sh wheel_mount_sim/cell_mount_run.py --process --replay wheel_mount_sim/output/cell/proc1
+```
+
 셀은 바퀴 4개의 트레드 충돌체(각 545개) 때문에 물리 계산만으로 실제 시간의 약 0.9배가 걸린다.
 그래서 모든 실행이 움직이는 물체 30개의 위치를 초당 30번 `replay.npz`에 기록하고, `--replay`는 물리 없이
 벽시계에 맞춰 그 기록을 그린다. 결과(접촉·힘)는 계산 실행의 `summary.json`이 기준이다.
